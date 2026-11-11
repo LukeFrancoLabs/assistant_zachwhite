@@ -1,0 +1,69 @@
+{
+  "_help": "The built-in text messages, with <tokens> where the sender's details go. Made by share/build-package.js for Settings > T: not meant to be edited.",
+  "texts": {
+    "1": {
+      "name": "Essentials Promo",
+      "text": "Hey its <first name> at Housecall Pro. We still have the $26 promo to get started and no contracts. Are you where you want to be this year? Call me at <call number> or reply here to get started!"
+    },
+    "2": {
+      "name": "Max Plan Promo",
+      "text": "Hey its <first name> at Housecall Pro. We are running a Max plan promo right now, $99/mo for the first 3 months, no contracts. Want to see what Max can do for your business? Call me at <call number> or reply here to get started!"
+    },
+    "3": {
+      "name": "Special Offer",
+      "text": "Special Offer this week only at Housecall Pro: Sign up for the Max plan at a promotional rate of $99/mo for the first 3 months and recieve a $100 amazon gift card!"
+    },
+    "4": {
+      "name": "HCP Full Stack Promo",
+      "text": "Hey! If you're still considering Housecall Pro for your business, we can get you started for just $26 for your first month! Alongside our streamlining abilities, we also partner with Google Local Services for top page visibility & high-converting leads, + a free $100 Thumbtack credit and a $50 Amazon gift card. . Reply \"Y\" if interested. Thanks again! - <first name> @ HCP"
+    },
+    "5": {
+      "name": "Respectful Follow-Up",
+      "text": "Hey, <first name> here with Housecall Pro. I know our team has reached out a few times. Is finding a new system still on your radar, or would you prefer we leave it here for now? Either way, happy to respect your timing."
+    },
+    "6": {
+      "name": "Re-Engagement $26 + $100 Amazon",
+      "text": "Hey its <first name> at Housecall Pro reaching back out to see if now is a better time to try out our all in one platform to help you make money and save time everyday. We can also help you rank higher on Google so more customers find you. We still have the promo that gives you the first month for only $26 and a $100 amazon gift card! Reply Y if you want to give us a shot or call me at <call number>"
+    },
+    "7": {
+      "name": "Key Accounts Re-Engagement (Max $99 + $50 Amazon)",
+      "text": "Hey, you met with our Key Accounts team earlier this year and we wanted to see if now is a better time to try out Housecall Pro at a discounted rate for the first 3 months. You get unlimited users for only $99 on the Max plan and a $50 amazon gift card! We have no contracts and we are ready to partner with you to grow the business and streamline operations."
+    },
+    "8": {
+      "name": "Follow-Up 1",
+      "text": "Just checking in, are you ready to get started with Housecall Pro? Remember, you get a $100 amazon giftcard after your 2nd onboarding session with us and the first month is only $26 with no contracts!\n\n- <full name> at HCP\n<call number>"
+    },
+    "9": {
+      "name": "Book A Demo",
+      "text": "Book a demo: <booking link>"
+    },
+    "10": {
+      "name": "Account Idea + Book A Demo",
+      "text": "Hey, it’s <first name> at Housecall Pro! I was looking at your account and had an idea to help you grow your business.\n\nI’d love to show you how our marketing campaigns and Pipeline tool work together to automate lead follow-up and help you win more jobs. Get started for $26 for your first month, plus the Amazon gift card and Thumbtack and Yelp lead credits. We’ll help you build systems that keep your business moving.\n\nCall me: <call number>\nBook a demo: <booking link>"
+    },
+    "11": {
+      "name": "Connect Tomorrow",
+      "text": "Do you have 15 minutes to connect tomorrow on how we can help you win more jobs? Book here: <booking link>\n\n* <first name> at HCP <call number>"
+    },
+    "12": {
+      "name": "Drip: Online Booking",
+      "text": "Hey, it's <first name> at Housecall Pro. Quick one: online booking lets customers book a job straight from your website or Google, and you get an alert right away when it comes in. No phone tag, no lost leads. Want to see how it would work for your business? <booking link>"
+    },
+    "13": {
+      "name": "Drip: Pipeline Follow-Up",
+      "text": "<first name> at Housecall Pro again. A lot of quotes go cold because nobody followed up, not because the customer said no. Pipeline keeps every lead and estimate in one view and sends the follow-ups for you. Want to see it on your own estimates? <booking link>"
+    },
+    "14": {
+      "name": "Drip: Get Paid + Financing",
+      "text": "<first name> at Housecall Pro. Bigger jobs stall when the customer can't pay all at once. With Housecall Pro you get paid on the spot by card, ACH, or financing, and in the 2026 homeowner survey 62% were more likely to book when financing was offered. Want to see how it works? <booking link>"
+    },
+    "15": {
+      "name": "Game Plan 2027",
+      "text": "Book 30 mins here and I will create you a custom game plan for growth in 2027: <booking link>\n\n- <full name> at Housecall Pro \n<call number>"
+    },
+    "16": {
+      "name": "Drip: Time Saved",
+      "text": "I know you were probably slammed yesterday (and everyday) but thats exactly why we are here to help at Housecall Pro. On average businesses owners save 8.5 hours a week when they partner with us. \n\nIs $26 for the first month worth over 40 hours of saved time for you per month?"
+    }
+  }
+}

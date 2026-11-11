@@ -1,0 +1,7 @@
+{
+  "shark": {
+    "name": "T14 Shark List All",
+    "kind": "Shark",
+    "url": "PASTE THE SALESFORCE REPORT URL HERE (https://housecallpro.lightning.force.com/lightning/r/Report/<id>/view?queryScope=userFolders)"
+  }
+}

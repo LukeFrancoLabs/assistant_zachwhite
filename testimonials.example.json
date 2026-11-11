@@ -1,0 +1,12 @@
+[
+  {
+    "id": "example-plumber-1",
+    "_placeholder": true,
+    "trade": "plumber",
+    "name": "EXAMPLE NAME (replace)",
+    "business": "EXAMPLE BUSINESS (replace)",
+    "quote": "EXAMPLE QUOTE: replace with a real, approved testimonial in the customer's own words.",
+    "features": ["online booking", "invoicing"],
+    "result": "EXAMPLE RESULT: replace, or leave empty if there is no measurable result."
+  }
+]

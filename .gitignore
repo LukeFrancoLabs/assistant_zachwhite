@@ -1,0 +1,54 @@
+# Pipeline Assistant writes customer and login data while it runs. None of it belongs in the repository.
+
+# The Chrome profiles the tool drives: they hold the Salesforce login (cookies)
+.browser-profile*
+
+# Everything it logs about the people it contacted or looked at: texted and emailed logs, bans, customer holds, notes, zones, plans, queues and more (all append-only .jsonl)
+*.jsonl
+
+# Per-rep settings and run state written by the setup screen and the modes. sender.json holds the rep's name, numbers and booking link.
+# (The *.example.json files ARE tracked: they are the templates for these.)
+/sender.json
+/text-templates.json
+/auto-config.json
+/coaching-policy.json
+/report-modes.json
+/email-industry.json
+/testimonials.json
+/released-customers.json
+/lds-review.json
+/text-queue.json
+/xref-today.json
+/board-status.json
+/evening-config.json
+/evening-queue.json
+/evening-status.json
+/follow-up-cadence.json
+/run.json
+/workflow-diagram.json
+/*.csv
+
+# Generated pages and debug captures (dashboards, screenshots of account pages)
+/texted-dashboard.html
+/instructions.html
+/pipeline-diagram.html
+/index.html
+/outreach-dashboard/
+/compose-failures/
+/email-debug/
+/report-probe/
+
+# Locks, temp and log files
+*.lock
+*.tmp
+*.new
+*.pid
+*.log
+
+# Dependencies and machine files
+node_modules/
+.env
+.env.*
+.DS_Store
+.claude/
+*.zip

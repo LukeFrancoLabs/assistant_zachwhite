@@ -1,0 +1,5 @@
+{
+  "_help": "What the 'Which email?' menu shows, in this order. Each entry is an email's key from email-templates.json, or \"built-in\" for the 'HCP re-engagement (first touch)' email. An email that is not listed is not in the menu, but it stays in email-templates.json (the follow-up board sends csr-ai, past-customers and why-now by name) and can still be named with --email-template. After the list comes the last choice, 'Type your own subject line & email (no signature needed)'; set typeYourOwn to false to take it out. Delete this file to get every email, the built-in one first.",
+  "menu": ["day-after-demo", "research-reengage", "csr-ai", "why-now"],
+  "typeYourOwn": true
+}

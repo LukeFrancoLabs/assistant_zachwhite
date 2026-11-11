@@ -1,0 +1,15 @@
+{
+  "_readme": "Copy to email-industry.json. Keys are industry.js labels. 'default' is used when the industry is unknown or has no entry. 'block' is the text that replaces {{industryBlock}} in the email (tokens like {{business}} work inside it). Leave a block empty to add nothing. Only real, approved material: a block starting with EXAMPLE is refused at send time.",
+  "default": {
+    "block": ""
+  },
+  "HVAC": {
+    "block": "EXAMPLE: replace with a real one-liner + link (one-pager / case study) for HVAC pros."
+  },
+  "Plumbing": {
+    "block": "EXAMPLE: replace with a real one-liner + link (one-pager / case study) for Plumbing pros."
+  },
+  "Cleaning": {
+    "block": "EXAMPLE: replace with a real one-liner + link (one-pager / case study) for Cleaning pros."
+  }
+}
