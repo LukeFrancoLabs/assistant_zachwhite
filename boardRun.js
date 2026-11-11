@@ -211,7 +211,7 @@ function stageChoices(sum, names, flags, copyFor) {
   return sum.per.map((p, i) => {
     const s = p.stage;
     const other = flags.textsOnly && s.ch !== 'text' ? '--texts-only' : flags.emailsOnly && s.ch !== 'email' ? '--emails-only' : null;
-    const why = s.byHand ? `${s.label} is done by hand (email --same-day): the board never sends it.` : !copyFor(s) ? `${s.label} has no ${s.ch} written yet, so it is held: nothing can go out for it.`
+    const why = s.byHand ? `${s.label} is done by hand: the board never sends it.` : !copyFor(s) ? `${s.label} has no ${s.ch} written yet, so it is held: nothing can go out for it.`
       : other ? `${s.label} is ${s.ch === 'email' ? 'an email' : 'a text'} stage and this run has ${other}.`
       : p.ready + p.later === 0 ? `nobody can go out for ${s.label} today (none ready now, none later today).`
       : null;
@@ -346,14 +346,14 @@ function printTable(sum, cfg, copyNames) {
   if (tot('blocked')) notRun.push(`${num(tot('blocked'))} waiting for copy that is not written yet`);
   console.log(`\n     Finished all ${cfg.stages.length} stages: ${num(sum.finished)} · not run today: ${notRun.length ? notRun.join(' · ') : 'none'}`);
   if (sum.noAddress) console.log(`     ✉️ ${num(sum.noAddress)} lead(s) have no email address (the sender found none): their email stages are skipped and the texts go on`);
-  for (const s of cfg.stages) if (s.byHand) console.log(`     ✋ ${s.label} is done by hand (email --same-day): the board never sends it, and a lead counts as having had it once it has had Text 1.`);
+  for (const s of cfg.stages) if (s.byHand) console.log(`     ✋ ${s.label} is done by hand: the board never sends it, and a lead counts as having had it once it has had Text 1.`);
   { const man = cfg.stages.filter((s) => s.manual && !s.byHand), them = man.length > 1 ? 'them' : 'it'; if (man.length) console.log(`     ✋ ${man.map((s) => s.label).join(' and ')} ${man.length > 1 ? 'are' : 'is'} marked BY HAND too (Day 1 is all done by hand). That is a label only: the board still sends ${them} to the leads waiting at ${them} when a run picks ${man.length > 1 ? 'those stages' : 'that stage'}.`); }
   if (sum.replied) console.log(`     💬 ${num(sum.replied)} lead(s) have replied and stay in the cadence: only a "not interested" takes a lead out (the interested ones are on the dashboard's 🎯 Top hit list: node topHit.js)`);
 }
 
 /** → the lines of copy names per stage, for the table. */
 function copyNamesOf(cfg, templates, emailSteps) {
-  return cfg.stages.map((s) => { if (s.byHand) return 'BY HAND (--same-day): the board skips it'; const c = cadence.copyOf(s, templates, emailSteps); const base = c ? (c.email ? `email touch ${c.touch}: ${c.name}` : `"${c.name}"`) : 'NOT WRITTEN YET (held)'; return s.manual ? `${base}  ✋ BY HAND (Day 1: you do it; the board still sends it if picked)` : base; });
+  return cfg.stages.map((s) => { if (s.byHand) return 'BY HAND: the board skips it'; const c = cadence.copyOf(s, templates, emailSteps); const base = c ? (c.email ? `email touch ${c.touch}: ${c.name}` : `"${c.name}"`) : 'NOT WRITTEN YET (held)'; return s.manual ? `${base}  ✋ BY HAND (Day 1: you do it; the board still sends it if picked)` : base; });
 }
 
 /**

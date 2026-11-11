@@ -7,6 +7,9 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Flags this version of Assistant does not have (--same-day / --today, --nocheck / --no-review / --no-check): Assistant.js refuses them before anything starts, so no Chrome is started (or closed) for them first.
+for a in "$@"; do case "$a" in --same-day|--today|--nocheck|--no-review|--no-check) exec node Assistant.js "$@" ;; esac; done
+
 # No flags = the EMAIL campaign (Pipeline Assistant opens on its welcome screen). Every flag works exactly as before: `email --text` is the text campaign, `email --board` the board, and so on.
 # --test (a practice run on your own list, always a dry run) and --dry-run do not name a campaign either, so `email --test` and `email --dry-run` are the email campaign too. So is `email --no-auto` (it only says: pick a template instead of writing each email from the account's notes).
 # Done HERE, before the port is picked below, so the email browser (9324) is the one started.
