@@ -2788,9 +2788,10 @@ function pageReadRows() {
     const hrefOf = (a) => a.getAttribute('href') || '';
     const acct = links.find((a) => /\/lightning\/r\/Account\/001/.test(hrefOf(a))) || links.find((a) => /\/Account\/001/.test(hrefOf(a))) || links.find((a) => ID.test(hrefOf(a)));
     const m = acct ? hrefOf(acct).match(ID) : null;
-    // Split-view sidebar rows often link the Opportunity (006) only — still count the row so the harvest total matches the list header; accountId stays null until an Account link exists.
-    const opp = !m && links.find((a) => OPP.test(hrefOf(a)));
-    const key = r.getAttribute('data-row-key-value') || r.getAttribute('data-row-number') || hrefOf(links[0]) || (opp ? hrefOf(opp) : '') || (r.textContent || '').trim().slice(0, 80);
+    // Prefer Opportunity id (006) / data-row-key-value as the stable key — virtual lists recycle DOM nodes, so textContent keys collide across scrolls.
+    const oppLink = links.find((a) => OPP.test(hrefOf(a)));
+    const oppId = oppLink ? (hrefOf(oppLink).match(OPP) || [])[1] : null;
+    const key = r.getAttribute('data-row-key-value') || oppId || r.getAttribute('data-row-number') || (m ? m[1] : null) || hrefOf(links[0]) || (r.textContent || '').trim().slice(0, 80);
     if (!key || seenKey.has(key)) continue;
     seenKey.add(key);
     out.push({ key, accountId: m ? m[1] : null, name: acct ? (acct.textContent || '').trim().replace(/Edit Account Name/gi, '').trim() : null });
@@ -2799,75 +2800,74 @@ function pageReadRows() {
 }
 
 /**
- * Find the Salesforce list-view scroller (split-view sidebar first — that is what lazy-loads more rows —
- * then the datatable / virtual list, then the nearest scrolling ancestor of a visible row).
- * Runs in the page. → { el, box } or null.
+ * Runs IN THE PAGE (passed whole to page.evaluate): locate scroll panes that contain
+ * Opportunity/Account row links — never the left app nav. reset=true scrolls the best one to top.
+ * → { x, y, h, scrollTop, scrollHeight, clientHeight, links } or null.
  */
-function pageFindListScroller(resetTop) {
+function pageScrollTargetInPage(reset) {
   const deepAll = (root, sel, out) => {
     try { root.querySelectorAll(sel).forEach((e) => out.push(e)); } catch (_) {}
     for (const el of root.querySelectorAll('*')) if (el.shadowRoot) deepAll(el.shadowRoot, sel, out);
     return out;
   };
   const up = (el) => el.parentElement || (el.getRootNode && el.getRootNode().host) || null;
+  const ROW_SEL = 'table[role="grid"] tbody tr, div[role="row"], li[role="option"], .slds-split-view__list-item';
+  const LINK_SEL = 'a[href*="/Account/"], a[href*="/Opportunity/"], a[href*="/001"], a[href*="/006"]';
   const isScrollable = (el) => {
     if (!el || !el.getBoundingClientRect) return false;
     try {
       const cs = getComputedStyle(el);
-      if (!/(auto|scroll)/.test(cs.overflowY)) return false;
-      // Virtual lists often have scrollHeight ≈ clientHeight until they load more; still usable if they have a visible height.
+      if (!/(auto|scroll)/.test(cs.overflowY) && !/(auto|scroll)/.test(cs.overflow)) return false;
       return el.clientHeight > 40;
     } catch (_) { return false; }
+  };
+  const rowLinksIn = (el) => {
+    try { return deepAll(el, LINK_SEL, []).filter((a) => a.getClientRects && a.getClientRects().length).length; }
+    catch (_) { return 0; }
   };
   const score = (el) => {
     if (!el) return -1;
     const box = el.getBoundingClientRect();
     if (box.width < 40 || box.height < 40) return -1;
-    let s = 0;
-    const cls = `${el.className || ''} ${el.tagName || ''}`.toLowerCase();
-    // Prefer the split-view sidebar / list navigation pane (lazy-loads as you scroll it).
-    if (/split-view|splitview|list-view-manager|listviewmanager|forcevirtuallist|uiVirtualDataTable|virtualList/i.test(cls)) s += 50;
-    if (el.getAttribute && /listbox|grid/.test(el.getAttribute('role') || '')) s += 10;
-    if (box.left < innerWidth * 0.45) s += 20;      // left pane (split view) beats a wide main table
-    if (el.scrollHeight > el.clientHeight + 4) s += 15;
-    s += Math.min(box.height, 800) / 100;
+    const links = rowLinksIn(el);
+    if (links < 1) return -1;
+    let s = links * 20;
+    const cls = ((el.className && String(el.className)) || '') + ' ' + (el.tagName || '');
+    if (/nav|navigation|tabBar|utilityBar|oneAppNav|slds-nav-vertical|global-header|headerBar/i.test(cls)) s -= 500;
+    if (/split-view|splitview|list-view-manager|listviewmanager|forcevirtuallist|virtualList|uiVirtualDataTable|scrollerWrapper|scrollable_y/i.test(cls)) s += 40;
+    if (el.getAttribute && /listbox|grid/.test(el.getAttribute('role') || '')) s += 15;
+    if (el.scrollHeight > el.clientHeight + 4) s += 25;
+    s += Math.min(box.height, 900) / 80;
     return s;
   };
   const preferredSels = [
-    '.slds-split-view .slds-scrollable_y',
-    '.slds-split-view .slds-scrollable',
-    '.slds-split-view_container .slds-scrollable_y',
-    '.slds-split-view_container .slds-scrollable',
+    '.slds-split-view .slds-scrollable_y', '.slds-split-view .slds-scrollable',
+    '.slds-split-view_container .slds-scrollable_y', '.slds-split-view_container .slds-scrollable',
     '.slds-split-view__list-container',
-    'force-list-view-manager-grid .slds-scrollable',
-    '.forceListViewManager .slds-scrollable',
-    '.forceVirtualListview',
-    '.forceVirtualTreeGrid',
-    'lightning-datatable .slds-scrollable',
-    '.slds-table_container',
-    '[role="grid"]',
+    'lst-list-view-manager .slds-scrollable_y', 'lst-list-view-manager .slds-scrollable',
+    'force-list-view-manager-grid .slds-scrollable', '.forceListViewManager .slds-scrollable',
+    '.forceVirtualListview', '.forceVirtualTreeGrid',
+    'lightning-datatable .slds-scrollable_y', 'lightning-datatable .slds-scrollable',
+    '.slds-table_container', '.slds-scrollable_y', '.slds-scrollable', '[role="grid"]',
   ];
-  let best = null, bestScore = -1;
-  for (const sel of preferredSels) {
-    for (const el of deepAll(document, sel, [])) {
-      if (!isScrollable(el) && !(el.scrollHeight > el.clientHeight + 4)) continue;
-      const sc = score(el);
-      if (sc > bestScore) { best = el; bestScore = sc; }
-    }
+  const all = [];
+  const seen = new Set();
+  const consider = (el) => {
+    if (!el || seen.has(el)) return;
+    if (!isScrollable(el) && !(el.scrollHeight > el.clientHeight + 4)) return;
+    if (score(el) < 0) return;
+    seen.add(el);
+    all.push(el);
+  };
+  for (const sel of preferredSels) deepAll(document, sel, []).forEach(consider);
+  for (const row of deepAll(document, ROW_SEL, [])) {
+    if (!row.getClientRects().length || !row.querySelector(LINK_SEL)) continue;
+    let el = up(row);
+    while (el) { consider(el); el = up(el); }
   }
-  // Fallback: nearest scrolling ancestor of a visible data row.
-  if (!best) {
-    const row = deepAll(document, 'table[role="grid"] tbody tr, div[role="row"], li[role="option"], .slds-split-view__list-item', [])
-      .find((r) => r.getClientRects().length && (r.querySelector('a[href]') || r.querySelector('[href]')));
-    if (row) {
-      let el = up(row);
-      while (el) {
-        if (isScrollable(el) || (el.scrollHeight > el.clientHeight + 4)) { best = el; break; }
-        el = up(el);
-      }
-    }
-  }
-  if (resetTop) {
+  all.sort((a, b) => score(b) - score(a));
+  const best = all[0] || null;
+  if (reset) {
     if (best) best.scrollTop = 0;
     else window.scrollTo(0, 0);
   }
@@ -2881,128 +2881,188 @@ function pageFindListScroller(resetTop) {
     scrollTop: Math.round(best.scrollTop || 0),
     scrollHeight: Math.round(best.scrollHeight || 0),
     clientHeight: Math.round(best.clientHeight || 0),
+    links: rowLinksIn(best),
   };
 }
 
-/** Where the list scrolls: split-view sidebar / list manager first, then the grid. resetTop = scroll it back to the top first. → { x, y, h, … } or null. */
+/**
+ * Runs IN THE PAGE: scroll every list scroller that holds row links, bring the last row into view,
+ * focus the grid. → coords for a follow-up mouse wheel (no click — clicking opens the record).
+ */
+function pageScrollStepInPage() {
+  const deepAll = (root, sel, out) => {
+    try { root.querySelectorAll(sel).forEach((e) => out.push(e)); } catch (_) {}
+    for (const el of root.querySelectorAll('*')) if (el.shadowRoot) deepAll(el.shadowRoot, sel, out);
+    return out;
+  };
+  const up = (el) => el.parentElement || (el.getRootNode && el.getRootNode().host) || null;
+  const ROW_SEL = 'table[role="grid"] tbody tr, div[role="row"], li[role="option"], .slds-split-view__list-item';
+  const LINK_SEL = 'a[href*="/Account/"], a[href*="/Opportunity/"], a[href*="/001"], a[href*="/006"]';
+  const isScrollable = (el) => {
+    if (!el || !el.getBoundingClientRect) return false;
+    try {
+      const cs = getComputedStyle(el);
+      if (!/(auto|scroll)/.test(cs.overflowY) && !/(auto|scroll)/.test(cs.overflow)) return false;
+      return el.clientHeight > 40;
+    } catch (_) { return false; }
+  };
+  const rowLinksIn = (el) => {
+    try { return deepAll(el, LINK_SEL, []).filter((a) => a.getClientRects && a.getClientRects().length).length; }
+    catch (_) { return 0; }
+  };
+  const score = (el) => {
+    if (!el) return -1;
+    const box = el.getBoundingClientRect();
+    if (box.width < 40 || box.height < 40) return -1;
+    const links = rowLinksIn(el);
+    if (links < 1) return -1;
+    let s = links * 20;
+    const cls = ((el.className && String(el.className)) || '') + ' ' + (el.tagName || '');
+    if (/nav|navigation|tabBar|utilityBar|oneAppNav|slds-nav-vertical|global-header|headerBar/i.test(cls)) s -= 500;
+    if (/split-view|splitview|list-view-manager|listviewmanager|forcevirtuallist|virtualList|scrollerWrapper|scrollable_y/i.test(cls)) s += 40;
+    if (el.scrollHeight > el.clientHeight + 4) s += 25;
+    return s + Math.min(box.height, 900) / 80;
+  };
+  const preferredSels = [
+    '.slds-split-view .slds-scrollable_y', '.slds-split-view .slds-scrollable',
+    '.slds-split-view_container .slds-scrollable_y', '.slds-split-view_container .slds-scrollable',
+    '.slds-split-view__list-container',
+    'lst-list-view-manager .slds-scrollable_y', 'lst-list-view-manager .slds-scrollable',
+    'force-list-view-manager-grid .slds-scrollable', '.forceListViewManager .slds-scrollable',
+    '.forceVirtualListview', '.forceVirtualTreeGrid',
+    'lightning-datatable .slds-scrollable_y', 'lightning-datatable .slds-scrollable',
+    '.slds-table_container', '.slds-scrollable_y', '.slds-scrollable', '[role="grid"]',
+  ];
+  const scrollers = [];
+  const seen = new Set();
+  const consider = (el) => {
+    if (!el || seen.has(el)) return;
+    if (!isScrollable(el) && !(el.scrollHeight > el.clientHeight + 4)) return;
+    if (score(el) < 0) return;
+    seen.add(el);
+    scrollers.push(el);
+  };
+  for (const sel of preferredSels) deepAll(document, sel, []).forEach(consider);
+  for (const row of deepAll(document, ROW_SEL, [])) {
+    if (!row.getClientRects().length || !row.querySelector(LINK_SEL)) continue;
+    let el = up(row);
+    while (el) { consider(el); el = up(el); }
+  }
+  scrollers.sort((a, b) => score(b) - score(a));
+  const rows = deepAll(document, ROW_SEL, []).filter((r) => r.getClientRects().length && r.querySelector(LINK_SEL));
+  const lastRow = rows[rows.length - 1] || null;
+  if (lastRow) {
+    try { lastRow.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'instant' }); } catch (_) {
+      try { lastRow.scrollIntoView(false); } catch (__) {}
+    }
+  }
+  let moved = false, atBottom = false;
+  for (const el of scrollers) {
+    const before = el.scrollTop;
+    const stepPx = Math.max(120, Math.floor((el.clientHeight || 300) * 0.8));
+    el.scrollTop = before + stepPx;
+    el.dispatchEvent(new Event('scroll', { bubbles: true }));
+    try { el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: stepPx, deltaMode: 0 })); } catch (_) {}
+    if (el.scrollTop !== before) moved = true;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 2) atBottom = true;
+  }
+  const best = scrollers[0] || null;
+  const box = best ? best.getBoundingClientRect() : null;
+  let lastBox = null;
+  if (lastRow) {
+    const b = lastRow.getBoundingClientRect();
+    lastBox = { x: b.left + b.width / 2, y: Math.min(Math.max(b.top + b.height / 2, 8), innerHeight - 8) };
+  }
+  const grid = document.querySelector('table[role="grid"], [role="grid"]');
+  if (grid && grid.focus) try { grid.focus({ preventScroll: true }); } catch (_) {}
+  const top = box ? Math.max(box.top, 0) : 0;
+  const bottom = box ? Math.min(box.bottom, innerHeight) : innerHeight;
+  return {
+    moved,
+    atBottom,
+    candidates: scrollers.length,
+    lastBox,
+    x: box ? box.left + Math.min(box.width, Math.max(innerWidth - box.left, 0)) / 2 : (lastBox ? lastBox.x : innerWidth / 2),
+    y: box ? top + (bottom - top) / 2 : (lastBox ? lastBox.y : innerHeight / 2),
+    h: box ? Math.max(bottom - top, 100) : 400,
+    scrollTop: best ? Math.round(best.scrollTop || 0) : 0,
+    scrollHeight: best ? Math.round(best.scrollHeight || 0) : 0,
+    links: best ? rowLinksIn(best) : 0,
+  };
+}
+
+/** Where the list scrolls: only a pane that contains Account/Opportunity rows. resetTop scrolls it to the top. → { x, y, h, … } or null. */
 async function pageScrollTarget(page, resetTop = false) {
-  try { return await page.evaluate(pageFindListScroller, resetTop); } catch (_) { return null; }
+  try { return await page.evaluate(pageScrollTargetInPage, resetTop); } catch (_) { return null; }
 }
 
 /**
- * Physically scroll the open list view down one step the way a person does: move the last visible row into view,
- * bump the scroller's scrollTop, fire scroll + wheel events over the sidebar/grid, then PageDown.
- * Salesforce lazy-loads more rows only when that pane actually moves. → { moved, atBottom, … } or null.
+ * One advance of the open list view. Tries every strategy Salesforce actually responds to:
+ *   1) scrollIntoView on the last data row
+ *   2) bump scrollTop on EVERY scroller that contains row links (not the app nav)
+ *   3) real mouse wheel over the last row (no click — a click would open the record)
+ *   4) ArrowDown / PageDown / End on the focused grid
+ * → { moved, atBottom, … }
  */
-async function scrollListViewStep(page) {
+async function scrollListViewStep(page, { escalate = false } = {}) {
   let info = null;
+  try { info = await page.evaluate(pageScrollStepInPage); } catch (_) { info = null; }
+
+  // Playwright scrollIntoView on the last grid row — drives the same virtual scroller a person nudges.
   try {
-    info = await page.evaluate(() => {
-      const deepAll = (root, sel, out) => {
-        try { root.querySelectorAll(sel).forEach((e) => out.push(e)); } catch (_) {}
-        for (const el of root.querySelectorAll('*')) if (el.shadowRoot) deepAll(el.shadowRoot, sel, out);
-        return out;
-      };
-      const up = (el) => el.parentElement || (el.getRootNode && el.getRootNode().host) || null;
-      const preferredSels = [
-        '.slds-split-view .slds-scrollable_y',
-        '.slds-split-view .slds-scrollable',
-        '.slds-split-view_container .slds-scrollable_y',
-        '.slds-split-view_container .slds-scrollable',
-        '.slds-split-view__list-container',
-        'force-list-view-manager-grid .slds-scrollable',
-        '.forceListViewManager .slds-scrollable',
-        '.forceVirtualListview',
-        '.forceVirtualTreeGrid',
-        'lightning-datatable .slds-scrollable',
-        '.slds-table_container',
-        '[role="grid"]',
-      ];
-      const score = (el) => {
-        const box = el.getBoundingClientRect();
-        if (box.width < 40 || box.height < 40) return -1;
-        let s = 0;
-        const cls = `${el.className || ''} ${el.tagName || ''}`.toLowerCase();
-        if (/split-view|splitview|list-view-manager|listviewmanager|forcevirtuallist|virtualList/i.test(cls)) s += 50;
-        if (box.left < innerWidth * 0.45) s += 20;
-        if (el.scrollHeight > el.clientHeight + 4) s += 15;
-        return s + Math.min(box.height, 800) / 100;
-      };
-      let best = null, bestScore = -1;
-      for (const sel of preferredSels) {
-        for (const el of deepAll(document, sel, [])) {
-          const cs = getComputedStyle(el);
-          if (!/(auto|scroll)/.test(cs.overflowY) && !(el.scrollHeight > el.clientHeight + 4)) continue;
-          if (el.clientHeight < 40) continue;
-          const sc = score(el);
-          if (sc > bestScore) { best = el; bestScore = sc; }
-        }
-      }
-      if (!best) {
-        const row = deepAll(document, 'table[role="grid"] tbody tr, div[role="row"], li[role="option"], .slds-split-view__list-item', [])
-          .find((r) => r.getClientRects().length && r.querySelector('a[href], [href]'));
-        if (row) {
-          let el = up(row);
-          while (el) {
-            const cs = getComputedStyle(el);
-            if (/(auto|scroll)/.test(cs.overflowY) && el.clientHeight > 40) { best = el; break; }
-            el = up(el);
-          }
-        }
-      }
-      if (!best) return null;
-      // Bring the last visible linked row into view so the virtual list advances.
-      const rows = deepAll(best, 'table[role="grid"] tbody tr, div[role="row"], li[role="option"], .slds-split-view__list-item', [])
-        .filter((r) => r.getClientRects().length && r.querySelector('a[href], [href]'));
-      const last = rows[rows.length - 1];
-      if (last && last.scrollIntoView) {
-        try { last.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'instant' }); } catch (_) {
-          try { last.scrollIntoView(false); } catch (__) {}
-        }
-      }
-      const before = best.scrollTop;
-      const step = Math.max(180, Math.floor(best.clientHeight * 0.65));
-      best.scrollTop = before + step;
-      best.dispatchEvent(new Event('scroll', { bubbles: true }));
-      // A few smaller bumps help Salesforce's lazy loader notice movement.
-      for (let i = 0; i < 3; i++) {
-        best.scrollTop += Math.max(80, Math.floor(step / 3));
-        best.dispatchEvent(new Event('scroll', { bubbles: true }));
-      }
-      const box = best.getBoundingClientRect();
-      const top = Math.max(box.top, 0), bottom = Math.min(box.bottom, innerHeight);
-      return {
-        moved: best.scrollTop !== before || !!last,
-        atBottom: best.scrollTop + best.clientHeight >= best.scrollHeight - 2,
-        x: box.left + Math.min(box.width, Math.max(innerWidth - box.left, 0)) / 2,
-        y: top + (bottom - top) / 2,
-        h: Math.max(bottom - top, 100),
-        scrollTop: Math.round(best.scrollTop),
-        scrollHeight: Math.round(best.scrollHeight),
-      };
-    });
-  } catch (_) { info = null; }
-  if (!info) {
-    try { await page.mouse.wheel(0, 600); } catch (_) {}
-    try { await page.keyboard.press('PageDown'); } catch (_) {}
-    return { moved: true, atBottom: false };
-  }
-  // Real mouse wheel + PageDown over the pane (some Lightning layouts only load on pointer wheel).
-  try {
-    await page.mouse.move(info.x, info.y);
-    await page.mouse.wheel(0, Math.max(240, Math.floor(info.h * 0.75)));
-    await page.mouse.wheel(0, Math.max(160, Math.floor(info.h * 0.4)));
+    const last = page.locator('table[role="grid"] tbody tr, [role="grid"] [role="row"], .slds-split-view__list-item').last();
+    if (await last.count()) await last.scrollIntoViewIfNeeded({ timeout: 1200 });
   } catch (_) {}
-  try { await page.keyboard.press('PageDown'); } catch (_) {}
-  return info;
+
+  // Wheel over the last row (or the scroller centre). Do NOT click — that opens the opportunity.
+  const wx = info && info.lastBox ? info.lastBox.x : (info ? info.x : 400);
+  const wy = info && info.lastBox ? info.lastBox.y : (info ? info.y : 400);
+  try {
+    await page.mouse.move(wx, wy);
+    const delta = Math.max(280, Math.floor(((info && info.h) || 400) * 0.85));
+    await page.mouse.wheel(0, delta);
+    await page.mouse.wheel(0, Math.floor(delta * 0.6));
+    if (escalate) {
+      await page.mouse.wheel(0, delta);
+      await page.mouse.wheel(0, delta);
+    }
+  } catch (_) {}
+
+  // Keyboard walk: Salesforce loads the next virtual rows as selection moves down the grid.
+  try {
+    const presses = escalate ? 24 : 10;
+    for (let i = 0; i < presses; i++) {
+      await page.keyboard.press('ArrowDown');
+      if (i % 5 === 4) await sleep(50);
+    }
+    await page.keyboard.press('PageDown');
+    if (escalate) {
+      await page.keyboard.press('PageDown');
+      await page.keyboard.press('End');
+    }
+  } catch (_) {}
+
+  // Also run the older incremental scroller (shadow-DOM aware) when we are stuck mid-list.
+  if (escalate) {
+    try { await scrollList(page); } catch (_) {}
+  }
+
+  // Some list layouts use an explicit "Load More" control instead of infinite scroll.
+  try {
+    const more = page.getByRole('button', { name: /load more|show more|view more/i }).first();
+    if (await more.count() && await more.isVisible().catch(() => false)) {
+      await more.click({ timeout: 1500 }).catch(() => {});
+      if (info) info.moved = true;
+    }
+  } catch (_) {}
+
+  return info || { moved: true, atBottom: false };
 }
 
 /**
  * Harvest the accounts of the open LIST VIEW → [{ name, accountId, url }] in list order, one per account (an Opportunities list has a row per opportunity, so an account can repeat).
- * It physically scrolls the list pane (split-view sidebar first, then the grid) the way a person does — scrollTop bumps, mouse wheel, PageDown — and reads every rendered row after EACH step, so it
- * works when Salesforce lazy-loads more rows as you scroll AND when it keeps only the rows on screen (a virtualised grid). It compares what it read with the list's own count ("41 items") and
- * keeps scrolling until that count is reached, when opts.limit accounts are collected, or when scrolling has brought nothing new for a while. The array carries what happened: rowsSeen (rows read),
- * listTotal (the header's count, or null), rowsWithoutAccount, stopped ('complete' | 'limit' | 'stalled' | 'time' | 'no-rows'). Nothing readable at all → the earlier method (harvestListLeadsOld).
+ * Scrolls the list's own pane (a scroller that contains Account/Opportunity links — never the app nav), using scrollTop, mouse wheel over the last row, and ArrowDown/PageDown so Salesforce's
+ * lazy / virtual loader keeps fetching. Keeps going until the list header's count is reached, opts.limit, or a long stall. Carries rowsSeen, listTotal, stopped on the array.
  */
 async function harvestListLeads(page, opts = {}) {
   const limit = opts.limit || null, maxMs = opts.maxMs || 8 * 60 * 1000;
@@ -3012,10 +3072,12 @@ async function harvestListLeads(page, opts = {}) {
   let stopped = null, stalls = 0, noAccount = 0, shown = 0;
   const t0 = Date.now(); let lastFreshAt = t0;
   commandLog('📇', 'Harvest scroll', tot
-    ? `scrolling the list pane until all ${tot.total}${tot.plus ? '+' : ''} row(s) are loaded…`
-    : 'scrolling the list pane (split-view sidebar / grid) to load every row…');
-  await pageScrollTarget(page, true);      // start from the top, so row 1 is read first
-  await sleep(600);
+    ? `scrolling the list until all ${tot.total}${tot.plus ? '+' : ''} row(s) are loaded…`
+    : 'scrolling the list (wheel + ArrowDown) to load every row…');
+  const target = await pageScrollTarget(page, true);
+  if (target) commandLog('🗺️', 'List pane', `scroller ready · ${target.links || '?'} link(s) in view · ${target.clientHeight}px tall`);
+  else commandLog('⚠️', 'List pane', 'could not pin a list scroller yet — will keep trying with keyboard/wheel');
+  await sleep(500);
   for (let step = 0; step < 4000; step++) {
     let fresh = 0;
     let rows = []; try { rows = await page.evaluate(pageReadRows); } catch (_) {}
@@ -3026,32 +3088,30 @@ async function harvestListLeads(page, opts = {}) {
       if (!seen.has(r.accountId)) seen.set(r.accountId, { name: r.name || '(unnamed account)', accountId: r.accountId, url: `${origin}/lightning/r/Account/${r.accountId}/view` });
     }
     if (fresh) { stalls = 0; lastFreshAt = Date.now(); } else stalls++;
-    if (keys.size - shown >= 25 || (fresh && keys.size <= 50 && keys.size !== shown)) {
+    if (keys.size - shown >= 10 || (fresh && keys.size !== shown)) {
       shown = keys.size;
       commandLog('🗺️', 'Reading list', `${keys.size}${tot ? ` of ${tot.total}${tot.plus ? '+' : ''}` : ''} rows read, ${seen.size} accounts so far`);
     }
     if (limit && seen.size >= limit) { stopped = 'limit'; break; }
-    if (tot && tot.sure && !tot.plus && keys.size >= tot.total && stalls >= 1) { stopped = 'complete'; break; }      // the list header's count is reached AND one more scroll step found nothing new (a count from some other "N items" text never ends the harvest early)
+    if (tot && tot.sure && !tot.plus && keys.size >= tot.total && stalls >= 1) { stopped = 'complete'; break; }
     if (Date.now() - t0 > maxMs) { stopped = 'time'; break; }
-    // Be patient while under the list's own count: Salesforce lazy-loads in batches and often pauses between them.
     const underTotal = tot && !tot.plus && keys.size < tot.total;
-    const stallLimit = underTotal ? 14 : 6;
-    const stallMs = underTotal ? 18000 : 6000;
+    const stallLimit = underTotal ? 20 : 8;
+    const stallMs = underTotal ? 25000 : 7000;
     if (stalls >= stallLimit && Date.now() - lastFreshAt > stallMs) {
       stopped = keys.size ? (underTotal ? 'stalled' : 'complete') : 'no-rows';
       break;
     }
-    const scrolled = await scrollListViewStep(page);
-    if (!scrolled) { await sleep(1000); continue; }      // no scroller / row on screen yet: wait and look again
-    await sleep(underTotal && stalls > 2 ? 700 : 400);
-    try { await page.waitForSelector('.slds-spinner', { state: 'hidden', timeout: 6000 }); } catch (_) {}
-    // Extra pause after a quiet stretch so a slow lazy-load batch can land before we give up.
-    if (fresh === 0 && underTotal) await sleep(450);
+    const escalate = stalls >= 3 || (underTotal && stalls >= 1 && step > 5);
+    await scrollListViewStep(page, { escalate });
+    await sleep(escalate ? 650 : 350);
+    try { await page.waitForSelector('.slds-spinner, .slds-spinner_container', { state: 'hidden', timeout: 8000 }); } catch (_) {}
+    if (fresh === 0 && underTotal) await sleep(500);
   }
   let out = [...seen.values()];
   if (limit) out = out.slice(0, limit);
   out.rowsSeen = keys.size; out.listTotal = tot ? tot.total : null; out.listTotalPlus = tot ? tot.plus : false; out.rowsWithoutAccount = noAccount; out.stopped = stopped || 'complete';
-  if (!out.length && !keys.size) {      // nothing could be read this way: the earlier method may still see something
+  if (!out.length && !keys.size) {
     const old = await harvestListLeadsOld(page, opts);
     old.rowsSeen = null; old.listTotal = tot ? tot.total : null; old.listTotalPlus = tot ? tot.plus : false; old.stopped = 'fallback';
     return old;
