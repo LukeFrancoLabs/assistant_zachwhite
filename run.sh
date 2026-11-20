@@ -32,35 +32,29 @@ if [ -f "$SCRIPT_DIR/senderSetup.js" ]; then
 fi
 # (end of the first-launch setup)
 
-# The big green dollar sign shown while Chrome loads: printed line by line, only on a terminal.
-dollar_banner() {
-  local GREEN='\033[1;32m' RESET='\033[0m' line
-  printf '\n%b' "$GREEN"
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-    sleep 0.07
-  done <<'DOLLAR'
-                  ██
-                  ██
-        ████████████████████
-      ████████████████████████
-     █████████    ██    █████████
-    ██████        ██        ██████
-    ██████        ██
-    ██████        ██
-     █████████    ██
-       ████████████████████
-          ████████████████████
-                  ██    █████████
-                  ██        ██████
-    ██████        ██        ██████
-     █████████    ██    █████████
-      ████████████████████████
-        ████████████████████
-                  ██
-                  ██
-DOLLAR
-  printf '%b\n' "$RESET"
+# HCP manta + 3-2-1 while Chrome finishes loading. No other loading animation.
+hcp_manta_countdown() {
+  local CYAN='\033[1;36m' BOLD='\033[1m' RESET='\033[0m'
+  if [ -t 1 ]; then
+    printf '\n%b' "$CYAN"
+    cat <<'MANTA'
+              __
+     .-------()----.
+   .'               '.
+  /   .-.       .-.   \\
+ |   /   \\ HCP /   \\   |
+  \\  \\___/     \\___/  /
+   '.     manta     .'
+     '-------------'
+MANTA
+    printf '%b\n' "$RESET"
+  fi
+  printf '%b3...%b\n' "$BOLD" "$RESET"
+  sleep 1
+  printf '%b2...%b\n' "$BOLD" "$RESET"
+  sleep 1
+  printf '%b1...%b\n' "$BOLD" "$RESET"
+  sleep 1
 }
 
 # Pick port + profile based on whether this is an email run.
@@ -276,10 +270,7 @@ if [ $REUSE = 0 ]; then
   node start-browser.js &
   BROWSER_PID=$!
 
-  # The big dollar sign prints out while Chrome loads
-  if [ -t 1 ]; then dollar_banner; fi
-
-  # Wait for CDP port to be available
+  # Wait for CDP port to be available (no dollar / lift-off animation — only the manta countdown after)
   for i in $(seq 1 30); do
     if curl -s http://localhost:$CDP_PORT/json/version >/dev/null 2>&1; then
       break
@@ -293,14 +284,8 @@ if [ $REUSE = 0 ]; then
     exit 1
   fi
 
-  sleep 2
-  echo "3..."
   sleep 1
-  echo "2..."
-  sleep 1
-  echo "1..."
-  sleep 1
-  echo "🚀 Lift Off"
+  hcp_manta_countdown
 fi
 
 # Run the texter (connects via CDP)
