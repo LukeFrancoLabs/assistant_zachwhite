@@ -1,4 +1,4 @@
-# Assistant: set up on your MacBook (about 15 minutes, once)
+# assistant_zachwhite: set up on your MacBook (about 15 minutes, once)
 
 You start the email tool by typing `email` in Terminal. It opens its own browser window, you sign in to Salesforce there, and it works through your pipeline list.
 
@@ -21,7 +21,7 @@ If it prints v18 or higher, go to step 2. If it says "command not found" (or a l
 Double-click the zip. Move the folder it makes, `assistant_zachwhite`, to your home folder so that its path is `~/assistant_zachwhite` (in Finder: Go > Home). Or in Terminal, if the zip is in Downloads:
 
 ```
-unzip ~/Downloads/Assistant.zip -d ~/
+unzip ~/Downloads/assistant_zachwhite.zip -d ~/
 ```
 
 ## 3. Install what it needs (once)
@@ -42,7 +42,7 @@ printf "\nalias email='%s/assistant_zachwhite/run.sh'\n" "$HOME" >> ~/.zshrc
 source ~/.zshrc
 ```
 
-Check it: `type email` should say "email is an alias for ...Assistant/run.sh". (macOS uses zsh. If `echo $SHELL` shows /bin/bash, use `~/.bash_profile` instead of `~/.zshrc`.)
+Check it: `type email` should say "email is an alias for ...assistant_zachwhite/run.sh". (macOS uses zsh. If `echo $SHELL` shows /bin/bash, use `~/.bash_profile` instead of `~/.zshrc`.)
 
 ## 5. First run: set up your name, then a practice run (nothing is sent)
 
