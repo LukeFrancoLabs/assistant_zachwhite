@@ -95,11 +95,11 @@ const CONFIG = {
   tomorrowCdpPort: 9333,
   startUrl: 'https://housecallpro.lightning.force.com/',
   sfUrlSubstring: 'lightning.force.com',
-  // The list the list-view campaigns open by themselves once Salesforce is signed in (resolveListViewPage); a list picked by hand is never replaced.
-  // It is YOUR pipeline list: the link you gave at your first launch, kept in sender.json (change it in Settings: email --settings). senderSetup.js reads it; with none saved it is your recently viewed opportunities.
-  listUrl: (() => { try { return require('./senderSetup').listUrl(); } catch (_) { return 'https://housecallpro.lightning.force.com/lightning/o/Opportunity/list?filterName=Recent'; } })(),
-  // `email --test` (applyTestMode): a PRACTICE RUN on your own list, and always a DRY RUN: every email is filled in on the account page, nothing is sent.
-  testListUrl: (() => { try { return require('./senderSetup').listUrl(); } catch (_) { return 'https://housecallpro.lightning.force.com/lightning/o/Opportunity/list?filterName=Recent'; } })(),
+  // The Salesforce REPORT the email / text campaigns open by themselves (resolveCampaignReportPage). Kept in sender.json (Settings line "Campaign report").
+  reportUrl: (() => { try { return require('./senderSetup').reportUrl(); } catch (_) { return 'https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000H2v6s2AB/view'; } })(),
+  // Older call sites still read listUrl / testListUrl — both point at the same campaign report.
+  listUrl: (() => { try { return require('./senderSetup').reportUrl(); } catch (_) { return 'https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000H2v6s2AB/view'; } })(),
+  testListUrl: (() => { try { return require('./senderSetup').reportUrl(); } catch (_) { return 'https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000H2v6s2AB/view'; } })(),
 
   // Row selectors - tried in order
   rowSelectors: [
@@ -508,7 +508,7 @@ function parseArgs(argv) {
     else if (a === '--zone-only') args.zoneOnly = argv[++i];                          // --followup --zone-only PT: only pros whose saved time zone is Pacific
     else if (a === '--max') { const v = argv[++i]; args.max = /^all$/i.test(String(v)) ? Number.MAX_SAFE_INTEGER : (parseInt(v, 10) || 25); args.maxSet = true; }
     else if (a === '--auto') args.auto = true;
-    else if (a === '--no-auto') args.noAuto = true;      // plain email / text campaigns: pick a template as before, instead of writing each message from the account's notes and opportunities (autoDraft.js)
+    else if (a === '--no-auto') args.noAuto = true;      // force template mode even when Settings has Claude drafts on
     else if (a === '--evidence-only') args.evidenceOnly = true;
     else if (a === '--again') args.again = true;
     else if (a === '--max-age-days') args.maxAgeDays = parseFloat(argv[++i]) || 7;
@@ -533,7 +533,7 @@ function pipelineOnlyBlock(args) {
   if (String(args.list || '').toLowerCase() === 'lds') bad.push('--list lds');
   if (args.kind && /lds/i.test(String(args.kind))) bad.push('--kind ' + args.kind);
   if (!bad.length) return null;
-  return `\n⛔ This copy only uses your opportunity pipeline list (Zach_White_Official_Fire_Pipeline). LDS mode is not available (${[...new Set(bad)].join(', ')}).\n   Use:  zw   or  zw --text   or  zw --test\n(Nothing was started.)\n`;
+  return `\n⛔ This copy only uses your campaign Salesforce report. LDS mode is not available (${[...new Set(bad)].join(', ')}).\n   Use:  zw   or  zw --text   or  zw --test\n(Nothing was started.)\n`;
 }
 
 // ============================================================================
@@ -626,6 +626,8 @@ const REENGAGE_TEXT = {
 REENGAGE_TEXT.text = sender.apply(REENGAGE_TEXT.text);
 // Saved report modes. LDS / Inbound KA LDS are intentionally omitted in this pipeline-only copy.
 const REPORT_MODES = {
+  // Default campaign report for zw / zw --text / zw --test (also CONFIG.reportUrl via senderSetup).
+  pipeline: { name: 'Zach White Campaign Report', kind: 'Shark', url: 'https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000H2v6s2AB/view' },
   // `zw --shark13`: tomorrow's Shark list (the T13 report: the pros who would post to T14 at midnight). It opens by itself, like --shark opens the saved T14 report.
   shark13: { name: 'T13 Shark List All', kind: 'Shark', url: 'https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000GVYkC2AX/view?queryScope=userFolders' },
 };
@@ -852,20 +854,21 @@ async function launchBrowser(opts = {}) {
   return { context, page, cleanup };
 }
 
-// The welcome screen of the EMAIL campaign: what `zw` with no flags opens on, right after run.sh's HCP manta countdown. DR's own words, kept exactly as given, printed in yellow with a rocket at the end.
+// The welcome screen of the EMAIL campaign: what `zw` with no flags opens on, right after run.sh's H→C→P letter countdown. DR's own words, kept exactly as given, printed in yellow with a rocket at the end.
 // The colour codes are left out when the output is not a terminal or NO_COLOR is set (FORCE_COLOR=1 turns them on for a test).
-const WELCOME_EMAIL_TEXT = 'Welcome ' + (sender.firstName || 'there') + ', lets send out an email campaign!\n\nHit Enter when you sign into salesforce AND load the correct opportunity list you want to email 🚀';
+const WELCOME_EMAIL_TEXT = 'Welcome ' + (sender.firstName || 'there') + ', lets send out an email campaign!\n\nHit Enter when you sign into salesforce — your campaign report opens by itself. Wait until the rows are visible, then press Enter 🚀';
 const YELLOW = (!process.env.NO_COLOR && (process.stdout.isTTY || process.env.FORCE_COLOR)) ? ['\x1b[1;33m', '\x1b[0m'] : ['', ''];
 const WELCOME_EMAIL = `\n${YELLOW[0]}${WELCOME_EMAIL_TEXT}${YELLOW[1]}\n`;
 
 /**
- * `--test`: a practice run. The list is CONFIG.testListUrl (your own pipeline list), and it is ALWAYS a dry run (--yes cannot change that): the composers are filled in on
+ * `--test`: a practice run. Uses CONFIG.reportUrl (your campaign report), and it is ALWAYS a dry run (--yes cannot change that): the composers are filled in on
  * each account you pick and nothing is sent. Called first thing in main(), before anything else looks at args.dryRun. → true when test mode is on.
  */
 function applyTestMode(args) {
   if (!args.test) return false;
   args.dryRun = true;
   CONFIG.listUrl = CONFIG.testListUrl;
+  CONFIG.reportUrl = CONFIG.testListUrl;
   return true;
 }
 
@@ -888,8 +891,10 @@ const practiceFlagGiven = (args, argv) => !!args.dryRun || argv.some((a) => PRAC
 
 /** Signed in to Salesforce Lightning? A login page does not count: its address can carry "lightning.force.com" inside a startURL, so the host is matched, not a piece of text. */
 const onLightning = (p) => { const u = p.url() || ''; return /^https:\/\/[^/]*lightning\.force\.com\//.test(u) && !/okta|login|saml|secur\/frontdoor/i.test(u); };
-/** Showing an opportunity list view (DR's, or one picked by hand)? */
+/** Showing an opportunity list view? (legacy; this copy uses a report.) */
 const onOpportunityList = (p) => /\/lightning\/o\/Opportunity\/list/i.test(p.url() || '');
+/** Showing a Salesforce report run page? */
+const onReportUrl = (p) => /\/lightning\/r\/Report\//i.test(p.url() || '');
 /** Wait until the list view shows at least one row, so the harvest that follows never runs on a half-drawn page. */
 async function waitForListRows(page, ms = 45000) {
   const end = Date.now() + ms;
@@ -899,30 +904,57 @@ async function waitForListRows(page, ms = 45000) {
   }
   return false;
 }
+/** Wait until the report iframe is present (and ideally has a data grid). */
+async function waitForReportFrame(page, ms = 60000) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    const frame = reportFrame(page);
+    if (frame) {
+      try {
+        const ready = await frame.evaluate(() => !!document.querySelector('table.data-grid-full-table, table[role="grid"], .data-grid'));
+        if (ready) return frame;
+      } catch (_) { /* frame navigating */ }
+      return frame;      // iframe is there even if the grid is still painting
+    }
+    await sleep(1000);
+  }
+  return null;
+}
 
-// Let the user sign in, then return the tab that shows DR's opportunity list (CONFIG.listUrl)
-async function resolveListViewPage(context, initialPage, o = {}) {
-  const listName = new URL(CONFIG.listUrl).searchParams.get('filterName');
-  // Chrome goes to DR's list straight away: a saved Salesforce login lands on it at once, and a first sign-in is sent back to it by Salesforce (or by the check after the prompt below).
-  try { await initialPage.goto(CONFIG.listUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }); } catch (_) {}
+/**
+ * Open the campaign Salesforce REPORT (CONFIG.reportUrl), wait for sign-in, then wait for the
+ * lightningReportApp iframe so harvestReportLeads can scroll its virtualized grid (same path as --report).
+ */
+async function resolveCampaignReportPage(context, initialPage, o = {}) {
+  const url = CONFIG.reportUrl || CONFIG.listUrl;
+  const reportId = (() => { try { return new URL(url).pathname.match(/\/Report\/([A-Za-z0-9]+)/i)?.[1] || 'report'; } catch (_) { return 'report'; } })();
+  try { await initialPage.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 }); } catch (_) {}
   let page = null;
   for (let first = true; !page; first = false) {
     await ask(first
       ? (o.email ? WELCOME_EMAIL : (
-        '\nIn the Chrome window: log in (if needed) and open your Salesforce OPPORTUNITIES LIST VIEW,\n' +
-        'then press Enter here to continue... '
+        '\nIn the Chrome window: log in (if needed). Your campaign REPORT opens by itself —\n' +
+        'wait until its detail rows are visible, then press Enter here to continue... '
       ))
       : '\nChrome is not signed in to Salesforce yet. Finish signing in in the Chrome window, then hit Enter... ');
-    const lightning = context.pages().filter(onLightning), onList = lightning.filter(onOpportunityList);
-    page = onList.length ? onList[onList.length - 1] : (lightning.length ? lightning[lightning.length - 1] : null);      // a tab already on an opportunity list (even one picked by hand) wins
+    const lightning = context.pages().filter(onLightning);
+    const onRep = lightning.filter(onReportUrl);
+    page = onRep.length ? onRep[onRep.length - 1] : (lightning.length ? lightning[lightning.length - 1] : null);
   }
   try { await page.bringToFront(); } catch (_) {}
-  if (!onOpportunityList(page)) {      // signed in, but on the home page or somewhere else (a saved login that opened home, or a sign-in that did not come back to the list)
-    commandLog('📋', 'Opportunity list', `Opening ${listName}`);
-    try { await page.goto(CONFIG.listUrl, { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch (e) { commandLog('⚠️', 'Opportunity list', `could not open it: ${e.message}`); }
+  if (!onReportUrl(page) || !(page.url() || '').includes(reportId)) {
+    commandLog('📊', 'Campaign report', `Opening ${reportId}`);
+    try { await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch (e) { commandLog('⚠️', 'Campaign report', `could not open it: ${e.message}`); }
   }
-  if (!(await waitForListRows(page))) commandLog('⚠️', 'Opportunity list', 'no rows are showing yet: make sure the list in Chrome has finished loading');
+  commandLog('⏳', 'Report loading', 'waiting for the report grid (virtualized rows load as we scroll)…');
+  if (!(await waitForReportFrame(page))) commandLog('⚠️', 'Campaign report', 'the report iframe is not showing yet — make sure the report finished loading in Chrome');
+  else commandLog('✅', 'Campaign report', 'report grid ready');
   return page;
+}
+
+/** @deprecated name — this copy opens the campaign report. Kept so older call sites still resolve. */
+async function resolveListViewPage(context, initialPage, o = {}) {
+  return resolveCampaignReportPage(context, initialPage, o);
 }
 
 // ============================================================================
@@ -2768,7 +2800,7 @@ async function readListTotal(page) {
   } catch (_) { return null; }
 }
 
-/** Runs IN THE PAGE: every rendered row of the list (also inside shadow roots) with its Account link. → [{ key, accountId, name }]. Rows with no link at all (the spacer rows of a virtualised grid) are left out. */
+/** Runs IN THE PAGE: every rendered row of the list (also inside shadow roots / split-view sidebar) with its Account link. → [{ key, accountId, name }]. Rows with no link at all (the spacer rows of a virtualised grid) are left out. */
 function pageReadRows() {
   const deepAll = (root, sel, out) => {
     try { root.querySelectorAll(sel).forEach((e) => out.push(e)); } catch (_) {}
@@ -2776,8 +2808,10 @@ function pageReadRows() {
     return out;
   };
   const ID = /\/(001[A-Za-z0-9]{12,15})(?=[/?#]|$)/;
-  const out = [], seenEl = new Set();
-  for (const r of deepAll(document, 'table[role="grid"] tbody tr, div[role="row"]', [])) {
+  const OPP = /\/(006[A-Za-z0-9]{12,15})(?=[/?#]|$)/;
+  const out = [], seenEl = new Set(), seenKey = new Set();
+  const rowSels = 'table[role="grid"] tbody tr, div[role="row"], li[role="option"], .slds-split-view__list-item, .slds-split-view li, .forceVirtualListview .slds-hint-parent';
+  for (const r of deepAll(document, rowSels, [])) {
     if (seenEl.has(r)) continue;
     seenEl.add(r);
     if (!r.getClientRects().length) continue;      // not on screen (a page opened earlier that Salesforce keeps hidden in the DOM): not part of this list
@@ -2786,51 +2820,297 @@ function pageReadRows() {
     const hrefOf = (a) => a.getAttribute('href') || '';
     const acct = links.find((a) => /\/lightning\/r\/Account\/001/.test(hrefOf(a))) || links.find((a) => /\/Account\/001/.test(hrefOf(a))) || links.find((a) => ID.test(hrefOf(a)));
     const m = acct ? hrefOf(acct).match(ID) : null;
-    const key = r.getAttribute('data-row-key-value') || r.getAttribute('data-row-number') || hrefOf(links[0]) || (r.textContent || '').trim().slice(0, 80);
+    // Prefer Opportunity id (006) / data-row-key-value as the stable key — virtual lists recycle DOM nodes, so textContent keys collide across scrolls.
+    const oppLink = links.find((a) => OPP.test(hrefOf(a)));
+    const oppId = oppLink ? (hrefOf(oppLink).match(OPP) || [])[1] : null;
+    const key = r.getAttribute('data-row-key-value') || oppId || r.getAttribute('data-row-number') || (m ? m[1] : null) || hrefOf(links[0]) || (r.textContent || '').trim().slice(0, 80);
+    if (!key || seenKey.has(key)) continue;
+    seenKey.add(key);
     out.push({ key, accountId: m ? m[1] : null, name: acct ? (acct.textContent || '').trim().replace(/Edit Account Name/gi, '').trim() : null });
   }
   return out;
 }
 
-/** Where the list scrolls: the nearest scrolling ancestor of the first row (or the page), its centre and visible height, so a real mouse wheel can be turned over it. resetTop = scroll it back to the top first. → { x, y, h } or null when there is no row. */
+/**
+ * Runs IN THE PAGE (passed whole to page.evaluate): locate scroll panes that contain
+ * Opportunity/Account row links — never the left app nav. reset=true scrolls the best one to top.
+ * → { x, y, h, scrollTop, scrollHeight, clientHeight, links } or null.
+ */
+function pageScrollTargetInPage(reset) {
+  const deepAll = (root, sel, out) => {
+    try { root.querySelectorAll(sel).forEach((e) => out.push(e)); } catch (_) {}
+    for (const el of root.querySelectorAll('*')) if (el.shadowRoot) deepAll(el.shadowRoot, sel, out);
+    return out;
+  };
+  const up = (el) => el.parentElement || (el.getRootNode && el.getRootNode().host) || null;
+  const ROW_SEL = 'table[role="grid"] tbody tr, div[role="row"], li[role="option"], .slds-split-view__list-item';
+  const LINK_SEL = 'a[href*="/Account/"], a[href*="/Opportunity/"], a[href*="/001"], a[href*="/006"]';
+  const isScrollable = (el) => {
+    if (!el || !el.getBoundingClientRect) return false;
+    try {
+      const cs = getComputedStyle(el);
+      if (!/(auto|scroll)/.test(cs.overflowY) && !/(auto|scroll)/.test(cs.overflow)) return false;
+      return el.clientHeight > 40;
+    } catch (_) { return false; }
+  };
+  const rowLinksIn = (el) => {
+    try { return deepAll(el, LINK_SEL, []).filter((a) => a.getClientRects && a.getClientRects().length).length; }
+    catch (_) { return 0; }
+  };
+  const score = (el) => {
+    if (!el) return -1;
+    const box = el.getBoundingClientRect();
+    if (box.width < 40 || box.height < 40) return -1;
+    const links = rowLinksIn(el);
+    if (links < 1) return -1;
+    let s = links * 20;
+    const cls = ((el.className && String(el.className)) || '') + ' ' + (el.tagName || '');
+    if (/nav|navigation|tabBar|utilityBar|oneAppNav|slds-nav-vertical|global-header|headerBar/i.test(cls)) s -= 500;
+    if (/split-view|splitview|list-view-manager|listviewmanager|forcevirtuallist|virtualList|uiVirtualDataTable|scrollerWrapper|scrollable_y/i.test(cls)) s += 40;
+    if (el.getAttribute && /listbox|grid/.test(el.getAttribute('role') || '')) s += 15;
+    if (el.scrollHeight > el.clientHeight + 4) s += 25;
+    s += Math.min(box.height, 900) / 80;
+    return s;
+  };
+  const preferredSels = [
+    '.slds-split-view .slds-scrollable_y', '.slds-split-view .slds-scrollable',
+    '.slds-split-view_container .slds-scrollable_y', '.slds-split-view_container .slds-scrollable',
+    '.slds-split-view__list-container',
+    'lst-list-view-manager .slds-scrollable_y', 'lst-list-view-manager .slds-scrollable',
+    'force-list-view-manager-grid .slds-scrollable', '.forceListViewManager .slds-scrollable',
+    '.forceVirtualListview', '.forceVirtualTreeGrid',
+    'lightning-datatable .slds-scrollable_y', 'lightning-datatable .slds-scrollable',
+    '.slds-table_container', '.slds-scrollable_y', '.slds-scrollable', '[role="grid"]',
+  ];
+  const all = [];
+  const seen = new Set();
+  const consider = (el) => {
+    if (!el || seen.has(el)) return;
+    if (!isScrollable(el) && !(el.scrollHeight > el.clientHeight + 4)) return;
+    if (score(el) < 0) return;
+    seen.add(el);
+    all.push(el);
+  };
+  for (const sel of preferredSels) deepAll(document, sel, []).forEach(consider);
+  for (const row of deepAll(document, ROW_SEL, [])) {
+    if (!row.getClientRects().length || !row.querySelector(LINK_SEL)) continue;
+    let el = up(row);
+    while (el) { consider(el); el = up(el); }
+  }
+  all.sort((a, b) => score(b) - score(a));
+  const best = all[0] || null;
+  if (reset) {
+    if (best) best.scrollTop = 0;
+    else window.scrollTo(0, 0);
+  }
+  if (!best) return null;
+  const box = best.getBoundingClientRect();
+  const top = Math.max(box.top, 0), bottom = Math.min(box.bottom, innerHeight);
+  return {
+    x: box.left + Math.min(box.width, Math.max(innerWidth - box.left, 0)) / 2,
+    y: top + (bottom - top) / 2,
+    h: Math.max(bottom - top, 100),
+    scrollTop: Math.round(best.scrollTop || 0),
+    scrollHeight: Math.round(best.scrollHeight || 0),
+    clientHeight: Math.round(best.clientHeight || 0),
+    links: rowLinksIn(best),
+  };
+}
+
+/**
+ * Runs IN THE PAGE: scroll every list scroller that holds row links, bring the last row into view,
+ * focus the grid. → coords for a follow-up mouse wheel (no click — clicking opens the record).
+ */
+function pageScrollStepInPage() {
+  const deepAll = (root, sel, out) => {
+    try { root.querySelectorAll(sel).forEach((e) => out.push(e)); } catch (_) {}
+    for (const el of root.querySelectorAll('*')) if (el.shadowRoot) deepAll(el.shadowRoot, sel, out);
+    return out;
+  };
+  const up = (el) => el.parentElement || (el.getRootNode && el.getRootNode().host) || null;
+  const ROW_SEL = 'table[role="grid"] tbody tr, div[role="row"], li[role="option"], .slds-split-view__list-item';
+  const LINK_SEL = 'a[href*="/Account/"], a[href*="/Opportunity/"], a[href*="/001"], a[href*="/006"]';
+  const isScrollable = (el) => {
+    if (!el || !el.getBoundingClientRect) return false;
+    try {
+      const cs = getComputedStyle(el);
+      if (!/(auto|scroll)/.test(cs.overflowY) && !/(auto|scroll)/.test(cs.overflow)) return false;
+      return el.clientHeight > 40;
+    } catch (_) { return false; }
+  };
+  const rowLinksIn = (el) => {
+    try { return deepAll(el, LINK_SEL, []).filter((a) => a.getClientRects && a.getClientRects().length).length; }
+    catch (_) { return 0; }
+  };
+  const score = (el) => {
+    if (!el) return -1;
+    const box = el.getBoundingClientRect();
+    if (box.width < 40 || box.height < 40) return -1;
+    const links = rowLinksIn(el);
+    if (links < 1) return -1;
+    let s = links * 20;
+    const cls = ((el.className && String(el.className)) || '') + ' ' + (el.tagName || '');
+    if (/nav|navigation|tabBar|utilityBar|oneAppNav|slds-nav-vertical|global-header|headerBar/i.test(cls)) s -= 500;
+    if (/split-view|splitview|list-view-manager|listviewmanager|forcevirtuallist|virtualList|scrollerWrapper|scrollable_y/i.test(cls)) s += 40;
+    if (el.scrollHeight > el.clientHeight + 4) s += 25;
+    return s + Math.min(box.height, 900) / 80;
+  };
+  const preferredSels = [
+    '.slds-split-view .slds-scrollable_y', '.slds-split-view .slds-scrollable',
+    '.slds-split-view_container .slds-scrollable_y', '.slds-split-view_container .slds-scrollable',
+    '.slds-split-view__list-container',
+    'lst-list-view-manager .slds-scrollable_y', 'lst-list-view-manager .slds-scrollable',
+    'force-list-view-manager-grid .slds-scrollable', '.forceListViewManager .slds-scrollable',
+    '.forceVirtualListview', '.forceVirtualTreeGrid',
+    'lightning-datatable .slds-scrollable_y', 'lightning-datatable .slds-scrollable',
+    '.slds-table_container', '.slds-scrollable_y', '.slds-scrollable', '[role="grid"]',
+  ];
+  const scrollers = [];
+  const seen = new Set();
+  const consider = (el) => {
+    if (!el || seen.has(el)) return;
+    if (!isScrollable(el) && !(el.scrollHeight > el.clientHeight + 4)) return;
+    if (score(el) < 0) return;
+    seen.add(el);
+    scrollers.push(el);
+  };
+  for (const sel of preferredSels) deepAll(document, sel, []).forEach(consider);
+  for (const row of deepAll(document, ROW_SEL, [])) {
+    if (!row.getClientRects().length || !row.querySelector(LINK_SEL)) continue;
+    let el = up(row);
+    while (el) { consider(el); el = up(el); }
+  }
+  scrollers.sort((a, b) => score(b) - score(a));
+  const rows = deepAll(document, ROW_SEL, []).filter((r) => r.getClientRects().length && r.querySelector(LINK_SEL));
+  const lastRow = rows[rows.length - 1] || null;
+  if (lastRow) {
+    try { lastRow.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'instant' }); } catch (_) {
+      try { lastRow.scrollIntoView(false); } catch (__) {}
+    }
+  }
+  let moved = false, atBottom = false;
+  for (const el of scrollers) {
+    const before = el.scrollTop;
+    const stepPx = Math.max(120, Math.floor((el.clientHeight || 300) * 0.8));
+    el.scrollTop = before + stepPx;
+    el.dispatchEvent(new Event('scroll', { bubbles: true }));
+    try { el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: stepPx, deltaMode: 0 })); } catch (_) {}
+    if (el.scrollTop !== before) moved = true;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 2) atBottom = true;
+  }
+  const best = scrollers[0] || null;
+  const box = best ? best.getBoundingClientRect() : null;
+  let lastBox = null;
+  if (lastRow) {
+    const b = lastRow.getBoundingClientRect();
+    lastBox = { x: b.left + b.width / 2, y: Math.min(Math.max(b.top + b.height / 2, 8), innerHeight - 8) };
+  }
+  const grid = document.querySelector('table[role="grid"], [role="grid"]');
+  if (grid && grid.focus) try { grid.focus({ preventScroll: true }); } catch (_) {}
+  const top = box ? Math.max(box.top, 0) : 0;
+  const bottom = box ? Math.min(box.bottom, innerHeight) : innerHeight;
+  return {
+    moved,
+    atBottom,
+    candidates: scrollers.length,
+    lastBox,
+    x: box ? box.left + Math.min(box.width, Math.max(innerWidth - box.left, 0)) / 2 : (lastBox ? lastBox.x : innerWidth / 2),
+    y: box ? top + (bottom - top) / 2 : (lastBox ? lastBox.y : innerHeight / 2),
+    h: box ? Math.max(bottom - top, 100) : 400,
+    scrollTop: best ? Math.round(best.scrollTop || 0) : 0,
+    scrollHeight: best ? Math.round(best.scrollHeight || 0) : 0,
+    links: best ? rowLinksIn(best) : 0,
+  };
+}
+
+/** Where the list scrolls: only a pane that contains Account/Opportunity rows. resetTop scrolls it to the top. → { x, y, h, … } or null. */
 async function pageScrollTarget(page, resetTop = false) {
+  try { return await page.evaluate(pageScrollTargetInPage, resetTop); } catch (_) { return null; }
+}
+
+/**
+ * One advance of the open list view. Tries every strategy Salesforce actually responds to:
+ *   1) scrollIntoView on the last data row
+ *   2) bump scrollTop on EVERY scroller that contains row links (not the app nav)
+ *   3) real mouse wheel over the last row (no click — a click would open the record)
+ *   4) ArrowDown / PageDown / End on the focused grid
+ * → { moved, atBottom, … }
+ */
+async function scrollListViewStep(page, { escalate = false } = {}) {
+  let info = null;
+  try { info = await page.evaluate(pageScrollStepInPage); } catch (_) { info = null; }
+
+  // Playwright scrollIntoView on the last grid row — drives the same virtual scroller a person nudges.
   try {
-    return await page.evaluate((reset) => {
-      const deepAll = (root, sel, out) => {
-        try { root.querySelectorAll(sel).forEach((e) => out.push(e)); } catch (_) {}
-        for (const el of root.querySelectorAll('*')) if (el.shadowRoot) deepAll(el.shadowRoot, sel, out);
-        return out;
-      };
-      const row = deepAll(document, 'table[role="grid"] tbody tr, div[role="row"]', []).find((r) => r.getClientRects().length && r.querySelector('a[href]'));
-      if (!row) return null;
-      const up = (el) => el.parentElement || (el.getRootNode && el.getRootNode().host) || null;
-      let el = up(row);
-      while (el) { const cs = getComputedStyle(el); if (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 4) break; el = up(el); }
-      if (reset) { if (el) el.scrollTop = 0; else window.scrollTo(0, 0); }
-      const box = el ? el.getBoundingClientRect() : { left: 0, top: 0, right: innerWidth, bottom: innerHeight, width: innerWidth };
-      const top = Math.max(box.top, 0), bottom = Math.min(box.bottom, innerHeight);
-      return { x: box.left + Math.min(box.width, innerWidth - box.left) / 2, y: top + (bottom - top) / 2, h: Math.max(bottom - top, 100) };
-    }, resetTop);
-  } catch (_) { return null; }
+    const last = page.locator('table[role="grid"] tbody tr, [role="grid"] [role="row"], .slds-split-view__list-item').last();
+    if (await last.count()) await last.scrollIntoViewIfNeeded({ timeout: 1200 });
+  } catch (_) {}
+
+  // Wheel over the last row (or the scroller centre). Do NOT click — that opens the opportunity.
+  const wx = info && info.lastBox ? info.lastBox.x : (info ? info.x : 400);
+  const wy = info && info.lastBox ? info.lastBox.y : (info ? info.y : 400);
+  try {
+    await page.mouse.move(wx, wy);
+    const delta = Math.max(280, Math.floor(((info && info.h) || 400) * 0.85));
+    await page.mouse.wheel(0, delta);
+    await page.mouse.wheel(0, Math.floor(delta * 0.6));
+    if (escalate) {
+      await page.mouse.wheel(0, delta);
+      await page.mouse.wheel(0, delta);
+    }
+  } catch (_) {}
+
+  // Keyboard walk: Salesforce loads the next virtual rows as selection moves down the grid.
+  try {
+    const presses = escalate ? 24 : 10;
+    for (let i = 0; i < presses; i++) {
+      await page.keyboard.press('ArrowDown');
+      if (i % 5 === 4) await sleep(50);
+    }
+    await page.keyboard.press('PageDown');
+    if (escalate) {
+      await page.keyboard.press('PageDown');
+      await page.keyboard.press('End');
+    }
+  } catch (_) {}
+
+  // Also run the older incremental scroller (shadow-DOM aware) when we are stuck mid-list.
+  if (escalate) {
+    try { await scrollList(page); } catch (_) {}
+  }
+
+  // Some list layouts use an explicit "Load More" control instead of infinite scroll.
+  try {
+    const more = page.getByRole('button', { name: /load more|show more|view more/i }).first();
+    if (await more.count() && await more.isVisible().catch(() => false)) {
+      await more.click({ timeout: 1500 }).catch(() => {});
+      if (info) info.moved = true;
+    }
+  } catch (_) {}
+
+  return info || { moved: true, atBottom: false };
 }
 
 /**
  * Harvest the accounts of the open LIST VIEW → [{ name, accountId, url }] in list order, one per account (an Opportunities list has a row per opportunity, so an account can repeat).
- * It scrolls the way a person does (mouse-wheel steps, each LESS than the height of the grid, so no row is jumped over) and reads every rendered row after EACH step, so it works when
- * the list loads 50 rows at a time as you scroll AND when it keeps only the rows on screen (a virtualised grid). It compares what it read with the list's own count ("323 items") and
- * stops when that count is reached, when opts.limit accounts are collected, or when scrolling has brought nothing new for a while. The array carries what happened: rowsSeen (rows read),
- * listTotal (the header's count, or null), rowsWithoutAccount, stopped ('complete' | 'limit' | 'stalled' | 'time' | 'no-rows'). Nothing readable at all → the earlier method (harvestListLeadsOld).
+ * Scrolls the list's own pane (a scroller that contains Account/Opportunity links — never the app nav), using scrollTop, mouse wheel over the last row, and ArrowDown/PageDown so Salesforce's
+ * lazy / virtual loader keeps fetching. Keeps going until the list header's count is reached, opts.limit, or a long stall. Carries rowsSeen, listTotal, stopped on the array.
  */
 async function harvestListLeads(page, opts = {}) {
-  const limit = opts.limit || null, maxMs = opts.maxMs || 6 * 60 * 1000;
+  const limit = opts.limit || null, maxMs = opts.maxMs || 8 * 60 * 1000;
   const origin = new URL(page.url()).origin;
   const tot = await readListTotal(page);
   const seen = new Map(), keys = new Set();
   let stopped = null, stalls = 0, noAccount = 0, shown = 0;
   const t0 = Date.now(); let lastFreshAt = t0;
-  await pageScrollTarget(page, true);      // start from the top, so row 1 is read first
+  commandLog('📇', 'Harvest scroll', tot
+    ? `scrolling the list until all ${tot.total}${tot.plus ? '+' : ''} row(s) are loaded…`
+    : 'scrolling the list (wheel + ArrowDown) to load every row…');
+  const target = await pageScrollTarget(page, true);
+  if (target) commandLog('🗺️', 'List pane', `scroller ready · ${target.links || '?'} link(s) in view · ${target.clientHeight}px tall`);
+  else commandLog('⚠️', 'List pane', 'could not pin a list scroller yet — will keep trying with keyboard/wheel');
   await sleep(500);
-  for (let step = 0; step < 3000; step++) {
+  for (let step = 0; step < 4000; step++) {
     let fresh = 0;
     let rows = []; try { rows = await page.evaluate(pageReadRows); } catch (_) {}
     for (const r of rows) {
@@ -2840,21 +3120,30 @@ async function harvestListLeads(page, opts = {}) {
       if (!seen.has(r.accountId)) seen.set(r.accountId, { name: r.name || '(unnamed account)', accountId: r.accountId, url: `${origin}/lightning/r/Account/${r.accountId}/view` });
     }
     if (fresh) { stalls = 0; lastFreshAt = Date.now(); } else stalls++;
-    if (keys.size - shown >= 100) { shown = keys.size; commandLog('🗺️', 'Reading list', `${keys.size}${tot ? ` of ${tot.total}${tot.plus ? '+' : ''}` : ''} rows read, ${seen.size} accounts so far`); }
+    if (keys.size - shown >= 10 || (fresh && keys.size !== shown)) {
+      shown = keys.size;
+      commandLog('🗺️', 'Reading list', `${keys.size}${tot ? ` of ${tot.total}${tot.plus ? '+' : ''}` : ''} rows read, ${seen.size} accounts so far`);
+    }
     if (limit && seen.size >= limit) { stopped = 'limit'; break; }
-    if (tot && tot.sure && !tot.plus && keys.size >= tot.total && stalls >= 1) { stopped = 'complete'; break; }      // the list header's count is reached AND one more scroll step found nothing new (a count from some other "N items" text never ends the harvest early)
+    if (tot && tot.sure && !tot.plus && keys.size >= tot.total && stalls >= 1) { stopped = 'complete'; break; }
     if (Date.now() - t0 > maxMs) { stopped = 'time'; break; }
-    if (stalls >= 5 && Date.now() - lastFreshAt > (tot ? 9000 : 4500)) { stopped = keys.size ? (tot && !tot.plus && keys.size < tot.total ? 'stalled' : 'complete') : 'no-rows'; break; }
-    const tg = await pageScrollTarget(page);
-    if (!tg) { await sleep(1000); continue; }      // no row with a link is on screen yet (a slow page, placeholder rows, a grid redrawing): wait and look again; the stall rule above decides when to give up
-    try { await page.mouse.move(tg.x, tg.y); await page.mouse.wheel(0, Math.max(200, Math.floor(tg.h * 0.7))); } catch (_) {}
-    await sleep(350);
-    try { await page.waitForSelector('.slds-spinner', { state: 'hidden', timeout: 4000 }); } catch (_) {}
+    const underTotal = tot && !tot.plus && keys.size < tot.total;
+    const stallLimit = underTotal ? 20 : 8;
+    const stallMs = underTotal ? 25000 : 7000;
+    if (stalls >= stallLimit && Date.now() - lastFreshAt > stallMs) {
+      stopped = keys.size ? (underTotal ? 'stalled' : 'complete') : 'no-rows';
+      break;
+    }
+    const escalate = stalls >= 3 || (underTotal && stalls >= 1 && step > 5);
+    await scrollListViewStep(page, { escalate });
+    await sleep(escalate ? 650 : 350);
+    try { await page.waitForSelector('.slds-spinner, .slds-spinner_container', { state: 'hidden', timeout: 8000 }); } catch (_) {}
+    if (fresh === 0 && underTotal) await sleep(500);
   }
   let out = [...seen.values()];
   if (limit) out = out.slice(0, limit);
   out.rowsSeen = keys.size; out.listTotal = tot ? tot.total : null; out.listTotalPlus = tot ? tot.plus : false; out.rowsWithoutAccount = noAccount; out.stopped = stopped || 'complete';
-  if (!out.length && !keys.size) {      // nothing could be read this way: the earlier method may still see something
+  if (!out.length && !keys.size) {
     const old = await harvestListLeadsOld(page, opts);
     old.rowsSeen = null; old.listTotal = tot ? tot.total : null; old.listTotalPlus = tot ? tot.plus : false; old.stopped = 'fallback';
     return old;
@@ -2871,7 +3160,7 @@ function harvestSummary(leads) {
 function warnShortHarvest(leads) {
   if (leads.rowsSeen == null) return;
   const why = { stalled: 'the list stopped loading more rows', time: 'it ran out of time', 'no-rows': 'no rows were found' }[leads.stopped] || leads.stopped;
-  if (leads.stopped !== 'limit' && leads.listTotal && !leads.listTotalPlus && leads.rowsSeen < leads.listTotal) console.log(`\n  ⚠️  Only ${leads.rowsSeen} of the list's ${leads.listTotal} rows were read (${why}). Scroll the list to the bottom in Chrome, check that it shows all ${leads.listTotal}, then run this again.\n`);
+  if (leads.stopped !== 'limit' && leads.listTotal && !leads.listTotalPlus && leads.rowsSeen < leads.listTotal) console.log(`\n  ⚠️  Only ${leads.rowsSeen} of the list's ${leads.listTotal} rows were read (${why}). In Chrome, scroll the list sidebar / grid all the way down until it shows ${leads.listTotal} rows, then run this again.\n`);
   if (leads.rowsSeen > 0 && !leads.length) console.log(`\n  ⚠️  ${leads.rowsSeen} rows were read but none has an Account link. Add the "Account Name" column to this list view (the email is sent from the account), then run again.\n`);
   else if (leads.rowsWithoutAccount) console.log(`  ℹ️  ${leads.rowsWithoutAccount} row(s) had no Account link and were left out.`);
 }
@@ -4348,10 +4637,10 @@ async function main() {
     console.log(sender.apply(
       'Pipeline Assistant — texts OR emails leads from a Salesforce Opportunities LIST VIEW or REPORT.\n\n' +
       'NO FLAGS = THE EMAIL CAMPAIGN:\n' +
-      '       zw                             (HCP manta + 3-2-1 while Chrome loads, then the welcome screen: sign in to Salesforce (your pipeline list opens by itself), press Enter, then pick the email and the rows). This is a LIVE run: it sends.\n' +
-      '       zw --test                      a PRACTICE RUN of the same thing: always a DRY RUN (the email is filled in on each account you pick, NOTHING is sent; --yes cannot change that), and always on your own pipeline list. Pick "Type your own subject line & email" to practise typing one.\n\n' +
+      '       zw                             (H→C→P letter countdown while Chrome loads, then the welcome screen: sign in to Salesforce (your campaign REPORT opens by itself), press Enter, then pick the email and the rows). This is a LIVE run: it sends.\n' +
+      '       zw --test                      a PRACTICE RUN of the same thing: always a DRY RUN (the email is filled in on each account you pick, NOTHING is sent; --yes cannot change that), and always on your campaign report. Pick "Type your own subject line & email" to practise typing one.\n\n' +
       'TEXT:\n' +
-      '       node Assistant.js --text                  (the text campaign: list view; prompts for the rows, and each text is written from the account\'s notes and opportunities: see --no-auto)\n' +
+      '       node Assistant.js --text                  (the text campaign: list view; prompts for the rows; Claude drafts only when turned on in Settings)\n' +
       '       email --text --test                 a TEXT PRACTICE RUN on the testing list (--dry-run alone does the same on the list you have open): on each account the text is typed into the message box and checked, then taken out again. Send is NEVER clicked and nothing is recorded as sent.\n' +
       '       node Assistant.js --template 1 --range 1-10\n' +
       '       node Assistant.js --message "Hey..." --range 1-10\n' +
@@ -4437,7 +4726,7 @@ async function main() {
       '       AUTO WORDING, on by default in the plain campaigns: email (= email --email) and email --text write each message from that account\'s Salesforce notes and opportunities (your Granola note first), exactly as --auto does.\n' +
       '                    Per account it reads, writes (Claude), and checks every claim; you see every draft, answer one y/N, and only that kind goes out (email, or text), through the normal guards. Needs Claude signed in.\n' +
       '                    First, for every account, it opens the account and reads Customer Status (beta): "Enrolled: …" (e.g. Enrolled: Current Customer) is a current customer and is left out (saved on the held list), unless the account is only on the free Invoicing and Payments plan. --force does not bypass it.\n' +
-      '                    --no-auto: pick a template as before.  Also template mode, because you chose the wording or the mode has its own: --message, --template, --email-template, --subject, --body-file, --sequence / --core, --library, --blast, --never-emailed, a text campaign off a --report.\n' +
+      '                    Claude drafts are OFF by default (Settings → Claude drafts → on to enable). --no-auto forces a template. Also template mode when you chose the wording or the mode has its own: --message, --template, --email-template, --subject, --body-file, --sequence / --core, --library, --blast, --never-emailed, a text campaign off a --report.\n' +
       '                    Not part of it: --board, --shark / --queue / --evening / --tomorrow, --reengage, --followup and its variants, --oppy (they keep their fixed wording and timing).\n' +
       '       CUSTOMER STATUS, on by default in EVERY mode: right before every text (and on every email) the account\'s Customer Status (beta) is read on its page. "Enrolled: …" (e.g. Enrolled: Current Customer) is a current customer and is NOT contacted, unless the account is only on the free Invoicing and Payments plan; it is saved on the held list.\n' +
       '       email --shark --send [--template N] [--until HH:MM] [--unknown-zone strict] [--yes]   the hands-off morning: the backup, then it STAYS RUNNING and texts each queued pro as their own 8:00 arrives, until everyone is done (same with  email --queue --send  for a queue you already have). Texts really go out; leave the Chrome window and the Mac as they are. Without --send, --shark sends nothing\n' +
@@ -4473,7 +4762,10 @@ async function main() {
   }
   const unsetSender = sender.missing();
   if (unsetSender.length) console.log(`\n  ⚠️  sender.json is not filled in yet (${unsetSender.join(', ')}). Previews and read-only modes work, but a text or email that carries your name or numbers will not be sent until it is.\n     File: ${sender.FILE}\n`);
-  if (testMode) console.log(`\n  🧪 TEST RUN: the list is ${new URL(CONFIG.listUrl).searchParams.get('filterName')} and this is a DRY RUN. ${args.email ? 'The email is filled in on each account you pick, but NOTHING is sent.' : (args.text || args.report || args.oppy || args.queue || args.reengage) ? 'The text is typed in and taken out again on each account you pick, but NOTHING is sent.' : 'NOTHING is sent.'}\n`);
+  if (testMode) {
+    const rid = (() => { try { return new URL(CONFIG.reportUrl || CONFIG.listUrl).pathname.match(/\/Report\/([A-Za-z0-9]+)/i)?.[1] || 'campaign report'; } catch (_) { return 'campaign report'; } })();
+    console.log(`\n  🧪 TEST RUN: the report is ${rid} and this is a DRY RUN. ${args.email ? 'The email is filled in on each account you pick, but NOTHING is sent.' : (args.text || args.report || args.oppy || args.queue || args.reengage) ? 'The text is typed in and taken out again on each account you pick, but NOTHING is sent.' : 'NOTHING is sent.'}\n`);
+  }
 
   // --sent: build + open the durable texted dashboard (no Salesforce/browser needed).
   if (args.sent) {
@@ -4649,9 +4941,11 @@ async function main() {
     if (!tcpa.anyOpen()) { commandLog('⏰', 'TCPA hours', `HOLD — no US time zone is inside texting hours right now (texting reopens ${tcpa.nextOpen(undefined, { any: true })}). Nothing sent.`); return; }
   }
 
-  const isReport = !!args.report;
-  const viewLabel = isReport ? 'REPORT' : 'list view';
-  const resolveView = (ctx, init, o) => (isReport ? resolveReportPage(ctx, init) : resolveListViewPage(ctx, init, o));
+  // This copy emails/texts from a Salesforce REPORT (CONFIG.reportUrl), not an opportunity list view.
+  // Explicit --report still lets you open a different report by hand; plain zw / zw --text open the saved campaign report.
+  const isReport = !!args.report || !!args.email || !!args.text;
+  const viewLabel = 'REPORT';
+  const resolveView = (ctx, init, o) => (args.report ? resolveReportPage(ctx, init) : resolveCampaignReportPage(ctx, init, o));
 
   // Email runs in its OWN browser (port 9324 / .browser-profile-email) so it can run
   // concurrently with a texting session (port 9323) on the same machine.
@@ -5155,14 +5449,14 @@ async function main() {
         return;
       }
 
-      // AUTO WORDING (autoDraft.js): unless the rep chose the wording or the mode has its own, each email is written from that account's Salesforce notes and opportunities (the --auto
-      // pipeline): no template menu, every draft is shown, one question, then only the email is sent. --no-auto goes back to picking a template.
+      // AUTO WORDING (autoDraft.js): only when Settings has Claude drafts on (and the mode does not pick its own wording). Each email is written from that account's Salesforce notes and
+      // opportunities: no template menu, every draft is shown, one question, then only the email is sent. Off by default → template picker.
       const autoW = autoDraft.wordingFor(args, 'email');
       let autoCtx = null;
       if (autoW.on) {
         autoCtx = await autoDraft.startSession({ args, deps: autoDeps(), channels: ['email'], noAutoHint: true });
         if (!autoCtx) return;
-        commandLog('✨', 'Auto wording', "each email is written from that account's Salesforce notes and opportunities (your Granola note first). Add --no-auto to pick a template instead.");
+        commandLog('✨', 'Auto wording', "each email is written from that account's Salesforce notes and opportunities (your Granola note first). Turn Claude drafts off in Settings to pick a template instead.");
       } else commandLog('ℹ️', 'Auto wording', `off — ${autoW.why}`);
 
       // Which email? Asked only when nothing already chose one (--email-template / --subject / --body-file / --sequence / --library) and someone is at the keyboard.
@@ -5444,12 +5738,11 @@ async function main() {
         try { parsed = parseRange(range); } catch (e) { console.log('  ' + e.message); range = null; }
       }
 
-      if (parsed.end == null) commandLog('⚠️', 'Full scan', 'Range is "all" — scanning the entire loaded list (up to 2000). This is slow; prefer a range like 1-100.');
-      commandLog('📇', 'Harvest', `Scanning the list view${parsed.end ? ` for the first ${parsed.end} account(s)` : ' (all)'}…`);
-      const leads = await harvestListLeads(page, { limit: parsed.end });
-      commandLog('📬', 'Accounts harvested', `${leads.length} account(s) detected${harvestSummary(leads)}`);
-      warnShortHarvest(leads);
-      if (!leads.length) await listViewDiag(page);
+      if (parsed.end == null) commandLog('⚠️', 'Full scan', 'Range is "all" — scanning the entire report. Prefer a range like 1-100.');
+      commandLog('📇', 'Harvest', `Scanning the report${parsed.end ? ` for accounts (will take the first ${parsed.end})` : ' (all)'}…`);
+      let leads = await harvestReportLeads(page);
+      if (parsed.end) leads = leads.slice(0, parsed.end);
+      commandLog('📬', 'Accounts harvested', `${leads.length} account(s) detected`);
 
       if (args.inspect) {
         console.log(`\nAccounts harvested (rows up to ${parsed.end || 'end'}): ${leads.length}\n`);
@@ -5490,11 +5783,27 @@ async function main() {
       return;
     }
 
-    // AUTO WORDING (autoDraft.js): the plain text campaign off a list view writes each text from that account's Salesforce notes and opportunities (the --auto pipeline) instead of asking for a
-    // template, unless the rep chose the wording (--message / --template) or --no-auto. A text campaign off a report keeps its templates.
-    const autoText = autoDraft.wordingFor(args, 'text', { isReport });
+    // AUTO WORDING (autoDraft.js): off by default (templates). When Claude drafts are on in Settings, each text is written from the account's notes.
+    // This copy works from a report, so template mode is the normal path; Claude drafts can still be turned on.
+    const autoText = autoDraft.wordingFor(args, 'text', { isReport: false });
     if (autoText.on) {
-      await autoDraft.runAutoText({ context, initialPage, args, io: { ask, parseRange, resolveView, harvestListLeads, harvestSummary, warnShortHarvest, deps: autoDeps() } });
+      await autoDraft.runAutoText({
+        context, initialPage, args,
+        io: {
+          ask, parseRange, resolveView,
+          harvestListLeads: async (page, opts = {}) => {
+            let leads = await harvestReportLeads(page);
+            if (opts.limit) leads = leads.slice(0, opts.limit);
+            leads.rowsSeen = leads.length;
+            leads.listTotal = leads.length;
+            leads.stopped = 'complete';
+            return leads;
+          },
+          harvestSummary: (leads) => ` from ${leads.length} report row${leads.length === 1 ? '' : 's'}`,
+          warnShortHarvest: () => {},
+          deps: autoDeps(),
+        },
+      });
       return;
     }
     commandLog('ℹ️', 'Auto wording', `off — ${autoText.why}`);

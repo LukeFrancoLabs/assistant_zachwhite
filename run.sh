@@ -11,7 +11,7 @@ cd "$SCRIPT_DIR"
 for a in "$@"; do case "$a" in --same-day|--today|--nocheck|--no-review|--no-check) exec node Assistant.js "$@" ;; esac; done
 
 # No flags = the EMAIL campaign (Pipeline Assistant opens on its welcome screen). Every flag works exactly as before: `zw --text` is the text campaign, `zw --board` the board, and so on.
-# --test (a practice run on your own list, always a dry run) and --dry-run do not name a campaign either, so `zw --test` and `zw --dry-run` are the email campaign too. So is `zw --no-auto` (it only says: pick a template instead of writing each email from the account's notes).
+# --test (a practice run on your own list, always a dry run) and --dry-run do not name a campaign either, so `zw --test` and `zw --dry-run` are the email campaign too. So is `zw --no-auto` (force a template even if Settings has Claude drafts on; Claude drafts are off by default).
 # Done HERE, before the port is picked below, so the email browser (9324) is the one started.
 ONLY_MODIFIERS=1
 for a in "$@"; do case "$a" in --test|--dry-run|--dryrun|--no-auto) ;; *) ONLY_MODIFIERS=0 ;; esac; done
@@ -32,29 +32,70 @@ if [ -f "$SCRIPT_DIR/senderSetup.js" ]; then
 fi
 # (end of the first-launch setup)
 
-# HCP manta + 3-2-1 while Chrome finishes loading. No other loading animation.
-hcp_manta_countdown() {
-  local CYAN='\033[1;36m' BOLD='\033[1m' RESET='\033[0m'
-  if [ -t 1 ]; then
-    printf '\n%b' "$CYAN"
-    cat <<'MANTA'
-              __
-     .-------()----.
-   .'               '.
-  /   .-.       .-.   \\
- |   /   \\ HCP /   \\   |
-  \\  \\___/     \\___/  /
-   '.     manta     .'
-     '-------------'
-MANTA
-    printf '%b\n' "$RESET"
+# Big colored H → C → P countdown while Chrome finishes loading. Each letter carries its line.
+# H = do the work · C = enjoy the journey · P = champion the pro
+hcp_letter_countdown() {
+  local RESET='\033[0m' DIM='\033[2m' BOLD='\033[1m'
+  local H_COLOR='\033[38;5;208m'   # orange
+  local C_COLOR='\033[1;36m'       # cyan
+  local P_COLOR='\033[1;32m'       # green
+  local is_tty=0
+  [ -t 1 ] && is_tty=1
+
+  _hcp_show_letter() {
+    local color="$1" letter="$2" tagline="$3"
+    if [ "$is_tty" = 1 ]; then
+      printf '\033[2J\033[H'      # clear screen for a real countdown beat
+      printf '\n%b%b' "$color" "$BOLD"
+      case "$letter" in
+        H) cat <<'HART'
+    ██  ██
+    ██  ██
+    ██  ██
+    ██████
+    ██  ██
+    ██  ██
+    ██  ██
+HART
+          ;;
+        C) cat <<'CART'
+     █████
+    ██   ██
+    ██
+    ██
+    ██
+    ██   ██
+     █████
+CART
+          ;;
+        P) cat <<'PART'
+    ██████
+    ██   ██
+    ██   ██
+    ██████
+    ██
+    ██
+    ██
+PART
+          ;;
+      esac
+      printf '%b\n' "$RESET"
+      printf '  %b%b%s%b\n\n' "$color" "$BOLD" "$tagline" "$RESET"
+    else
+      printf '\n%c — %s\n\n' "$letter" "$tagline"
+    fi
+    sleep 1
+  }
+
+  _hcp_show_letter "$H_COLOR" H 'do the work'
+  _hcp_show_letter "$C_COLOR" C 'enjoy the journey'
+  _hcp_show_letter "$P_COLOR" P 'champion the pro'
+  if [ "$is_tty" = 1 ]; then
+    printf '\033[2J\033[H'
+    printf '\n%b%b  H  C  P%b\n' "$BOLD" '\033[1;36m' "$RESET"
+    printf '  %bready%b\n\n' "$DIM" "$RESET"
+    sleep 0.35
   fi
-  printf '%b3...%b\n' "$BOLD" "$RESET"
-  sleep 1
-  printf '%b2...%b\n' "$BOLD" "$RESET"
-  sleep 1
-  printf '%b1...%b\n' "$BOLD" "$RESET"
-  sleep 1
 }
 
 # Pick port + profile based on whether this is an email run.
@@ -270,7 +311,7 @@ if [ $REUSE = 0 ]; then
   node start-browser.js &
   BROWSER_PID=$!
 
-  # Wait for CDP port to be available (no dollar / lift-off animation — only the manta countdown after)
+  # Wait for CDP port to be available (H → C → P letter countdown plays after)
   for i in $(seq 1 30); do
     if curl -s http://localhost:$CDP_PORT/json/version >/dev/null 2>&1; then
       break
@@ -285,7 +326,7 @@ if [ $REUSE = 0 ]; then
   fi
 
   sleep 1
-  hcp_manta_countdown
+  hcp_letter_countdown
 fi
 
 # Run the texter (connects via CDP)
