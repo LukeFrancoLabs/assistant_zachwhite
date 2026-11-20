@@ -18,7 +18,7 @@ node --version
 If it prints v18 or higher, go to step 2. If it says "command not found" (or a lower number), install the LTS version from https://nodejs.org (download the macOS installer and click through it), then **close Terminal, open a new one**, and run the check again.
 
 ## 2. Put the folder in your home folder
-Double-click the zip. Move the folder it makes, `Assistant`, to your home folder so that its path is `~/Assistant` (in Finder: Go > Home). Or in Terminal, if the zip is in Downloads:
+Double-click the zip. Move the folder it makes, `assistant_zachwhite`, to your home folder so that its path is `~/assistant_zachwhite` (in Finder: Go > Home). Or in Terminal, if the zip is in Downloads:
 
 ```
 unzip ~/Downloads/Assistant.zip -d ~/
@@ -27,18 +27,18 @@ unzip ~/Downloads/Assistant.zip -d ~/
 ## 3. Install what it needs (once)
 
 ```
-cd ~/Assistant
+cd ~/assistant_zachwhite
 npm install
 npx playwright install chromium
 chmod +x run.sh
 ```
 
-`npx playwright install chromium` downloads the browser the tool drives (a few hundred MB, a few minutes). Notices from `npm install` are normal. If macOS says a file is from an unidentified developer, run `xattr -dr com.apple.quarantine ~/Assistant` and try again.
+`npx playwright install chromium` downloads the browser the tool drives (a few hundred MB, a few minutes). Notices from `npm install` are normal. If macOS says a file is from an unidentified developer, run `xattr -dr com.apple.quarantine ~/assistant_zachwhite` and try again.
 
 ## 4. Make the `email` command
 
 ```
-printf "\nalias email='%s/Assistant/run.sh'\n" "$HOME" >> ~/.zshrc
+printf "\nalias email='%s/assistant_zachwhite/run.sh'\n" "$HOME" >> ~/.zshrc
 source ~/.zshrc
 ```
 
@@ -54,7 +54,7 @@ email --test
 
 Then a green $ shows while the browser loads, then a welcome message. In the browser window that opened, sign in to Salesforce. Your pipeline list opens by itself. Back in Terminal press Enter and give a small range such as 1-3. The tool reads each account in that range and writes its email for you (see **How the messages are written** below), and you read every draft before anything goes out. In `--test` the tool fills in each email on the account page and stops: **nothing is sent.**
 
-Your Salesforce login is saved in `~/Assistant/.browser-profile-email`, so next time you will not have to sign in again (until Salesforce signs you out).
+Your Salesforce login is saved in `~/assistant_zachwhite/.browser-profile-email`, so next time you will not have to sign in again (until Salesforce signs you out).
 
 ## 6. A real run
 `email` with no flags is **live: it sends.** Do a practice run first. It asks once, after it has shown you every drafted email: type `y` to send.
@@ -80,8 +80,8 @@ Every text and email this tool actually sends is also saved, one line each, in `
 
 ## If something goes wrong
 - "command not found: email": open a new Terminal window, or run `source ~/.zshrc`, and redo step 4.
-- "Cannot find module 'playwright'": run `cd ~/Assistant && npm install`.
-- "Executable doesn't exist at .../ms-playwright/...": run `cd ~/Assistant && npx playwright install chromium`.
+- "Cannot find module 'playwright'": run `cd ~/assistant_zachwhite && npm install`.
+- "Executable doesn't exist at .../ms-playwright/...": run `cd ~/assistant_zachwhite && npx playwright install chromium`.
 - "Browser did not start in time": close the tool's browser window, run `lsof -ti :9324 | xargs kill -9`, then `email --test` again.
 - Your list does not open, or Salesforce says you cannot see it: run `email --settings`, choose line 7 and paste the address of a list you can open (copy it from the address bar while that list is showing in your usual browser). It has to be a list of Opportunities.
 - Salesforce opens on a list you did not choose (your recently viewed opportunities): no pipeline list is saved yet. Run `email --settings` and set line 7.

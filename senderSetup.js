@@ -107,7 +107,7 @@ const LIST_HOST = 'housecallpro.lightning.force.com';
 const LIST_PATH = '/lightning/o/Opportunity/list';
 /** What a copy opens when no list was ever saved: the person's OWN recently viewed opportunities (Salesforce's standard "Recent" list view), never somebody else's list. */
 const GENERIC_LIST = `https://${LIST_HOST}${LIST_PATH}?filterName=Recent`;
-const BUILT_IN_LIST_RAW = '';      // share/build-package.js fills this in (PKG_LIST_URL): the list this zip offers at the first launch, or nothing (each person pastes their own)
+const BUILT_IN_LIST_RAW = 'https://housecallpro.lightning.force.com/lightning/o/Opportunity/list?filterName=Zach_White_Official_Fire_Pipeline';      // Zach White's Official Fire Pipeline (this copy); share/build-package.js can also fill PKG_LIST_URL
 const BUILT_IN_LIST = /^\{\{.*\}\}$/.test(BUILT_IN_LIST_RAW) ? '' : BUILT_IN_LIST_RAW;      // (it is still the placeholder when this file is run from share/)
 
 /**

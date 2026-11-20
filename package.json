@@ -1,7 +1,7 @@
 {
-  "name": "assistant",
+  "name": "assistant_zachwhite",
   "version": "1.0.0",
-  "description": "Pipeline Assistant: a Salesforce text and email bot that sends as whoever sets it up. Drives Salesforce through its own Chrome profile and starts with no history of its own.",
+  "description": "Pipeline Assistant for Zach White — opens Zach_White_Official_Fire_Pipeline. Drives Salesforce through its own Chrome profile and starts with no history of its own.",
   "main": "Assistant.js",
   "scripts": {
     "start": "node Assistant.js"
