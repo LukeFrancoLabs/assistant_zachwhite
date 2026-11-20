@@ -852,7 +852,7 @@ async function launchBrowser(opts = {}) {
   return { context, page, cleanup };
 }
 
-// The welcome screen of the EMAIL campaign: what `zw` with no flags opens on, right after run.sh's HCP manta countdown. DR's own words, kept exactly as given, printed in yellow with a rocket at the end.
+// The welcome screen of the EMAIL campaign: what `zw` with no flags opens on, right after run.sh's H→C→P letter countdown. DR's own words, kept exactly as given, printed in yellow with a rocket at the end.
 // The colour codes are left out when the output is not a terminal or NO_COLOR is set (FORCE_COLOR=1 turns them on for a test).
 const WELCOME_EMAIL_TEXT = 'Welcome ' + (sender.firstName || 'there') + ', lets send out an email campaign!\n\nHit Enter when you sign into salesforce AND load the correct opportunity list you want to email 🚀';
 const YELLOW = (!process.env.NO_COLOR && (process.stdout.isTTY || process.env.FORCE_COLOR)) ? ['\x1b[1;33m', '\x1b[0m'] : ['', ''];
@@ -4545,7 +4545,7 @@ async function main() {
     console.log(sender.apply(
       'Pipeline Assistant — texts OR emails leads from a Salesforce Opportunities LIST VIEW or REPORT.\n\n' +
       'NO FLAGS = THE EMAIL CAMPAIGN:\n' +
-      '       zw                             (HCP manta + 3-2-1 while Chrome loads, then the welcome screen: sign in to Salesforce (your pipeline list opens by itself), press Enter, then pick the email and the rows). This is a LIVE run: it sends.\n' +
+      '       zw                             (H→C→P letter countdown while Chrome loads, then the welcome screen: sign in to Salesforce (your pipeline list opens by itself), press Enter, then pick the email and the rows). This is a LIVE run: it sends.\n' +
       '       zw --test                      a PRACTICE RUN of the same thing: always a DRY RUN (the email is filled in on each account you pick, NOTHING is sent; --yes cannot change that), and always on your own pipeline list. Pick "Type your own subject line & email" to practise typing one.\n\n' +
       'TEXT:\n' +
       '       node Assistant.js --text                  (the text campaign: list view; prompts for the rows; Claude drafts only when turned on in Settings)\n' +
