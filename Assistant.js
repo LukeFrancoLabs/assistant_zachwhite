@@ -95,11 +95,11 @@ const CONFIG = {
   tomorrowCdpPort: 9333,
   startUrl: 'https://housecallpro.lightning.force.com/',
   sfUrlSubstring: 'lightning.force.com',
-  // The list the list-view campaigns open by themselves once Salesforce is signed in (resolveListViewPage); a list picked by hand is never replaced.
-  // It is YOUR pipeline list: the link you gave at your first launch, kept in sender.json (change it in Settings: email --settings). senderSetup.js reads it; with none saved it is your recently viewed opportunities.
-  listUrl: (() => { try { return require('./senderSetup').listUrl(); } catch (_) { return 'https://housecallpro.lightning.force.com/lightning/o/Opportunity/list?filterName=Recent'; } })(),
-  // `email --test` (applyTestMode): a PRACTICE RUN on your own list, and always a DRY RUN: every email is filled in on the account page, nothing is sent.
-  testListUrl: (() => { try { return require('./senderSetup').listUrl(); } catch (_) { return 'https://housecallpro.lightning.force.com/lightning/o/Opportunity/list?filterName=Recent'; } })(),
+  // The Salesforce REPORT the email / text campaigns open by themselves (resolveCampaignReportPage). Kept in sender.json (Settings line "Campaign report").
+  reportUrl: (() => { try { return require('./senderSetup').reportUrl(); } catch (_) { return 'https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000H2v6s2AB/view'; } })(),
+  // Older call sites still read listUrl / testListUrl — both point at the same campaign report.
+  listUrl: (() => { try { return require('./senderSetup').reportUrl(); } catch (_) { return 'https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000H2v6s2AB/view'; } })(),
+  testListUrl: (() => { try { return require('./senderSetup').reportUrl(); } catch (_) { return 'https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000H2v6s2AB/view'; } })(),
 
   // Row selectors - tried in order
   rowSelectors: [
@@ -533,7 +533,7 @@ function pipelineOnlyBlock(args) {
   if (String(args.list || '').toLowerCase() === 'lds') bad.push('--list lds');
   if (args.kind && /lds/i.test(String(args.kind))) bad.push('--kind ' + args.kind);
   if (!bad.length) return null;
-  return `\n⛔ This copy only uses your opportunity pipeline list (Zach_White_Official_Fire_Pipeline). LDS mode is not available (${[...new Set(bad)].join(', ')}).\n   Use:  zw   or  zw --text   or  zw --test\n(Nothing was started.)\n`;
+  return `\n⛔ This copy only uses your campaign Salesforce report. LDS mode is not available (${[...new Set(bad)].join(', ')}).\n   Use:  zw   or  zw --text   or  zw --test\n(Nothing was started.)\n`;
 }
 
 // ============================================================================
@@ -626,6 +626,8 @@ const REENGAGE_TEXT = {
 REENGAGE_TEXT.text = sender.apply(REENGAGE_TEXT.text);
 // Saved report modes. LDS / Inbound KA LDS are intentionally omitted in this pipeline-only copy.
 const REPORT_MODES = {
+  // Default campaign report for zw / zw --text / zw --test (also CONFIG.reportUrl via senderSetup).
+  pipeline: { name: 'Zach White Campaign Report', kind: 'Shark', url: 'https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000H2v6s2AB/view' },
   // `zw --shark13`: tomorrow's Shark list (the T13 report: the pros who would post to T14 at midnight). It opens by itself, like --shark opens the saved T14 report.
   shark13: { name: 'T13 Shark List All', kind: 'Shark', url: 'https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000GVYkC2AX/view?queryScope=userFolders' },
 };
@@ -854,18 +856,19 @@ async function launchBrowser(opts = {}) {
 
 // The welcome screen of the EMAIL campaign: what `zw` with no flags opens on, right after run.sh's H→C→P letter countdown. DR's own words, kept exactly as given, printed in yellow with a rocket at the end.
 // The colour codes are left out when the output is not a terminal or NO_COLOR is set (FORCE_COLOR=1 turns them on for a test).
-const WELCOME_EMAIL_TEXT = 'Welcome ' + (sender.firstName || 'there') + ', lets send out an email campaign!\n\nHit Enter when you sign into salesforce AND load the correct opportunity list you want to email 🚀';
+const WELCOME_EMAIL_TEXT = 'Welcome ' + (sender.firstName || 'there') + ', lets send out an email campaign!\n\nHit Enter when you sign into salesforce — your campaign report opens by itself. Wait until the rows are visible, then press Enter 🚀';
 const YELLOW = (!process.env.NO_COLOR && (process.stdout.isTTY || process.env.FORCE_COLOR)) ? ['\x1b[1;33m', '\x1b[0m'] : ['', ''];
 const WELCOME_EMAIL = `\n${YELLOW[0]}${WELCOME_EMAIL_TEXT}${YELLOW[1]}\n`;
 
 /**
- * `--test`: a practice run. The list is CONFIG.testListUrl (your own pipeline list), and it is ALWAYS a dry run (--yes cannot change that): the composers are filled in on
+ * `--test`: a practice run. Uses CONFIG.reportUrl (your campaign report), and it is ALWAYS a dry run (--yes cannot change that): the composers are filled in on
  * each account you pick and nothing is sent. Called first thing in main(), before anything else looks at args.dryRun. → true when test mode is on.
  */
 function applyTestMode(args) {
   if (!args.test) return false;
   args.dryRun = true;
   CONFIG.listUrl = CONFIG.testListUrl;
+  CONFIG.reportUrl = CONFIG.testListUrl;
   return true;
 }
 
@@ -888,8 +891,10 @@ const practiceFlagGiven = (args, argv) => !!args.dryRun || argv.some((a) => PRAC
 
 /** Signed in to Salesforce Lightning? A login page does not count: its address can carry "lightning.force.com" inside a startURL, so the host is matched, not a piece of text. */
 const onLightning = (p) => { const u = p.url() || ''; return /^https:\/\/[^/]*lightning\.force\.com\//.test(u) && !/okta|login|saml|secur\/frontdoor/i.test(u); };
-/** Showing an opportunity list view (DR's, or one picked by hand)? */
+/** Showing an opportunity list view? (legacy; this copy uses a report.) */
 const onOpportunityList = (p) => /\/lightning\/o\/Opportunity\/list/i.test(p.url() || '');
+/** Showing a Salesforce report run page? */
+const onReportUrl = (p) => /\/lightning\/r\/Report\//i.test(p.url() || '');
 /** Wait until the list view shows at least one row, so the harvest that follows never runs on a half-drawn page. */
 async function waitForListRows(page, ms = 45000) {
   const end = Date.now() + ms;
@@ -899,30 +904,57 @@ async function waitForListRows(page, ms = 45000) {
   }
   return false;
 }
+/** Wait until the report iframe is present (and ideally has a data grid). */
+async function waitForReportFrame(page, ms = 60000) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    const frame = reportFrame(page);
+    if (frame) {
+      try {
+        const ready = await frame.evaluate(() => !!document.querySelector('table.data-grid-full-table, table[role="grid"], .data-grid'));
+        if (ready) return frame;
+      } catch (_) { /* frame navigating */ }
+      return frame;      // iframe is there even if the grid is still painting
+    }
+    await sleep(1000);
+  }
+  return null;
+}
 
-// Let the user sign in, then return the tab that shows DR's opportunity list (CONFIG.listUrl)
-async function resolveListViewPage(context, initialPage, o = {}) {
-  const listName = new URL(CONFIG.listUrl).searchParams.get('filterName');
-  // Chrome goes to DR's list straight away: a saved Salesforce login lands on it at once, and a first sign-in is sent back to it by Salesforce (or by the check after the prompt below).
-  try { await initialPage.goto(CONFIG.listUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }); } catch (_) {}
+/**
+ * Open the campaign Salesforce REPORT (CONFIG.reportUrl), wait for sign-in, then wait for the
+ * lightningReportApp iframe so harvestReportLeads can scroll its virtualized grid (same path as --report).
+ */
+async function resolveCampaignReportPage(context, initialPage, o = {}) {
+  const url = CONFIG.reportUrl || CONFIG.listUrl;
+  const reportId = (() => { try { return new URL(url).pathname.match(/\/Report\/([A-Za-z0-9]+)/i)?.[1] || 'report'; } catch (_) { return 'report'; } })();
+  try { await initialPage.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 }); } catch (_) {}
   let page = null;
   for (let first = true; !page; first = false) {
     await ask(first
       ? (o.email ? WELCOME_EMAIL : (
-        '\nIn the Chrome window: log in (if needed) and open your Salesforce OPPORTUNITIES LIST VIEW,\n' +
-        'then press Enter here to continue... '
+        '\nIn the Chrome window: log in (if needed). Your campaign REPORT opens by itself —\n' +
+        'wait until its detail rows are visible, then press Enter here to continue... '
       ))
       : '\nChrome is not signed in to Salesforce yet. Finish signing in in the Chrome window, then hit Enter... ');
-    const lightning = context.pages().filter(onLightning), onList = lightning.filter(onOpportunityList);
-    page = onList.length ? onList[onList.length - 1] : (lightning.length ? lightning[lightning.length - 1] : null);      // a tab already on an opportunity list (even one picked by hand) wins
+    const lightning = context.pages().filter(onLightning);
+    const onRep = lightning.filter(onReportUrl);
+    page = onRep.length ? onRep[onRep.length - 1] : (lightning.length ? lightning[lightning.length - 1] : null);
   }
   try { await page.bringToFront(); } catch (_) {}
-  if (!onOpportunityList(page)) {      // signed in, but on the home page or somewhere else (a saved login that opened home, or a sign-in that did not come back to the list)
-    commandLog('📋', 'Opportunity list', `Opening ${listName}`);
-    try { await page.goto(CONFIG.listUrl, { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch (e) { commandLog('⚠️', 'Opportunity list', `could not open it: ${e.message}`); }
+  if (!onReportUrl(page) || !(page.url() || '').includes(reportId)) {
+    commandLog('📊', 'Campaign report', `Opening ${reportId}`);
+    try { await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch (e) { commandLog('⚠️', 'Campaign report', `could not open it: ${e.message}`); }
   }
-  if (!(await waitForListRows(page))) commandLog('⚠️', 'Opportunity list', 'no rows are showing yet: make sure the list in Chrome has finished loading');
+  commandLog('⏳', 'Report loading', 'waiting for the report grid (virtualized rows load as we scroll)…');
+  if (!(await waitForReportFrame(page))) commandLog('⚠️', 'Campaign report', 'the report iframe is not showing yet — make sure the report finished loading in Chrome');
+  else commandLog('✅', 'Campaign report', 'report grid ready');
   return page;
+}
+
+/** @deprecated name — this copy opens the campaign report. Kept so older call sites still resolve. */
+async function resolveListViewPage(context, initialPage, o = {}) {
+  return resolveCampaignReportPage(context, initialPage, o);
 }
 
 // ============================================================================
@@ -4605,8 +4637,8 @@ async function main() {
     console.log(sender.apply(
       'Pipeline Assistant — texts OR emails leads from a Salesforce Opportunities LIST VIEW or REPORT.\n\n' +
       'NO FLAGS = THE EMAIL CAMPAIGN:\n' +
-      '       zw                             (H→C→P letter countdown while Chrome loads, then the welcome screen: sign in to Salesforce (your pipeline list opens by itself), press Enter, then pick the email and the rows). This is a LIVE run: it sends.\n' +
-      '       zw --test                      a PRACTICE RUN of the same thing: always a DRY RUN (the email is filled in on each account you pick, NOTHING is sent; --yes cannot change that), and always on your own pipeline list. Pick "Type your own subject line & email" to practise typing one.\n\n' +
+      '       zw                             (H→C→P letter countdown while Chrome loads, then the welcome screen: sign in to Salesforce (your campaign REPORT opens by itself), press Enter, then pick the email and the rows). This is a LIVE run: it sends.\n' +
+      '       zw --test                      a PRACTICE RUN of the same thing: always a DRY RUN (the email is filled in on each account you pick, NOTHING is sent; --yes cannot change that), and always on your campaign report. Pick "Type your own subject line & email" to practise typing one.\n\n' +
       'TEXT:\n' +
       '       node Assistant.js --text                  (the text campaign: list view; prompts for the rows; Claude drafts only when turned on in Settings)\n' +
       '       email --text --test                 a TEXT PRACTICE RUN on the testing list (--dry-run alone does the same on the list you have open): on each account the text is typed into the message box and checked, then taken out again. Send is NEVER clicked and nothing is recorded as sent.\n' +
@@ -4730,7 +4762,10 @@ async function main() {
   }
   const unsetSender = sender.missing();
   if (unsetSender.length) console.log(`\n  ⚠️  sender.json is not filled in yet (${unsetSender.join(', ')}). Previews and read-only modes work, but a text or email that carries your name or numbers will not be sent until it is.\n     File: ${sender.FILE}\n`);
-  if (testMode) console.log(`\n  🧪 TEST RUN: the list is ${new URL(CONFIG.listUrl).searchParams.get('filterName')} and this is a DRY RUN. ${args.email ? 'The email is filled in on each account you pick, but NOTHING is sent.' : (args.text || args.report || args.oppy || args.queue || args.reengage) ? 'The text is typed in and taken out again on each account you pick, but NOTHING is sent.' : 'NOTHING is sent.'}\n`);
+  if (testMode) {
+    const rid = (() => { try { return new URL(CONFIG.reportUrl || CONFIG.listUrl).pathname.match(/\/Report\/([A-Za-z0-9]+)/i)?.[1] || 'campaign report'; } catch (_) { return 'campaign report'; } })();
+    console.log(`\n  🧪 TEST RUN: the report is ${rid} and this is a DRY RUN. ${args.email ? 'The email is filled in on each account you pick, but NOTHING is sent.' : (args.text || args.report || args.oppy || args.queue || args.reengage) ? 'The text is typed in and taken out again on each account you pick, but NOTHING is sent.' : 'NOTHING is sent.'}\n`);
+  }
 
   // --sent: build + open the durable texted dashboard (no Salesforce/browser needed).
   if (args.sent) {
@@ -4906,9 +4941,11 @@ async function main() {
     if (!tcpa.anyOpen()) { commandLog('⏰', 'TCPA hours', `HOLD — no US time zone is inside texting hours right now (texting reopens ${tcpa.nextOpen(undefined, { any: true })}). Nothing sent.`); return; }
   }
 
-  const isReport = !!args.report;
-  const viewLabel = isReport ? 'REPORT' : 'list view';
-  const resolveView = (ctx, init, o) => (isReport ? resolveReportPage(ctx, init) : resolveListViewPage(ctx, init, o));
+  // This copy emails/texts from a Salesforce REPORT (CONFIG.reportUrl), not an opportunity list view.
+  // Explicit --report still lets you open a different report by hand; plain zw / zw --text open the saved campaign report.
+  const isReport = !!args.report || !!args.email || !!args.text;
+  const viewLabel = 'REPORT';
+  const resolveView = (ctx, init, o) => (args.report ? resolveReportPage(ctx, init) : resolveCampaignReportPage(ctx, init, o));
 
   // Email runs in its OWN browser (port 9324 / .browser-profile-email) so it can run
   // concurrently with a texting session (port 9323) on the same machine.
@@ -5701,12 +5738,11 @@ async function main() {
         try { parsed = parseRange(range); } catch (e) { console.log('  ' + e.message); range = null; }
       }
 
-      if (parsed.end == null) commandLog('⚠️', 'Full scan', 'Range is "all" — scanning the entire loaded list (up to 2000). This is slow; prefer a range like 1-100.');
-      commandLog('📇', 'Harvest', `Scanning the list view${parsed.end ? ` for the first ${parsed.end} account(s)` : ' (all)'}…`);
-      const leads = await harvestListLeads(page, { limit: parsed.end });
-      commandLog('📬', 'Accounts harvested', `${leads.length} account(s) detected${harvestSummary(leads)}`);
-      warnShortHarvest(leads);
-      if (!leads.length) await listViewDiag(page);
+      if (parsed.end == null) commandLog('⚠️', 'Full scan', 'Range is "all" — scanning the entire report. Prefer a range like 1-100.');
+      commandLog('📇', 'Harvest', `Scanning the report${parsed.end ? ` for accounts (will take the first ${parsed.end})` : ' (all)'}…`);
+      let leads = await harvestReportLeads(page);
+      if (parsed.end) leads = leads.slice(0, parsed.end);
+      commandLog('📬', 'Accounts harvested', `${leads.length} account(s) detected`);
 
       if (args.inspect) {
         console.log(`\nAccounts harvested (rows up to ${parsed.end || 'end'}): ${leads.length}\n`);
@@ -5747,11 +5783,27 @@ async function main() {
       return;
     }
 
-    // AUTO WORDING (autoDraft.js): the plain text campaign off a list view writes each text from that account's notes only when Settings has Claude drafts on. Off by default → template picker.
-    // A text campaign off a report keeps its templates.
-    const autoText = autoDraft.wordingFor(args, 'text', { isReport });
+    // AUTO WORDING (autoDraft.js): off by default (templates). When Claude drafts are on in Settings, each text is written from the account's notes.
+    // This copy works from a report, so template mode is the normal path; Claude drafts can still be turned on.
+    const autoText = autoDraft.wordingFor(args, 'text', { isReport: false });
     if (autoText.on) {
-      await autoDraft.runAutoText({ context, initialPage, args, io: { ask, parseRange, resolveView, harvestListLeads, harvestSummary, warnShortHarvest, deps: autoDeps() } });
+      await autoDraft.runAutoText({
+        context, initialPage, args,
+        io: {
+          ask, parseRange, resolveView,
+          harvestListLeads: async (page, opts = {}) => {
+            let leads = await harvestReportLeads(page);
+            if (opts.limit) leads = leads.slice(0, opts.limit);
+            leads.rowsSeen = leads.length;
+            leads.listTotal = leads.length;
+            leads.stopped = 'complete';
+            return leads;
+          },
+          harvestSummary: (leads) => ` from ${leads.length} report row${leads.length === 1 ? '' : 's'}`,
+          warnShortHarvest: () => {},
+          deps: autoDeps(),
+        },
+      });
       return;
     }
     commandLog('ℹ️', 'Auto wording', `off — ${autoText.why}`);

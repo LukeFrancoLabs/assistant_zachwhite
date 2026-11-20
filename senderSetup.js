@@ -17,9 +17,8 @@
  *                     after the built-in texts are set up, so an edited text is what the text campaign lists, types and sends. text-defaults.json (made by share/build-package.js) holds the built-in texts.
  *   Settings > Claude drafts (line 8)  off by default: plain email / text campaigns pick a template. Turn on to let Claude write each message from the account's notes (needs Claude Code signed in).
  *
- * THE PIPELINE LIST is the address of a Salesforce OPPORTUNITIES list view, pasted from the browser's address bar. Only a housecallpro.lightning.force.com/lightning/o/Opportunity/list?filterName=...
- * address is accepted (the rest of it is dropped). share/build-package.js patches the copy's Assistant.js so CONFIG.listUrl and CONFIG.testListUrl come from listUrl() below: the saved link, else the one
- * this zip was built to offer (PKG_LIST_URL, if any), else the person's own recently viewed opportunities, never somebody else's list. listUrl() never throws and never comes back blank.
+ * THE CAMPAIGN REPORT is the address of a Salesforce REPORT, pasted from the browser's address bar. Only a housecallpro.lightning.force.com/lightning/r/Report/<id>/view address is accepted (the rest of it is
+ * dropped). Assistant.js's CONFIG.reportUrl (and listUrl for older call sites) comes from reportUrl() below: the saved link, else the one this copy was built with, never a blank. reportUrl() never throws.
  *
  * Saved in sender.json (the file sender.js reads; ASSISTANT_SENDER_FILE points at another one, for tests) together with "confirmedAt": when the details were checked. Details that are complete
  * but were never confirmed here (typed by hand, or sent along with the folder) are asked about once too, with the old answers ready to keep.
@@ -55,7 +54,7 @@ const SIGNATURE_TEMPLATE = [
 
 const REQUIRED = ['fullName', 'callNumber', 'textNumber', 'bookingLink'];      // what sender.js cannot do without (firstName and title have a fallback there); the pipeline list is checked on its own, in needsFirstRun
 const SKIP_FLAGS = new Set(['--help', '-h', '--yes', '-y', '--inspect', '--sent', '--texted', '--dashboard']);      // nobody to ask, or nothing is sent
-const HELP = `Who this copy texts and emails as, and the pipeline list that opens by itself. Saved by the setup screen: change it with Settings (type S when ${CMD} starts, or run ${CMD} --settings). fullName must match how Salesforce shows your name on a text.`;
+const HELP = `Who this copy texts and emails as, and the Salesforce campaign report that opens by itself. Saved by the setup screen: change it with Settings (type S when ${CMD} starts, or run ${CMD} --settings). fullName must match how Salesforce shows your name on a text.`;
 
 // ---------------------------------------------------------------- what a good answer looks like
 const WORD = "\\p{L}[\\p{L}'’.\\-]*";
@@ -111,32 +110,33 @@ function parseOnOff(raw) {
   return { error: 'Type on or off.' };
 }
 
-// ---------------------------------------------------------------- the pipeline list
+// ---------------------------------------------------------------- the campaign report
 const LIST_HOST = 'housecallpro.lightning.force.com';
-const LIST_PATH = '/lightning/o/Opportunity/list';
-/** What a copy opens when no list was ever saved: the person's OWN recently viewed opportunities (Salesforce's standard "Recent" list view), never somebody else's list. */
-const GENERIC_LIST = `https://${LIST_HOST}${LIST_PATH}?filterName=Recent`;
-const BUILT_IN_LIST_RAW = 'https://housecallpro.lightning.force.com/lightning/o/Opportunity/list?filterName=Zach_White_Official_Fire_Pipeline';      // Zach White's Official Fire Pipeline (this copy); share/build-package.js can also fill PKG_LIST_URL
-const BUILT_IN_LIST = /^\{\{.*\}\}$/.test(BUILT_IN_LIST_RAW) ? '' : BUILT_IN_LIST_RAW;      // (it is still the placeholder when this file is run from share/)
+const REPORT_PATH = '/lightning/r/Report';
+/** Built-in campaign report for this copy (Zach White). Opened by zw / zw --text / zw --test. */
+const BUILT_IN_REPORT_RAW = 'https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000H2v6s2AB/view';
+const BUILT_IN_REPORT = /^\{\{.*\}\}$/.test(BUILT_IN_REPORT_RAW) ? '' : BUILT_IN_REPORT_RAW;
+const BUILT_IN_LIST = BUILT_IN_REPORT;      // older call sites / packager aliases
+const GENERIC_LIST = BUILT_IN_REPORT || `https://${LIST_HOST}${REPORT_PATH}/00OPD00000H2v6s2AB/view`;
 
 /**
- * A pipeline list: the address of a Salesforce OPPORTUNITIES list view, pasted from the browser's address bar (with or without https://). Everything else in the address is dropped.
- * → https://housecallpro.lightning.force.com/lightning/o/Opportunity/list?filterName=00B3t00000AbCdEFGH
+ * A campaign report: the address of a Salesforce REPORT, pasted from the browser's address bar (with or without https://).
+ * Everything else in the address is dropped. → https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000H2v6s2AB/view
  */
-function parseList(raw) {
+function parseReport(raw) {
   const s = String(raw == null ? '' : raw).trim().replace(/^[<"'(]+|[>"')]+$/g, '');
-  if (!s) return { error: 'Please paste your pipeline list link.' };
+  if (!s) return { error: 'Please paste your Salesforce report link.' };
   if (/\s/.test(s)) return { error: "A link has no spaces in it: paste the whole address from your browser's address bar, in one piece." };
   let u = null;
   try { u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`); } catch (_) { /* not an address at all */ }
-  if (!u || !/^https?:$/.test(u.protocol) || !u.hostname.includes('.')) return { error: "That does not look like a web link. Open your list in Salesforce and copy the whole address from your browser's address bar." };
-  if (u.host !== LIST_HOST) return { error: `That is not a Housecall Pro Salesforce link: it should start with https://${LIST_HOST}/ . Open your list in Salesforce and copy the address from your browser's address bar.` };
-  if (!/^\/lightning\/o\/Opportunity\/list\/?$/i.test(u.pathname)) return { error: 'This tool works from an OPPORTUNITIES list: the link should contain /lightning/o/Opportunity/list . In Salesforce open the Opportunities tab, pick your list, then copy the address.' };
-  const name = u.searchParams.get('filterName') || '';
-  if (!name) return { error: 'That link does not say which list it is (the address should end with ?filterName=...). In Salesforce pick your list from the list menu, then copy the address again.' };
-  if (!/^[A-Za-z0-9_]{1,80}$/.test(name)) return { error: 'The list name in that link has characters a Salesforce list never has. Copy the address again from the address bar.' };
-  return { value: `https://${LIST_HOST}${LIST_PATH}?filterName=${name}` };
+  if (!u || !/^https?:$/.test(u.protocol) || !u.hostname.includes('.')) return { error: "That does not look like a web link. Open your report in Salesforce and copy the whole address from your browser's address bar." };
+  if (u.host !== LIST_HOST) return { error: `That is not a Housecall Pro Salesforce link: it should start with https://${LIST_HOST}/ . Open your report in Salesforce and copy the address from your browser's address bar.` };
+  const m = u.pathname.match(/^\/lightning\/r\/Report\/([A-Za-z0-9]{15,18})\/view\/?$/i);
+  if (!m) return { error: 'This tool works from a Salesforce REPORT: the link should look like /lightning/r/Report/<id>/view . Open the report, then copy the address.' };
+  return { value: `https://${LIST_HOST}${REPORT_PATH}/${m[1]}/view` };
 }
+/** @deprecated alias — campaigns now use a report; kept so older call sites still work. */
+const parseList = parseReport;
 
 const FIELDS = [
   { key: 'fullName', label: 'Full name', ask: 'Your FULL name, exactly as Salesforce shows it on your texts', example: 'Jane Smith', parse: parseFullName },
@@ -145,7 +145,7 @@ const FIELDS = [
   { key: 'callNumber', label: 'Call number', ask: 'The phone number pros should CALL', example: '555-234-5678', parse: parsePhone },
   { key: 'textNumber', label: 'Text number', ask: 'The phone number pros should TEXT', example: '555-345-6789', parse: parsePhone },
   { key: 'bookingLink', label: 'Booking link', ask: 'Your booking link, where pros book a demo with you', example: 'tinyurl.com/jane-demo', parse: parseLink },
-  { key: 'listUrl', label: 'Pipeline list', ask: 'Your PIPELINE LIST: the Salesforce Opportunities list you work from', hint: 'In your normal browser open that list, copy the whole address from the address bar, and paste it here.', example: 'https://housecallpro.lightning.force.com/lightning/o/Opportunity/list?filterName=00B3t00000AbCdEFGH', parse: parseList, fallback: () => BUILT_IN_LIST },
+  { key: 'listUrl', label: 'Campaign report', ask: 'Your CAMPAIGN REPORT: the Salesforce report you email and text from', hint: 'In your normal browser open that report, copy the whole address from the address bar, and paste it here.', example: 'https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000H2v6s2AB/view', parse: parseReport, fallback: () => BUILT_IN_REPORT },
   // Settings only (not asked on first launch): plain email / text campaigns use templates unless this is on.
   { key: 'claudeDrafts', label: 'Claude drafts', ask: 'Claude drafts for plain email and text campaigns', hint: 'off = pick a ready-made template (no Claude). on = Claude writes each message from that account\'s Salesforce notes (needs Claude Code signed in).', example: 'off', parse: parseOnOff, fallback: () => 'off', settingsOnly: true },
 ];
@@ -180,24 +180,30 @@ function load() {
   }
   return { values, confirmedAt: typeof raw.confirmedAt === 'string' ? raw.confirmedAt : '', raw, broken, text };
 }
-/** First launch, or complete details that nobody has checked here yet. A pipeline list that is missing, or is not a good link, counts as an incomplete detail. */
-const needsFirstRun = (state) => REQUIRED.some((k) => !state.values[k]) || !!parseList(state.values.listUrl).error || !state.confirmedAt;
+/** First launch, or complete details that nobody has checked here yet. A campaign report that is missing, or is not a good link, counts as an incomplete detail. */
+const needsFirstRun = (state) => REQUIRED.some((k) => !state.values[k]) || !!parseReport(state.values.listUrl).error || !state.confirmedAt;
 
 /**
- * The pipeline list this copy opens by itself: Assistant.js's CONFIG.listUrl and CONFIG.testListUrl (share/build-package.js patches the copy to read it from here). The link saved in sender.json; until
- * one is saved, the one this zip was built to offer (if any); otherwise the person's own recently viewed opportunities, never somebody else's list. It never throws and never comes back blank:
- * a missing, unreadable or hand-edited sender.json just falls through to the next choice.
+ * The campaign report this copy opens by itself: Assistant.js's CONFIG.reportUrl. The link saved in sender.json; until one is saved, the built-in report for this copy.
+ * Never throws and never comes back blank.
  */
-function listUrl() {
+function reportUrl() {
   try {
-    const r = parseList(load().values.listUrl);
+    const r = parseReport(load().values.listUrl);
     if (!r.error) return r.value;
-  } catch (_) { /* fall through to the next choice */ }
-  const built = parseList(BUILT_IN_LIST);
+  } catch (_) { /* fall through */ }
+  const built = parseReport(BUILT_IN_REPORT);
   return built.error ? GENERIC_LIST : built.value;
 }
-/** The list's name inside its link (a Salesforce id like 00B3t00000AbCdEFGH, or an API name), for the small box; '' when there is none. */
-const listName = (url) => { try { return new URL(url).searchParams.get('filterName') || ''; } catch (_) { return ''; } };
+/** @deprecated alias — same as reportUrl(); older Assistant.js call sites still use listUrl(). */
+const listUrl = reportUrl;
+/** Short label for the start box: the report id from the link. */
+const listName = (url) => {
+  try {
+    const m = new URL(url).pathname.match(/\/Report\/([A-Za-z0-9]{15,18})\//i);
+    return m ? m[1] : '';
+  } catch (_) { return ''; }
+};
 
 class Cancelled extends Error {}
 class SaveFailed extends Error {}
@@ -489,8 +495,8 @@ async function review(io, draft) {
     io.out('');
     io.out('   Your full name must match how Salesforce shows you on a text: that is how your own texts are recognised.');
     io.out('   Tip: paste the booking link into a browser once, to be sure it opens.');
-    io.out(`   Line ${SETUP_COUNT} is the list that opens by itself after you sign in to Salesforce. Make sure it is YOUR pipeline, not a teammate's:`);
-    io.out('   every account on that list is texted and emailed under your name.');
+    io.out(`   Line ${SETUP_COUNT} is the Salesforce REPORT that opens by itself after you sign in. Make sure it is YOUR campaign report:`);
+    io.out('   every account on that report is texted and emailed under your name.');
     io.out(rule);
     const ans = await io.ask(`  Is it all right?  Type yes to save, a number (1-${SETUP_COUNT}) to fix that line, or quit:  `);
     if (ans === null) throw new Cancelled();
@@ -514,7 +520,7 @@ async function firstRun(io, state) {
   const draft = { ...state.values };
   const prefilled = FIELDS.some((f) => state.values[f.key]) || !!BUILT_IN_LIST;
   io.out('');
-  box(io, ['Welcome! Let us set up your name, email signature and pipeline list.', 'You do this once; it is saved.']);
+  box(io, ['Welcome! Let us set up your name, email signature and campaign report.', 'You do this once; it is saved.']);
   io.out('');
   io.out('  Your texts and emails go out under what you type here, so every letter counts.');
   io.out(`  ${COUNT_WORD} quick questions, then you check everything and confirm before anything is saved.`);
@@ -745,7 +751,7 @@ async function settings(io, state) {
 /** The small box at the start of every launch. → 'start' | 'settings' */
 async function startScreen(io, v) {
   io.out('');
-  box(io, [`Sending as:  ${v.fullName}${v.title ? `  ·  ${v.title}` : ''}`, `Pipeline list:  ${listName(v.listUrl) || '(not set)'}`, '', '[Enter] Start          [S] Settings']);
+  box(io, [`Sending as:  ${v.fullName}${v.title ? `  ·  ${v.title}` : ''}`, `Campaign report:  ${listName(v.listUrl) || '(not set)'}`, '', '[Enter] Start          [S] Settings']);
   for (;;) {
     const ans = await io.ask('  > ');
     if (ans === null) throw new Cancelled();
@@ -799,12 +805,12 @@ function selfcheck() {
     const bad = [];
     for (const want of ['Jane Smith', 'Account Executive', 'Text: 555-345-6789', 'Call: 555-234-5678', 'Book A Demo: https://tinyurl.com/jane-demo']) if (!text.includes(want)) bad.push(`missing "${want}"`);
     if (/Luke|970-338-3120|833-337-0813|housecallprodemo|\[SET sender\.json/i.test(text)) bad.push('still holds the first author\'s words or a [SET sender.json] marker');
-    const link = `https://${LIST_HOST}${LIST_PATH}?filterName=00B3t00000AbCdEFGH`;      // the pipeline list: an address pasted from the browser is cut down to this, and a copy never has a blank or foreign one
-    const pasted = parseList(`${link}&0.source=alohaHeader`);
-    if (pasted.error || pasted.value !== link) bad.push('a pasted pipeline list link is not read right');
-    if (parseList(GENERIC_LIST).error) bad.push('the fallback pipeline list is not a good link');
-    const used = listUrl();
-    if (parseList(used).error) bad.push(`listUrl() gave ${JSON.stringify(used)}`);
+    const link = `https://${LIST_HOST}${REPORT_PATH}/00OPD00000H2v6s2AB/view`;
+    const pasted = parseReport(`${link}?queryScope=userFolders&0.source=alohaHeader`);
+    if (pasted.error || pasted.value !== link) bad.push('a pasted campaign report link is not read right');
+    if (parseReport(GENERIC_LIST).error) bad.push('the fallback campaign report is not a good link');
+    const used = reportUrl();
+    if (parseReport(used).error) bad.push(`reportUrl() gave ${JSON.stringify(used)}`);
     // the text messages: the <tokens>, the checks, and the merge over the built-in texts (a temporary file, removed again)
     const v = { fullName: 'Jane Smith', firstName: 'Jane', callNumber: '555-234-5678', textNumber: '555-345-6789', bookingLink: 'https://tinyurl.com/jane-demo' };
     if (expandTokens('Hi <first name> <FULL  name> <call number> <text number> <Booking Link>', v) !== 'Hi Jane Jane Smith 555-234-5678 555-345-6789 tinyurl.com/jane-demo') bad.push('the <tokens> of a text are not filled in right');
@@ -848,7 +854,7 @@ function selfcheck() {
   }
 }
 
-module.exports = { FIELDS, SETUP_FIELDS, REQUIRED, SIGNATURE_TEMPLATE, FILE, LIST_HOST, GENERIC_LIST, parseFullName, parseFirstName, parseTitle, parsePhone, parseLink, parseOnOff, parseList, listUrl, listName, claudeDraftsOn, load, save, needsFirstRun, signatureLines, main, selfcheck,
+module.exports = { FIELDS, SETUP_FIELDS, REQUIRED, SIGNATURE_TEMPLATE, FILE, LIST_HOST, GENERIC_LIST, BUILT_IN_REPORT, parseFullName, parseFirstName, parseTitle, parsePhone, parseLink, parseOnOff, parseReport, parseList, reportUrl, listUrl, listName, claudeDraftsOn, load, save, needsFirstRun, signatureLines, main, selfcheck,
   TEXTS_FILE, DEFAULTS_FILE, MAX_TEXT, MAX_ADDED, REENGAGE_PREFIX, RESERVED_NAMES, RESERVED_PREFIXES, oddChar, expandTokens, checkText, checkName, loadTexts, saveTexts, loadDefaults, applyTextEdits, textsView, textsMenu };
 
 if (require.main === module) {
