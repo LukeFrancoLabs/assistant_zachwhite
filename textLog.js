@@ -39,6 +39,8 @@ const CUST_FILE = path.join(__dirname, 'current-customers.jsonl');   // accounts
 const IND_FILE = path.join(__dirname, 'account-industry.jsonl');
 const EML_FILE = path.join(__dirname, 'account-emails.jsonl');
 const SF_ORIGIN = 'https://housecallpro.lightning.force.com';
+/** This copy (assistant_zachwhite) is pipeline-list only: hide the LDS dashboard tab and #lds tagging. */
+const PIPELINE_ONLY = true;
 
 /** Append one outreach event (text or email) to the durable log. */
 function recordOutreach({ channel, accountId, accountName, accountUrl, email, templateName, message, subject, body, mode, source, step }) {
@@ -92,7 +94,7 @@ function readAll() {
 const MANUAL_FILE = path.join(__dirname, 'manual-shark.jsonl');
 const MANUAL_MODE = 'manual';
 const MANUAL_LIST_NAME = 'Added by hand';
-const MANUAL_TAG_KINDS = { shark: 'Shark', lds: 'LDS' };      // the tags that are real lists
+const MANUAL_TAG_KINDS = PIPELINE_ONLY ? { shark: 'Shark' } : { shark: 'Shark', lds: 'LDS' };      // the tags that are real lists (LDS off in this pipeline-only copy)
 let _manualRec = null;
 /** The tags of an add: its own, or #shark for one added before tags existed. */
 const manualTags = (a) => (a && Array.isArray(a.tags) && a.tags.length ? a.tags : ['shark']);
@@ -1828,14 +1830,14 @@ function generateDashboard() {
     <div class="stat"><b id="s-emails">0</b><span>email on file</span></div>
   </div>
   <div class="tabs groups">
-    <button class="tab on" data-group="leads" type="button" title="The accounts: everyone contacted, the Shark and LDS lists, and the leads held back">Leads</button>
+    <button class="tab on" data-group="leads" type="button" title="The accounts: everyone contacted, the lists, and the leads held back">Leads</button>
     <button class="tab" data-group="tools" type="button" title="Running the bot: follow-up board, send queue, daily harvest and the instructions">Tools</button>
     <button class="tab" data-group="analytics" type="button" title="How the outreach is landing: text and email engagement, replies and performance">Analytics</button>
   </div>
   <div class="tabs subtabs" data-group="leads">
     <button class="tab on" id="tab-shark" type="button">🦈 Shark (<span id="shark-n">0</span>)</button>
     <button class="tab" id="tab-tophit" type="button" title="Pros who answered with interest, and the accounts on your own hit list. They all stay on the follow-up board: only a not-interested reply takes a lead out of it">🎯 Top hit list (<span id="tophit-n">0</span>)</button>
-    <button class="tab" id="tab-lost" type="button">LDS (<span id="lost-n">0</span>)</button>
+    ${PIPELINE_ONLY ? '' : '<button class="tab" id="tab-lost" type="button">LDS (<span id="lost-n">0</span>)</button>'}
     <button class="tab" id="tab-cust" type="button">🤝 Current customers (<span id="cust-n">0</span>)</button>
     <button class="tab" id="tab-free" type="button" title="Enrolled, but every Closed Won opportunity is Invoicing and Payments (the free plan): not a customer, emailed like any lead">🆓 Invoicing &amp; Payments (<span id="free-n">0</span>)</button>
     <button class="tab" id="tab-coach" type="button" title="${_coachHeld ? 'Business coaching is a different department: these accounts are listed here, not as current customers, and are not contacted until you say otherwise' : 'Enrolled, but Closed Won only for business coaching (Foundation, Group, Solo, Solo Plus, Growth Workshop): not a customer, emailed like any lead'}">🎓 Business Coaching${_coachHeld ? '' : ' Leads'} (<span id="coach-n">0</span>)</button>
@@ -1985,7 +1987,7 @@ ${_customTags.map((t) => `      <option value="tag:${t}">✋ #${t} (your own tag
     <details id="addbox" class="addbox">
       <summary>➕ Add a lead I worked by hand: I did stage 1 myself, #tag its kind, track it for stage 2</summary>
       <div class="sub" style="margin:8px 0 0">For a lead you email, text and call yourself. Your stage 1 counts as ALL of Day 1 (text 1, text 2 and email 1): the bot leaves those alone (the once-a-day guards and the text queue see your touch) and the lead lands in the "Next: Day 2 · Text 3" column below, turning green the next day, in its own time zone.</div>
-      <div class="sub" style="margin:6px 0 0"><b>#Tag the kind of lead it is.</b> <b>#shark</b> puts it on the 🦈 Shark tab, <b>#lds</b> on the LDS tab; a tag of your own (say <b>#referral</b>) is a label you can filter by. Whatever its tags, every lead on this board follows the same thirteen stages over 60 days, by itself, inside its own texting hours. Tick several if it is several kinds.</div>
+      <div class="sub" style="margin:6px 0 0"><b>#Tag the kind of lead it is.</b> <b>#shark</b> puts it on the 🦈 Shark tab${PIPELINE_ONLY ? '' : '; <b>#lds</b> on the LDS tab'}; a tag of your own (say <b>#referral</b>) is a label you can filter by. Whatever its tags, every lead on this board follows the same thirteen stages over 60 days, by itself, inside its own texting hours. Tick several if it is several kinds.</div>
       <div class="sub" style="margin:6px 0 0"><b>Texts and emails go out together</b> from one run: <code>email --board</code> (add <code>--inspect</code> to look first, no browser). Email 1 is Day 1, Email 2 is Day 3.</div>
       <div class="sub" style="margin:6px 0 0">This page cannot save anything by itself: fill it in, run the command it builds in Terminal, then refresh the page.</div>
       <div class="abg">
@@ -2000,7 +2002,7 @@ ${_customTags.map((t) => `      <option value="tag:${t}">✋ #${t} (your own tag
         <label><input type="checkbox" id="ab-call" checked> 📞 called</label></div>
       <div class="abd" style="margin-top:8px"><b>Kind of lead:</b>
         <label><input type="checkbox" id="ab-t-shark" checked> #shark</label>
-        <label><input type="checkbox" id="ab-t-lds"> #lds</label>
+        ${PIPELINE_ONLY ? '' : '<label><input type="checkbox" id="ab-t-lds"> #lds</label>'}
         <label class="abo">your own tags<input type="text" id="ab-tags" placeholder="#referral #trade-show"></label>
         <span id="ab-chips"></span></div>
       <div class="abh" id="ab-tagnote"></div>
@@ -2008,7 +2010,7 @@ ${_customTags.map((t) => `      <option value="tag:${t}">✋ #${t} (your own tag
       <div class="abc"><code id="ab-cmd">Paste the account's Salesforce link above</code><button type="button" id="ab-copy">Copy command</button></div>
     </details>
     <div class="sub" style="margin-bottom:10px">Everyone on a list (or #tagged by you): banned, closed-won and current customers are left out. <b>✋ Cards are leads you added by hand</b>; filter by tag with the list on the right, and by <b>🏭 industry</b> (one or more) with the picker next to it.</div>
-    <div class="bar"><input id="bq" type="search" placeholder="Search account…"><select id="blist" title="Which leads: all of them, one list, the ones you added by hand, or one of your own #tags"><option value="">All leads</option><option value="Shark">#shark</option><option value="LDS">#lds</option><option value="@hand">✋ Added by hand</option>${_customTags.map((t) => `<option value="tag:${t}">#${t}</option>`).join('')}</select><details id="bind" class="indpick"><summary id="bind-sum" title="Pick one or more industries to see only those leads. The industry is the Salesforce Industry once email --industry has read it, else a guess from the business name (marked ~)">🏭 All industries</summary><div class="indbox"><div class="indnote" id="bind-note"></div><div id="bind-list"></div><button type="button" id="bind-clear">Show all industries</button></div></details><select id="bshow" title="Everyone, only the leads ready for their next stage, only the ones reached today (who we already texted or emailed), or the paused / held ones"><option value="">Everyone</option><option value="ready">⏰ Ready for their next stage</option><option value="today">✅ Reached today</option><option value="stuck">⏸ Paused or held</option></select></div>
+    <div class="bar"><input id="bq" type="search" placeholder="Search account…"><select id="blist" title="Which leads: all of them, one list, the ones you added by hand, or one of your own #tags"><option value="">All leads</option><option value="Shark">#shark</option>${PIPELINE_ONLY ? '' : '<option value="LDS">#lds</option>'}<option value="@hand">✋ Added by hand</option>${_customTags.map((t) => `<option value="tag:${t}">#${t}</option>`).join('')}</select><details id="bind" class="indpick"><summary id="bind-sum" title="Pick one or more industries to see only those leads. The industry is the Salesforce Industry once email --industry has read it, else a guess from the business name (marked ~)">🏭 All industries</summary><div class="indbox"><div class="indnote" id="bind-note"></div><div id="bind-list"></div><button type="button" id="bind-clear">Show all industries</button></div></details><select id="bshow" title="Everyone, only the leads ready for their next stage, only the ones reached today (who we already texted or emailed), or the paused / held ones"><option value="">Everyone</option><option value="ready">⏰ Ready for their next stage</option><option value="today">✅ Reached today</option><option value="stuck">⏸ Paused or held</option></select></div>
     <div class="indrun" id="bind-run" hidden>🏭 Work only these industries: <code id="bind-cmd"></code><button type="button" id="bind-copy">Copy command</button><span>Run it in Terminal; add <code>--inspect</code> to look first (no browser, nothing sent).</span></div>
     <div class="sub">Every lead follows thirteen stages over 60 days, by itself, in its own time zone: <b>Day 1</b> text 1, text 2, email 1 (<b>✋ all by hand</b>: you do Day 1 yourself. Text 2 is your own 2 PM text and the board never sends it; text 1 and email 1 are only marked, and the board still sends them if you run them) · <b>Day 2</b> text 3 · <b>Day 3</b> text 4, email 2 · <b>Day 5</b> text 5 · <b>Day 9</b> email 3 · <b>Day 14</b> text 6 · <b>Day 21</b> email 4 · <b>Day 28</b> text 7 · <b>Day 42</b> email 5 · <b>Day 60</b> text 8. A lead sits in the column of the stage it is waiting for; green = ready. <b>✋</b> = a stage you do by hand, <b>🤖</b> = a stage the board does by itself. Read from our own log, not from the Shark report. Look: <code>email --board --inspect</code> · run: <code>email --board</code> · only some industries: tick them in the 🏭 picker and the page builds the command (<code>--trade</code>)</div>
     <div id="bsum" class="sub"></div>
@@ -2570,16 +2572,17 @@ const APPDIR = ${JSON.stringify(__dirname)}, OWN_TAGS = ${customTagsJson};
   const IDRE = /001[A-Za-z0-9]{12}(?:[A-Za-z0-9]{3})?/g, TAGRE = /^[a-z0-9][a-z0-9_-]{0,23}$/;
   const LISTTAG = (t)=>t==='shark'||t==='lds';
   function abIds(){ const seen = new Set(), out = []; (String(E('ab-ref').value).match(IDRE)||[]).forEach(x=>{ const k = x.toLowerCase().slice(0,15); if(!seen.has(k)){ seen.add(k); out.push(x); } }); return out; }
-  // the tags: the two boxes (#shark, #lds) plus whatever is typed under "your own tags" (#referral #trade-show: spaces or commas) → { tags, typed, bad }
+  // the tags: the list boxes (#shark${PIPELINE_ONLY ? '' : ', #lds'}) plus whatever is typed under "your own tags" → { tags, typed, bad }
   function abTags(){
     const typed = [], bad = [], tags = [];
     String(E('ab-tags').value).split(/[ ,;]+/).forEach(x=>{ const t = x.replace(/^#+/,'').toLowerCase(); if(!t) return; if(!TAGRE.test(t)) bad.push(x); else if(!typed.includes(t)) typed.push(t); });
-    if(E('ab-t-shark').checked) tags.push('shark'); if(E('ab-t-lds').checked) tags.push('lds');
+    if(E('ab-t-shark') && E('ab-t-shark').checked) tags.push('shark');
+    if(E('ab-t-lds') && E('ab-t-lds').checked) tags.push('lds');
     typed.forEach(t=>{ if(!tags.includes(t)) tags.push(t); });
     return { tags, typed, bad };
   }
   function abTagNote(tags){
-    if(!tags.length) return '⚠️ Pick at least one tag: #shark, #lds or one of your own.';
+    if(!tags.length) return '⚠️ Pick at least one tag: #shark${PIPELINE_ONLY ? '' : ', #lds'} or one of your own.';
     const own = tags.filter(t=>!LISTTAG(t)), L = [];
     if(tags.includes('shark')) L.push('#shark: on the 🦈 Shark tab; the follow-up board texts it on its stage days (email --board)');
     if(tags.includes('lds')) L.push('#lds: on the LDS tab; the follow-up board texts it too (email --board takes LDS leads)');
@@ -2620,7 +2623,7 @@ const APPDIR = ${JSON.stringify(__dirname)}, OWN_TAGS = ${customTagsJson};
     try{ navigator.clipboard.writeText(cmd).then(done, fallback); }catch(_){ fallback(); }
   });
   ['ab-ref','ab-name','ab-note','ab-date','ab-tags'].forEach(id=>E(id).addEventListener('input', abUpdate));
-  ['ab-on','ab-email','ab-text','ab-call','ab-t-shark','ab-t-lds'].forEach(id=>E(id).addEventListener('change', abUpdate));
+  ['ab-on','ab-email','ab-text','ab-call','ab-t-shark','ab-t-lds'].forEach(id=>{ const el=E(id); if(el) el.addEventListener('change', abUpdate); });
   abUpdate();
 }
 document.querySelectorAll('th[data-sort]').forEach(th=>{
@@ -2654,7 +2657,7 @@ document.getElementById('csv').addEventListener('click',()=>{
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='outreach-log.csv'; a.click();
 });
 const LOST = ${lostJson};
-document.getElementById('lost-n').textContent = LOST.length;
+const _lostN = document.getElementById('lost-n'); if (_lostN) _lostN.textContent = LOST.length;
 const lq = document.getElementById('lq'), lflt = document.getElementById('lflt');
 const lstage = (r)=> pending[r.key] ? pending[r.key].stage : (r.note ? r.note.stage : '');
 function renderLost(){

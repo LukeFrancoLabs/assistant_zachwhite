@@ -35,7 +35,7 @@ const path = require('path');
 const DEFAULT_DAYS = 5;
 const MODE = 'blast';                         // the `mode` its log rows carry (cadence.BLAST_MODE: the follow-up board ignores such rows)
 const DRAFTS = 'blast-emails.jsonl';          // the emails typed at the prompt, one JSON line each, the newest last
-const LISTS = { shark: 'Shark', lds: 'LDS', 'email-report': 'Email report', 'free-plan': 'Free plan' };       // --list name → the list kind cadence.members reports
+const LISTS = { shark: 'Shark', 'email-report': 'Email report', 'free-plan': 'Free plan' };       // --list name → the list kind cadence.members reports (LDS omitted in this pipeline-only copy)
 const fmt = (x) => Number(x).toLocaleString('en-US');
 const clip = (s, n) => { s = String(s == null ? '' : s).replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 const when = (iso) => { const d = new Date(iso); return Number.isFinite(d.getTime()) ? d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '?'; };

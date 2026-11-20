@@ -48,6 +48,9 @@ const followupRetired = require('./followupRetired');                  // plain 
 const sender = require('./sender');                                    // who this copy texts and emails as (sender.json): every piece of wording below passes through sender.apply()
 const autoDraft = require('./autoDraft');                              // the --auto pipeline as a reusable step: --auto and the plain email and text campaigns write their messages through it
 
+/** This copy (assistant_zachwhite) works from the opportunity PIPELINE LIST only. LDS report / dashboard modes are disabled. */
+const PIPELINE_ONLY = true;
+
 // ============================================================================
 // CONFIG
 // ============================================================================
@@ -465,8 +468,7 @@ function parseArgs(argv) {
     else if (a === '--zone') args.zone = argv[++i];
     else if (a === '--thread-probe') args.threadProbe = argv[++i];
     else if (a === '--load-wait') args.loadWaitMs = Math.max(0, (parseFloat(argv[++i]) || 15) * 1000);
-    else if (a === '--lds') { args.reviewReport = true; args.mode = 'lds'; args.modes.push('lds'); }
-    else if (a === '--inbound-lds' || a === '--inbound-ka-lds') { args.reviewReport = true; args.mode = 'inbound-lds'; args.modes.push('inbound-lds'); }
+    else if (a === '--lds' || a === '--inbound-lds' || a === '--inbound-ka-lds') { args.wantLds = a; }
     else if (a === '--shark') { args.snapshot = true; args.sharkMode = true; if (REPORT_MODES.shark) args.mode = 'shark'; }
     else if (a === '--shark13') { args.snapshot = true; args.sharkMode = true; args.shark13 = true; args.mode = 'shark13'; }   // the --shark backup of the T13 report (tomorrow's Shark list); with --send it texts each pro at their own NEXT 8:00 AM (tomorrowSend.js)
     else if (a === '--tomorrow') args.tomorrow = true;                                  // with --send: hold every text until each pro's own NEXT 8:00 AM (tomorrow morning when started at night); nobody is texted tonight (tomorrowSend.js)
@@ -515,7 +517,23 @@ function parseArgs(argv) {
   }
   if (args.pick && args.snapshot && !args.shark13) args.mode = null;      // no saved report: the manual "open the list, press Enter" path
   if (args.shark13 && args.send) args.tomorrow = true;      // --shark13 is TOMORROW's list: texting it means each pro's next 8:00 AM, never "whoever is inside their hours tonight"
+  if (PIPELINE_ONLY) args.noLds = true;      // follow-up never pulls LDS leads in this copy
   return args;
+}
+
+/** Refuse LDS entry points in this pipeline-only copy. → error string or null. */
+function pipelineOnlyBlock(args) {
+  if (!PIPELINE_ONLY) return null;
+  const bad = [];
+  if (args.wantLds) bad.push(args.wantLds);
+  if (args.mode === 'lds' || args.mode === 'inbound-lds') bad.push('--' + args.mode);
+  for (const m of args.modes || []) if (m === 'lds' || m === 'inbound-lds') bad.push('--' + m);
+  if (args.scan === 'lds' || args.scan === 'inbound-lds') bad.push('--scan ' + args.scan);
+  if (args.fromDashboard) bad.push('--from-dashboard');
+  if (String(args.list || '').toLowerCase() === 'lds') bad.push('--list lds');
+  if (args.kind && /lds/i.test(String(args.kind))) bad.push('--kind ' + args.kind);
+  if (!bad.length) return null;
+  return `\n⛔ This copy only uses your opportunity pipeline list (Zach_White_Official_Fire_Pipeline). LDS mode is not available (${[...new Set(bad)].join(', ')}).\n   Use:  zw   or  zw --text   or  zw --test\n(Nothing was started.)\n`;
 }
 
 // ============================================================================
@@ -606,12 +624,9 @@ const REENGAGE_TEXT = {
   text: "Hey its Luke at HCP. Did you want to activate the software for $26 so we can help you get more jobs and streamline operations? Remember, we give you a $100 amazon giftcard after your 2nd onboarding session with us so this is a win for you!",
 };
 REENGAGE_TEXT.text = sender.apply(REENGAGE_TEXT.text);
-// Saved report modes: `email --lds` opens the report itself, so there is nothing to
-// click through first. Add more here as { flag: { name, url } }.
+// Saved report modes. LDS / Inbound KA LDS are intentionally omitted in this pipeline-only copy.
 const REPORT_MODES = {
-  lds: { name: 'LDS', kind: 'LDS', url: 'https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000GFcv42AD/view?queryScope=userFolders' },
-  'inbound-lds': { name: 'Inbound KA LDS', kind: 'LDS', url: 'https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000BmtlR2AR/view?queryScope=userFolders' },
-  // `email --shark13`: tomorrow's Shark list (the T13 report: the pros who would post to T14 at midnight). It opens by itself, like --shark opens the saved T14 report.
+  // `zw --shark13`: tomorrow's Shark list (the T13 report: the pros who would post to T14 at midnight). It opens by itself, like --shark opens the saved T14 report.
   shark13: { name: 'T13 Shark List All', kind: 'Shark', url: 'https://housecallpro.lightning.force.com/lightning/r/Report/00OPD00000GVYkC2AX/view?queryScope=userFolders' },
 };
 // `email --shark --pick` asks which Shark list to back up. A list whose report is not saved yet (T30, T150+) is opened by hand once and then remembered in report-modes.json.
@@ -625,7 +640,12 @@ const SHARK_PICK = [
 // → `email --shark`, `email --auto --shark`, and `email --lists` pick it up.
 try {
   const extra = JSON.parse(fs.readFileSync(path.join(__dirname, 'report-modes.json'), 'utf8'));
-  for (const [k, v] of Object.entries(extra)) if (v && /^https:\/\//.test(v.url || '') && /^[a-z0-9-]+$/.test(k)) REPORT_MODES[k] = { name: v.name || k, url: v.url, kind: v.kind || textLog.classifyList(v.name || k) };
+  for (const [k, v] of Object.entries(extra)) {
+    if (!(v && /^https:\/\//.test(v.url || '') && /^[a-z0-9-]+$/.test(k))) continue;
+    const kind = v.kind || textLog.classifyList(v.name || k);
+    if (PIPELINE_ONLY && (/lds/i.test(String(kind || '')) || /lds/i.test(k))) continue;      // this copy never loads an LDS report mode
+    REPORT_MODES[k] = { name: v.name || k, url: v.url, kind };
+  }
 } catch (_) {}
 
 function listTemplates() {
@@ -3580,11 +3600,14 @@ async function runAuto(context, initialPage, args) {
     const mine = log.filter((r) => r.accountId && r.accountId.toLowerCase() === id.toLowerCase());
     leads = [{ accountId: id, name: (mine[0] && mine[0].accountName) || id, url: `https://${CONFIG.startUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}/lightning/r/Account/${id}/view` }];
   } else if (args.mode || args.report) {
-    // Source = a Salesforce REPORT: a saved one (--lds / --inbound-lds) or whichever you open (--report).
+    // Source = a Salesforce REPORT you open (--report), or a saved non-LDS mode.
     const r = await openReportAndHarvest(context, initialPage, args);
     if (!r) return;
     page = r.page; leads = r.leads; leadSource = r.source && r.source.kind ? { kind: r.source.kind, name: r.source.name } : null;
     if (!leads.length) { console.log('\n⚠️  No accounts found. Open the report so its rows are visible, then retry.\n'); return; }
+  } else if (PIPELINE_ONLY) {
+    console.log('\n⛔ --auto with no source used to mean the LDS dashboard tab. This copy is pipeline-list only.\n   Use:  zw / zw --text  (your opportunity list)  or  zw --auto --report  (a report you open)\n');
+    return;
   } else {
     // Default source = the DASHBOARD's LDS tab (accounts whose opportunities include a Lost Demo
     // stage, from --harvest --deep / --lds / --review reads). Banned accounts and ones already sent a custom
@@ -4286,6 +4309,8 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   // no flags = the EMAIL campaign and its welcome screen (run.sh does the same first, so the email Chrome is the one it starts); --test and --dry-run alone do not name a campaign, so they mean the email campaign too. `--text` is the text campaign.
   if (process.argv.slice(2).every((a) => a === '--test' || a === '--dry-run' || a === '--dryrun')) args.email = true;
+  const ldsBlock = pipelineOnlyBlock(args);
+  if (ldsBlock) { console.error(ldsBlock); process.exit(1); }
   const testMode = applyTestMode(args);      // --test: the testing list and a DRY RUN, decided here, before anything below looks at args.dryRun
   const practiceProblem = practiceFlagProblem(process.argv.slice(2));
   if (practiceProblem) { console.error(practiceProblem); process.exit(1); }
