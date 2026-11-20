@@ -508,7 +508,7 @@ function parseArgs(argv) {
     else if (a === '--zone-only') args.zoneOnly = argv[++i];                          // --followup --zone-only PT: only pros whose saved time zone is Pacific
     else if (a === '--max') { const v = argv[++i]; args.max = /^all$/i.test(String(v)) ? Number.MAX_SAFE_INTEGER : (parseInt(v, 10) || 25); args.maxSet = true; }
     else if (a === '--auto') args.auto = true;
-    else if (a === '--no-auto') args.noAuto = true;      // plain email / text campaigns: pick a template as before, instead of writing each message from the account's notes and opportunities (autoDraft.js)
+    else if (a === '--no-auto') args.noAuto = true;      // force template mode even when Settings has Claude drafts on
     else if (a === '--evidence-only') args.evidenceOnly = true;
     else if (a === '--again') args.again = true;
     else if (a === '--max-age-days') args.maxAgeDays = parseFloat(argv[++i]) || 7;
@@ -2768,7 +2768,7 @@ async function readListTotal(page) {
   } catch (_) { return null; }
 }
 
-/** Runs IN THE PAGE: every rendered row of the list (also inside shadow roots) with its Account link. → [{ key, accountId, name }]. Rows with no link at all (the spacer rows of a virtualised grid) are left out. */
+/** Runs IN THE PAGE: every rendered row of the list (also inside shadow roots / split-view sidebar) with its Account link. → [{ key, accountId, name }]. Rows with no link at all (the spacer rows of a virtualised grid) are left out. */
 function pageReadRows() {
   const deepAll = (root, sel, out) => {
     try { root.querySelectorAll(sel).forEach((e) => out.push(e)); } catch (_) {}
@@ -2776,8 +2776,10 @@ function pageReadRows() {
     return out;
   };
   const ID = /\/(001[A-Za-z0-9]{12,15})(?=[/?#]|$)/;
-  const out = [], seenEl = new Set();
-  for (const r of deepAll(document, 'table[role="grid"] tbody tr, div[role="row"]', [])) {
+  const OPP = /\/(006[A-Za-z0-9]{12,15})(?=[/?#]|$)/;
+  const out = [], seenEl = new Set(), seenKey = new Set();
+  const rowSels = 'table[role="grid"] tbody tr, div[role="row"], li[role="option"], .slds-split-view__list-item, .slds-split-view li, .forceVirtualListview .slds-hint-parent';
+  for (const r of deepAll(document, rowSels, [])) {
     if (seenEl.has(r)) continue;
     seenEl.add(r);
     if (!r.getClientRects().length) continue;      // not on screen (a page opened earlier that Salesforce keeps hidden in the DOM): not part of this list
@@ -2786,51 +2788,235 @@ function pageReadRows() {
     const hrefOf = (a) => a.getAttribute('href') || '';
     const acct = links.find((a) => /\/lightning\/r\/Account\/001/.test(hrefOf(a))) || links.find((a) => /\/Account\/001/.test(hrefOf(a))) || links.find((a) => ID.test(hrefOf(a)));
     const m = acct ? hrefOf(acct).match(ID) : null;
-    const key = r.getAttribute('data-row-key-value') || r.getAttribute('data-row-number') || hrefOf(links[0]) || (r.textContent || '').trim().slice(0, 80);
+    // Split-view sidebar rows often link the Opportunity (006) only — still count the row so the harvest total matches the list header; accountId stays null until an Account link exists.
+    const opp = !m && links.find((a) => OPP.test(hrefOf(a)));
+    const key = r.getAttribute('data-row-key-value') || r.getAttribute('data-row-number') || hrefOf(links[0]) || (opp ? hrefOf(opp) : '') || (r.textContent || '').trim().slice(0, 80);
+    if (!key || seenKey.has(key)) continue;
+    seenKey.add(key);
     out.push({ key, accountId: m ? m[1] : null, name: acct ? (acct.textContent || '').trim().replace(/Edit Account Name/gi, '').trim() : null });
   }
   return out;
 }
 
-/** Where the list scrolls: the nearest scrolling ancestor of the first row (or the page), its centre and visible height, so a real mouse wheel can be turned over it. resetTop = scroll it back to the top first. → { x, y, h } or null when there is no row. */
+/**
+ * Find the Salesforce list-view scroller (split-view sidebar first — that is what lazy-loads more rows —
+ * then the datatable / virtual list, then the nearest scrolling ancestor of a visible row).
+ * Runs in the page. → { el, box } or null.
+ */
+function pageFindListScroller(resetTop) {
+  const deepAll = (root, sel, out) => {
+    try { root.querySelectorAll(sel).forEach((e) => out.push(e)); } catch (_) {}
+    for (const el of root.querySelectorAll('*')) if (el.shadowRoot) deepAll(el.shadowRoot, sel, out);
+    return out;
+  };
+  const up = (el) => el.parentElement || (el.getRootNode && el.getRootNode().host) || null;
+  const isScrollable = (el) => {
+    if (!el || !el.getBoundingClientRect) return false;
+    try {
+      const cs = getComputedStyle(el);
+      if (!/(auto|scroll)/.test(cs.overflowY)) return false;
+      // Virtual lists often have scrollHeight ≈ clientHeight until they load more; still usable if they have a visible height.
+      return el.clientHeight > 40;
+    } catch (_) { return false; }
+  };
+  const score = (el) => {
+    if (!el) return -1;
+    const box = el.getBoundingClientRect();
+    if (box.width < 40 || box.height < 40) return -1;
+    let s = 0;
+    const cls = `${el.className || ''} ${el.tagName || ''}`.toLowerCase();
+    // Prefer the split-view sidebar / list navigation pane (lazy-loads as you scroll it).
+    if (/split-view|splitview|list-view-manager|listviewmanager|forcevirtuallist|uiVirtualDataTable|virtualList/i.test(cls)) s += 50;
+    if (el.getAttribute && /listbox|grid/.test(el.getAttribute('role') || '')) s += 10;
+    if (box.left < innerWidth * 0.45) s += 20;      // left pane (split view) beats a wide main table
+    if (el.scrollHeight > el.clientHeight + 4) s += 15;
+    s += Math.min(box.height, 800) / 100;
+    return s;
+  };
+  const preferredSels = [
+    '.slds-split-view .slds-scrollable_y',
+    '.slds-split-view .slds-scrollable',
+    '.slds-split-view_container .slds-scrollable_y',
+    '.slds-split-view_container .slds-scrollable',
+    '.slds-split-view__list-container',
+    'force-list-view-manager-grid .slds-scrollable',
+    '.forceListViewManager .slds-scrollable',
+    '.forceVirtualListview',
+    '.forceVirtualTreeGrid',
+    'lightning-datatable .slds-scrollable',
+    '.slds-table_container',
+    '[role="grid"]',
+  ];
+  let best = null, bestScore = -1;
+  for (const sel of preferredSels) {
+    for (const el of deepAll(document, sel, [])) {
+      if (!isScrollable(el) && !(el.scrollHeight > el.clientHeight + 4)) continue;
+      const sc = score(el);
+      if (sc > bestScore) { best = el; bestScore = sc; }
+    }
+  }
+  // Fallback: nearest scrolling ancestor of a visible data row.
+  if (!best) {
+    const row = deepAll(document, 'table[role="grid"] tbody tr, div[role="row"], li[role="option"], .slds-split-view__list-item', [])
+      .find((r) => r.getClientRects().length && (r.querySelector('a[href]') || r.querySelector('[href]')));
+    if (row) {
+      let el = up(row);
+      while (el) {
+        if (isScrollable(el) || (el.scrollHeight > el.clientHeight + 4)) { best = el; break; }
+        el = up(el);
+      }
+    }
+  }
+  if (resetTop) {
+    if (best) best.scrollTop = 0;
+    else window.scrollTo(0, 0);
+  }
+  if (!best) return null;
+  const box = best.getBoundingClientRect();
+  const top = Math.max(box.top, 0), bottom = Math.min(box.bottom, innerHeight);
+  return {
+    x: box.left + Math.min(box.width, Math.max(innerWidth - box.left, 0)) / 2,
+    y: top + (bottom - top) / 2,
+    h: Math.max(bottom - top, 100),
+    scrollTop: Math.round(best.scrollTop || 0),
+    scrollHeight: Math.round(best.scrollHeight || 0),
+    clientHeight: Math.round(best.clientHeight || 0),
+  };
+}
+
+/** Where the list scrolls: split-view sidebar / list manager first, then the grid. resetTop = scroll it back to the top first. → { x, y, h, … } or null. */
 async function pageScrollTarget(page, resetTop = false) {
+  try { return await page.evaluate(pageFindListScroller, resetTop); } catch (_) { return null; }
+}
+
+/**
+ * Physically scroll the open list view down one step the way a person does: move the last visible row into view,
+ * bump the scroller's scrollTop, fire scroll + wheel events over the sidebar/grid, then PageDown.
+ * Salesforce lazy-loads more rows only when that pane actually moves. → { moved, atBottom, … } or null.
+ */
+async function scrollListViewStep(page) {
+  let info = null;
   try {
-    return await page.evaluate((reset) => {
+    info = await page.evaluate(() => {
       const deepAll = (root, sel, out) => {
         try { root.querySelectorAll(sel).forEach((e) => out.push(e)); } catch (_) {}
         for (const el of root.querySelectorAll('*')) if (el.shadowRoot) deepAll(el.shadowRoot, sel, out);
         return out;
       };
-      const row = deepAll(document, 'table[role="grid"] tbody tr, div[role="row"]', []).find((r) => r.getClientRects().length && r.querySelector('a[href]'));
-      if (!row) return null;
       const up = (el) => el.parentElement || (el.getRootNode && el.getRootNode().host) || null;
-      let el = up(row);
-      while (el) { const cs = getComputedStyle(el); if (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 4) break; el = up(el); }
-      if (reset) { if (el) el.scrollTop = 0; else window.scrollTo(0, 0); }
-      const box = el ? el.getBoundingClientRect() : { left: 0, top: 0, right: innerWidth, bottom: innerHeight, width: innerWidth };
+      const preferredSels = [
+        '.slds-split-view .slds-scrollable_y',
+        '.slds-split-view .slds-scrollable',
+        '.slds-split-view_container .slds-scrollable_y',
+        '.slds-split-view_container .slds-scrollable',
+        '.slds-split-view__list-container',
+        'force-list-view-manager-grid .slds-scrollable',
+        '.forceListViewManager .slds-scrollable',
+        '.forceVirtualListview',
+        '.forceVirtualTreeGrid',
+        'lightning-datatable .slds-scrollable',
+        '.slds-table_container',
+        '[role="grid"]',
+      ];
+      const score = (el) => {
+        const box = el.getBoundingClientRect();
+        if (box.width < 40 || box.height < 40) return -1;
+        let s = 0;
+        const cls = `${el.className || ''} ${el.tagName || ''}`.toLowerCase();
+        if (/split-view|splitview|list-view-manager|listviewmanager|forcevirtuallist|virtualList/i.test(cls)) s += 50;
+        if (box.left < innerWidth * 0.45) s += 20;
+        if (el.scrollHeight > el.clientHeight + 4) s += 15;
+        return s + Math.min(box.height, 800) / 100;
+      };
+      let best = null, bestScore = -1;
+      for (const sel of preferredSels) {
+        for (const el of deepAll(document, sel, [])) {
+          const cs = getComputedStyle(el);
+          if (!/(auto|scroll)/.test(cs.overflowY) && !(el.scrollHeight > el.clientHeight + 4)) continue;
+          if (el.clientHeight < 40) continue;
+          const sc = score(el);
+          if (sc > bestScore) { best = el; bestScore = sc; }
+        }
+      }
+      if (!best) {
+        const row = deepAll(document, 'table[role="grid"] tbody tr, div[role="row"], li[role="option"], .slds-split-view__list-item', [])
+          .find((r) => r.getClientRects().length && r.querySelector('a[href], [href]'));
+        if (row) {
+          let el = up(row);
+          while (el) {
+            const cs = getComputedStyle(el);
+            if (/(auto|scroll)/.test(cs.overflowY) && el.clientHeight > 40) { best = el; break; }
+            el = up(el);
+          }
+        }
+      }
+      if (!best) return null;
+      // Bring the last visible linked row into view so the virtual list advances.
+      const rows = deepAll(best, 'table[role="grid"] tbody tr, div[role="row"], li[role="option"], .slds-split-view__list-item', [])
+        .filter((r) => r.getClientRects().length && r.querySelector('a[href], [href]'));
+      const last = rows[rows.length - 1];
+      if (last && last.scrollIntoView) {
+        try { last.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'instant' }); } catch (_) {
+          try { last.scrollIntoView(false); } catch (__) {}
+        }
+      }
+      const before = best.scrollTop;
+      const step = Math.max(180, Math.floor(best.clientHeight * 0.65));
+      best.scrollTop = before + step;
+      best.dispatchEvent(new Event('scroll', { bubbles: true }));
+      // A few smaller bumps help Salesforce's lazy loader notice movement.
+      for (let i = 0; i < 3; i++) {
+        best.scrollTop += Math.max(80, Math.floor(step / 3));
+        best.dispatchEvent(new Event('scroll', { bubbles: true }));
+      }
+      const box = best.getBoundingClientRect();
       const top = Math.max(box.top, 0), bottom = Math.min(box.bottom, innerHeight);
-      return { x: box.left + Math.min(box.width, innerWidth - box.left) / 2, y: top + (bottom - top) / 2, h: Math.max(bottom - top, 100) };
-    }, resetTop);
-  } catch (_) { return null; }
+      return {
+        moved: best.scrollTop !== before || !!last,
+        atBottom: best.scrollTop + best.clientHeight >= best.scrollHeight - 2,
+        x: box.left + Math.min(box.width, Math.max(innerWidth - box.left, 0)) / 2,
+        y: top + (bottom - top) / 2,
+        h: Math.max(bottom - top, 100),
+        scrollTop: Math.round(best.scrollTop),
+        scrollHeight: Math.round(best.scrollHeight),
+      };
+    });
+  } catch (_) { info = null; }
+  if (!info) {
+    try { await page.mouse.wheel(0, 600); } catch (_) {}
+    try { await page.keyboard.press('PageDown'); } catch (_) {}
+    return { moved: true, atBottom: false };
+  }
+  // Real mouse wheel + PageDown over the pane (some Lightning layouts only load on pointer wheel).
+  try {
+    await page.mouse.move(info.x, info.y);
+    await page.mouse.wheel(0, Math.max(240, Math.floor(info.h * 0.75)));
+    await page.mouse.wheel(0, Math.max(160, Math.floor(info.h * 0.4)));
+  } catch (_) {}
+  try { await page.keyboard.press('PageDown'); } catch (_) {}
+  return info;
 }
 
 /**
  * Harvest the accounts of the open LIST VIEW → [{ name, accountId, url }] in list order, one per account (an Opportunities list has a row per opportunity, so an account can repeat).
- * It scrolls the way a person does (mouse-wheel steps, each LESS than the height of the grid, so no row is jumped over) and reads every rendered row after EACH step, so it works when
- * the list loads 50 rows at a time as you scroll AND when it keeps only the rows on screen (a virtualised grid). It compares what it read with the list's own count ("323 items") and
- * stops when that count is reached, when opts.limit accounts are collected, or when scrolling has brought nothing new for a while. The array carries what happened: rowsSeen (rows read),
+ * It physically scrolls the list pane (split-view sidebar first, then the grid) the way a person does — scrollTop bumps, mouse wheel, PageDown — and reads every rendered row after EACH step, so it
+ * works when Salesforce lazy-loads more rows as you scroll AND when it keeps only the rows on screen (a virtualised grid). It compares what it read with the list's own count ("41 items") and
+ * keeps scrolling until that count is reached, when opts.limit accounts are collected, or when scrolling has brought nothing new for a while. The array carries what happened: rowsSeen (rows read),
  * listTotal (the header's count, or null), rowsWithoutAccount, stopped ('complete' | 'limit' | 'stalled' | 'time' | 'no-rows'). Nothing readable at all → the earlier method (harvestListLeadsOld).
  */
 async function harvestListLeads(page, opts = {}) {
-  const limit = opts.limit || null, maxMs = opts.maxMs || 6 * 60 * 1000;
+  const limit = opts.limit || null, maxMs = opts.maxMs || 8 * 60 * 1000;
   const origin = new URL(page.url()).origin;
   const tot = await readListTotal(page);
   const seen = new Map(), keys = new Set();
   let stopped = null, stalls = 0, noAccount = 0, shown = 0;
   const t0 = Date.now(); let lastFreshAt = t0;
+  commandLog('📇', 'Harvest scroll', tot
+    ? `scrolling the list pane until all ${tot.total}${tot.plus ? '+' : ''} row(s) are loaded…`
+    : 'scrolling the list pane (split-view sidebar / grid) to load every row…');
   await pageScrollTarget(page, true);      // start from the top, so row 1 is read first
-  await sleep(500);
-  for (let step = 0; step < 3000; step++) {
+  await sleep(600);
+  for (let step = 0; step < 4000; step++) {
     let fresh = 0;
     let rows = []; try { rows = await page.evaluate(pageReadRows); } catch (_) {}
     for (const r of rows) {
@@ -2840,16 +3026,27 @@ async function harvestListLeads(page, opts = {}) {
       if (!seen.has(r.accountId)) seen.set(r.accountId, { name: r.name || '(unnamed account)', accountId: r.accountId, url: `${origin}/lightning/r/Account/${r.accountId}/view` });
     }
     if (fresh) { stalls = 0; lastFreshAt = Date.now(); } else stalls++;
-    if (keys.size - shown >= 100) { shown = keys.size; commandLog('🗺️', 'Reading list', `${keys.size}${tot ? ` of ${tot.total}${tot.plus ? '+' : ''}` : ''} rows read, ${seen.size} accounts so far`); }
+    if (keys.size - shown >= 25 || (fresh && keys.size <= 50 && keys.size !== shown)) {
+      shown = keys.size;
+      commandLog('🗺️', 'Reading list', `${keys.size}${tot ? ` of ${tot.total}${tot.plus ? '+' : ''}` : ''} rows read, ${seen.size} accounts so far`);
+    }
     if (limit && seen.size >= limit) { stopped = 'limit'; break; }
     if (tot && tot.sure && !tot.plus && keys.size >= tot.total && stalls >= 1) { stopped = 'complete'; break; }      // the list header's count is reached AND one more scroll step found nothing new (a count from some other "N items" text never ends the harvest early)
     if (Date.now() - t0 > maxMs) { stopped = 'time'; break; }
-    if (stalls >= 5 && Date.now() - lastFreshAt > (tot ? 9000 : 4500)) { stopped = keys.size ? (tot && !tot.plus && keys.size < tot.total ? 'stalled' : 'complete') : 'no-rows'; break; }
-    const tg = await pageScrollTarget(page);
-    if (!tg) { await sleep(1000); continue; }      // no row with a link is on screen yet (a slow page, placeholder rows, a grid redrawing): wait and look again; the stall rule above decides when to give up
-    try { await page.mouse.move(tg.x, tg.y); await page.mouse.wheel(0, Math.max(200, Math.floor(tg.h * 0.7))); } catch (_) {}
-    await sleep(350);
-    try { await page.waitForSelector('.slds-spinner', { state: 'hidden', timeout: 4000 }); } catch (_) {}
+    // Be patient while under the list's own count: Salesforce lazy-loads in batches and often pauses between them.
+    const underTotal = tot && !tot.plus && keys.size < tot.total;
+    const stallLimit = underTotal ? 14 : 6;
+    const stallMs = underTotal ? 18000 : 6000;
+    if (stalls >= stallLimit && Date.now() - lastFreshAt > stallMs) {
+      stopped = keys.size ? (underTotal ? 'stalled' : 'complete') : 'no-rows';
+      break;
+    }
+    const scrolled = await scrollListViewStep(page);
+    if (!scrolled) { await sleep(1000); continue; }      // no scroller / row on screen yet: wait and look again
+    await sleep(underTotal && stalls > 2 ? 700 : 400);
+    try { await page.waitForSelector('.slds-spinner', { state: 'hidden', timeout: 6000 }); } catch (_) {}
+    // Extra pause after a quiet stretch so a slow lazy-load batch can land before we give up.
+    if (fresh === 0 && underTotal) await sleep(450);
   }
   let out = [...seen.values()];
   if (limit) out = out.slice(0, limit);
@@ -2871,7 +3068,7 @@ function harvestSummary(leads) {
 function warnShortHarvest(leads) {
   if (leads.rowsSeen == null) return;
   const why = { stalled: 'the list stopped loading more rows', time: 'it ran out of time', 'no-rows': 'no rows were found' }[leads.stopped] || leads.stopped;
-  if (leads.stopped !== 'limit' && leads.listTotal && !leads.listTotalPlus && leads.rowsSeen < leads.listTotal) console.log(`\n  ⚠️  Only ${leads.rowsSeen} of the list's ${leads.listTotal} rows were read (${why}). Scroll the list to the bottom in Chrome, check that it shows all ${leads.listTotal}, then run this again.\n`);
+  if (leads.stopped !== 'limit' && leads.listTotal && !leads.listTotalPlus && leads.rowsSeen < leads.listTotal) console.log(`\n  ⚠️  Only ${leads.rowsSeen} of the list's ${leads.listTotal} rows were read (${why}). In Chrome, scroll the list sidebar / grid all the way down until it shows ${leads.listTotal} rows, then run this again.\n`);
   if (leads.rowsSeen > 0 && !leads.length) console.log(`\n  ⚠️  ${leads.rowsSeen} rows were read but none has an Account link. Add the "Account Name" column to this list view (the email is sent from the account), then run again.\n`);
   else if (leads.rowsWithoutAccount) console.log(`  ℹ️  ${leads.rowsWithoutAccount} row(s) had no Account link and were left out.`);
 }
@@ -4351,7 +4548,7 @@ async function main() {
       '       zw                             (HCP manta + 3-2-1 while Chrome loads, then the welcome screen: sign in to Salesforce (your pipeline list opens by itself), press Enter, then pick the email and the rows). This is a LIVE run: it sends.\n' +
       '       zw --test                      a PRACTICE RUN of the same thing: always a DRY RUN (the email is filled in on each account you pick, NOTHING is sent; --yes cannot change that), and always on your own pipeline list. Pick "Type your own subject line & email" to practise typing one.\n\n' +
       'TEXT:\n' +
-      '       node Assistant.js --text                  (the text campaign: list view; prompts for the rows, and each text is written from the account\'s notes and opportunities: see --no-auto)\n' +
+      '       node Assistant.js --text                  (the text campaign: list view; prompts for the rows; Claude drafts only when turned on in Settings)\n' +
       '       email --text --test                 a TEXT PRACTICE RUN on the testing list (--dry-run alone does the same on the list you have open): on each account the text is typed into the message box and checked, then taken out again. Send is NEVER clicked and nothing is recorded as sent.\n' +
       '       node Assistant.js --template 1 --range 1-10\n' +
       '       node Assistant.js --message "Hey..." --range 1-10\n' +
@@ -4437,7 +4634,7 @@ async function main() {
       '       AUTO WORDING, on by default in the plain campaigns: email (= email --email) and email --text write each message from that account\'s Salesforce notes and opportunities (your Granola note first), exactly as --auto does.\n' +
       '                    Per account it reads, writes (Claude), and checks every claim; you see every draft, answer one y/N, and only that kind goes out (email, or text), through the normal guards. Needs Claude signed in.\n' +
       '                    First, for every account, it opens the account and reads Customer Status (beta): "Enrolled: …" (e.g. Enrolled: Current Customer) is a current customer and is left out (saved on the held list), unless the account is only on the free Invoicing and Payments plan. --force does not bypass it.\n' +
-      '                    --no-auto: pick a template as before.  Also template mode, because you chose the wording or the mode has its own: --message, --template, --email-template, --subject, --body-file, --sequence / --core, --library, --blast, --never-emailed, a text campaign off a --report.\n' +
+      '                    Claude drafts are OFF by default (Settings → Claude drafts → on to enable). --no-auto forces a template. Also template mode when you chose the wording or the mode has its own: --message, --template, --email-template, --subject, --body-file, --sequence / --core, --library, --blast, --never-emailed, a text campaign off a --report.\n' +
       '                    Not part of it: --board, --shark / --queue / --evening / --tomorrow, --reengage, --followup and its variants, --oppy (they keep their fixed wording and timing).\n' +
       '       CUSTOMER STATUS, on by default in EVERY mode: right before every text (and on every email) the account\'s Customer Status (beta) is read on its page. "Enrolled: …" (e.g. Enrolled: Current Customer) is a current customer and is NOT contacted, unless the account is only on the free Invoicing and Payments plan; it is saved on the held list.\n' +
       '       email --shark --send [--template N] [--until HH:MM] [--unknown-zone strict] [--yes]   the hands-off morning: the backup, then it STAYS RUNNING and texts each queued pro as their own 8:00 arrives, until everyone is done (same with  email --queue --send  for a queue you already have). Texts really go out; leave the Chrome window and the Mac as they are. Without --send, --shark sends nothing\n' +
@@ -5155,14 +5352,14 @@ async function main() {
         return;
       }
 
-      // AUTO WORDING (autoDraft.js): unless the rep chose the wording or the mode has its own, each email is written from that account's Salesforce notes and opportunities (the --auto
-      // pipeline): no template menu, every draft is shown, one question, then only the email is sent. --no-auto goes back to picking a template.
+      // AUTO WORDING (autoDraft.js): only when Settings has Claude drafts on (and the mode does not pick its own wording). Each email is written from that account's Salesforce notes and
+      // opportunities: no template menu, every draft is shown, one question, then only the email is sent. Off by default → template picker.
       const autoW = autoDraft.wordingFor(args, 'email');
       let autoCtx = null;
       if (autoW.on) {
         autoCtx = await autoDraft.startSession({ args, deps: autoDeps(), channels: ['email'], noAutoHint: true });
         if (!autoCtx) return;
-        commandLog('✨', 'Auto wording', "each email is written from that account's Salesforce notes and opportunities (your Granola note first). Add --no-auto to pick a template instead.");
+        commandLog('✨', 'Auto wording', "each email is written from that account's Salesforce notes and opportunities (your Granola note first). Turn Claude drafts off in Settings to pick a template instead.");
       } else commandLog('ℹ️', 'Auto wording', `off — ${autoW.why}`);
 
       // Which email? Asked only when nothing already chose one (--email-template / --subject / --body-file / --sequence / --library) and someone is at the keyboard.
@@ -5490,8 +5687,8 @@ async function main() {
       return;
     }
 
-    // AUTO WORDING (autoDraft.js): the plain text campaign off a list view writes each text from that account's Salesforce notes and opportunities (the --auto pipeline) instead of asking for a
-    // template, unless the rep chose the wording (--message / --template) or --no-auto. A text campaign off a report keeps its templates.
+    // AUTO WORDING (autoDraft.js): the plain text campaign off a list view writes each text from that account's notes only when Settings has Claude drafts on. Off by default → template picker.
+    // A text campaign off a report keeps its templates.
     const autoText = autoDraft.wordingFor(args, 'text', { isReport });
     if (autoText.on) {
       await autoDraft.runAutoText({ context, initialPage, args, io: { ask, parseRange, resolveView, harvestListLeads, harvestSummary, warnShortHarvest, deps: autoDeps() } });

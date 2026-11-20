@@ -15,6 +15,7 @@
  *   Settings > T      the TEXT MESSAGES: read the ready-made texts, change their wording, add texts of your own. Saved in text-templates.json (only what was changed or added). <first name>, <full name>,
  *                     <call number>, <text number> and <booking link> stand for the sender's own details and are filled in when a text is sent. The copy's program calls applyTextEdits() (below) right
  *                     after the built-in texts are set up, so an edited text is what the text campaign lists, types and sends. text-defaults.json (made by share/build-package.js) holds the built-in texts.
+ *   Settings > Claude drafts (line 8)  off by default: plain email / text campaigns pick a template. Turn on to let Claude write each message from the account's notes (needs Claude Code signed in).
  *
  * THE PIPELINE LIST is the address of a Salesforce OPPORTUNITIES list view, pasted from the browser's address bar. Only a housecallpro.lightning.force.com/lightning/o/Opportunity/list?filterName=...
  * address is accepted (the rest of it is dropped). share/build-package.js patches the copy's Assistant.js so CONFIG.listUrl and CONFIG.testListUrl come from listUrl() below: the saved link, else the one
@@ -101,6 +102,14 @@ function parseLink(raw) {
   if (!new RegExp(`^${label}(?:\\.${label})+(?:/\\S*)?$`).test(bare)) return { error: 'That does not look like a web link. Type it like tinyurl.com/jane-demo.' };
   return { value: `${/^http:\/\//i.test(s) ? 'http' : 'https'}://${bare}` };
 }
+/** Claude drafts for plain email / text campaigns: on or off (default off — templates only, no Claude). */
+function parseOnOff(raw) {
+  const s = String(raw == null ? '' : raw).trim().toLowerCase();
+  if (!s) return { error: 'Type on or off.' };
+  if (['on', 'yes', 'y', 'true', '1', 'enable', 'enabled'].includes(s)) return { value: 'on' };
+  if (['off', 'no', 'n', 'false', '0', 'disable', 'disabled'].includes(s)) return { value: 'off' };
+  return { error: 'Type on or off.' };
+}
 
 // ---------------------------------------------------------------- the pipeline list
 const LIST_HOST = 'housecallpro.lightning.force.com';
@@ -137,10 +146,19 @@ const FIELDS = [
   { key: 'textNumber', label: 'Text number', ask: 'The phone number pros should TEXT', example: '555-345-6789', parse: parsePhone },
   { key: 'bookingLink', label: 'Booking link', ask: 'Your booking link, where pros book a demo with you', example: 'tinyurl.com/jane-demo', parse: parseLink },
   { key: 'listUrl', label: 'Pipeline list', ask: 'Your PIPELINE LIST: the Salesforce Opportunities list you work from', hint: 'In your normal browser open that list, copy the whole address from the address bar, and paste it here.', example: 'https://housecallpro.lightning.force.com/lightning/o/Opportunity/list?filterName=00B3t00000AbCdEFGH', parse: parseList, fallback: () => BUILT_IN_LIST },
+  // Settings only (not asked on first launch): plain email / text campaigns use templates unless this is on.
+  { key: 'claudeDrafts', label: 'Claude drafts', ask: 'Claude drafts for plain email and text campaigns', hint: 'off = pick a ready-made template (no Claude). on = Claude writes each message from that account\'s Salesforce notes (needs Claude Code signed in).', example: 'off', parse: parseOnOff, fallback: () => 'off', settingsOnly: true },
 ];
 const KEYS = FIELDS.map((f) => f.key);
+const SETUP_FIELDS = FIELDS.filter((f) => !f.settingsOnly);      // first launch asks these; Settings shows every line
 const LINE_NUMBER = new RegExp(`^[1-${FIELDS.length}]$`);      // "1" up to the last line (single digits)
-const COUNT_WORD = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'][FIELDS.length] || String(FIELDS.length);
+const SETUP_COUNT = SETUP_FIELDS.length;
+const COUNT_WORD = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'][SETUP_COUNT] || String(SETUP_COUNT);
+/** → true when Settings has Claude drafts turned on (missing / anything else = off). */
+function claudeDraftsOn(values) {
+  const v = values != null ? values : (() => { try { return load().values; } catch (_) { return {}; } })();
+  return String(v.claudeDrafts || '').trim().toLowerCase() === 'on';
+}
 
 // ---------------------------------------------------------------- the saved details
 /** What sender.json holds now: the six details, when they were confirmed, and the rest of the file (kept as it is when it is saved again). */
@@ -154,6 +172,12 @@ function load() {
   }
   const values = {};
   for (const k of KEYS) values[k] = String(raw[k] == null ? '' : raw[k]).trim();
+  // Claude drafts default off when the key was never saved (older sender.json files).
+  if (!values.claudeDrafts) values.claudeDrafts = 'off';
+  else {
+    const c = parseOnOff(values.claudeDrafts);
+    values.claudeDrafts = c.error ? 'off' : c.value;
+  }
   return { values, confirmedAt: typeof raw.confirmedAt === 'string' ? raw.confirmedAt : '', raw, broken, text };
 }
 /** First launch, or complete details that nobody has checked here yet. A pipeline list that is missing, or is not a good link, counts as an incomplete detail. */
@@ -183,6 +207,7 @@ let textsSaved = false;      // a text was saved in this Settings session (so "n
 function save(values, state) {
   const out = { _help: HELP };
   for (const k of KEYS) out[k] = values[k];
+  if (!out.claudeDrafts) out.claudeDrafts = 'off';
   out.confirmedAt = new Date().toISOString();
   for (const [k, v] of Object.entries(state.raw || {})) if (!(k in out)) out[k] = v;
   const tmp = `${FILE}.tmp-${process.pid}`;
@@ -433,12 +458,15 @@ async function askLine(io, draft, idx) {
     draft.firstName = await askField(io, FIELDS[1], draft, 2, FIELDS.length);
   }
 }
+/** First-launch questions only (Settings-only lines like Claude drafts are skipped). */
 async function askAll(io, draft) {
-  for (let i = 0; i < FIELDS.length; i++) {
+  for (let i = 0; i < SETUP_FIELDS.length; i++) {
+    const f = SETUP_FIELDS[i];
     const oldFirst = String(draft.fullName || '').split(' ')[0];
-    draft[FIELDS[i].key] = await askField(io, FIELDS[i], draft, i + 1, FIELDS.length);
-    if (FIELDS[i].key === 'fullName' && draft.firstName === oldFirst) draft.firstName = '';
+    draft[f.key] = await askField(io, f, draft, i + 1, SETUP_FIELDS.length);
+    if (f.key === 'fullName' && draft.firstName === oldFirst) draft.firstName = '';
   }
+  if (!draft.claudeDrafts) draft.claudeDrafts = 'off';
 }
 
 /** The check-it-yourself screen. Only the word yes saves; a number fixes that line and shows everything again. → 'yes' | 'quit' */
@@ -449,7 +477,10 @@ async function review(io, draft) {
     io.out(rule);
     io.out(`  ${io.color('1;33', 'PLEASE CHECK EVERY LETTER AND NUMBER.')} This is what goes out under your name.`);
     io.out('');
-    FIELDS.forEach((f, i) => io.out(`   ${i + 1}  ${f.label.padEnd(13)} ${draft[f.key]}`));
+    SETUP_FIELDS.forEach((f, i) => io.out(`   ${i + 1}  ${f.label.padEnd(13)} ${draft[f.key]}`));
+    if (draft.claudeDrafts && draft.claudeDrafts !== 'off') {
+      io.out(`   ${FIELDS.findIndex((f) => f.key === 'claudeDrafts') + 1}  ${'Claude drafts'.padEnd(13)} on  (Claude writes each email/text)`);
+    }
     io.out('');
     io.out(`   Your texts introduce you as: ${draft.firstName}`);
     io.out('   Your email signature, exactly as it will be sent:');
@@ -458,16 +489,21 @@ async function review(io, draft) {
     io.out('');
     io.out('   Your full name must match how Salesforce shows you on a text: that is how your own texts are recognised.');
     io.out('   Tip: paste the booking link into a browser once, to be sure it opens.');
-    io.out(`   Line ${FIELDS.length} is the list that opens by itself after you sign in to Salesforce. Make sure it is YOUR pipeline, not a teammate's:`);
+    io.out(`   Line ${SETUP_COUNT} is the list that opens by itself after you sign in to Salesforce. Make sure it is YOUR pipeline, not a teammate's:`);
     io.out('   every account on that list is texted and emailed under your name.');
     io.out(rule);
-    const ans = await io.ask(`  Is it all right?  Type yes to save, a number (1-${FIELDS.length}) to fix that line, or quit:  `);
+    const ans = await io.ask(`  Is it all right?  Type yes to save, a number (1-${SETUP_COUNT}) to fix that line, or quit:  `);
     if (ans === null) throw new Cancelled();
     const t = ans.trim().toLowerCase();
     if (t === 'yes' || t === 'y') return 'yes';
     if (t === 'quit' || t === 'q' || t === 'exit') return 'quit';
-    if (LINE_NUMBER.test(t)) { await askLine(io, draft, Number(t) - 1); continue; }
-    io.out(`    Please type yes, a number from 1 to ${FIELDS.length}, or quit. (Enter alone does not save.)`);
+    if (/^[1-9]$/.test(t) && Number(t) >= 1 && Number(t) <= SETUP_COUNT) {
+      const setupIdx = Number(t) - 1;
+      const fullIdx = FIELDS.indexOf(SETUP_FIELDS[setupIdx]);
+      await askLine(io, draft, fullIdx);
+      continue;
+    }
+    io.out(`    Please type yes, a number from 1 to ${SETUP_COUNT}, or quit. (Enter alone does not save.)`);
   }
 }
 
@@ -667,15 +703,23 @@ async function textsMenu(io, values, unsaved) {
 }
 
 /** Change any line, then check the result and confirm it. → true when something was saved */
+function fieldDisplay(f, draft, state) {
+  const v = draft[f.key] || (f.settingsOnly ? 'off' : '(not set)');
+  const changed = draft[f.key] !== state.values[f.key] ? '    ← changed' : '';
+  const note = f.key === 'claudeDrafts' ? (claudeDraftsOn(draft) ? '  (Claude writes each email/text)' : '  (templates only, no Claude)') : '';
+  return `   ${FIELDS.indexOf(f) + 1}  ${f.label.padEnd(13)} ${v}${note}${changed}`;
+}
+
 async function settings(io, state) {
   const draft = { ...state.values };
+  if (!draft.claudeDrafts) draft.claudeDrafts = 'off';
   let touchedTexts = false;
   for (;;) {
     io.out('');
     io.out(`  ${io.color('1;33', 'SETTINGS')}  (saved in ${path.basename(FILE)})`);
-    FIELDS.forEach((f, i) => io.out(`   ${i + 1}  ${f.label.padEnd(13)} ${draft[f.key] || '(not set)'}${draft[f.key] !== state.values[f.key] ? '    ← changed' : ''}`));
+    FIELDS.forEach((f) => io.out(fieldDisplay(f, draft, state)));
     io.out(`   T  ${'Text messages'.padEnd(13)} ${textsSummary()}`);
-    const ans = await io.ask(`  Type a number to change that line, a to go through all ${COUNT_WORD.toLowerCase()}, T for your text messages, or just press Enter when you are done:  `);
+    const ans = await io.ask(`  Type a number to change that line, a to go through your name/numbers/list, T for your text messages, or just press Enter when you are done:  `);
     if (ans === null) throw new Cancelled();
     const t = ans.trim().toLowerCase();
     if (t === '') break;
@@ -685,7 +729,14 @@ async function settings(io, state) {
     else io.out(`    Type a number from 1 to ${FIELDS.length}, a, T, or press Enter.`);
   }
   if (KEYS.every((k) => draft[k] === state.values[k])) { io.out(touchedTexts ? '\n  Your details are unchanged.' : '\n  No changes.'); return false; }
-  if (await review(io, draft) !== 'yes') { io.out('\n  Nothing was changed.'); return false; }
+  // Claude-only change: confirm with a short yes, without re-asking the signature lines.
+  const onlyClaude = KEYS.every((k) => k === 'claudeDrafts' || draft[k] === state.values[k]);
+  if (onlyClaude) {
+    const ans = await io.ask(`  Save Claude drafts as ${draft.claudeDrafts}?  Type yes to save, or quit:  `);
+    if (ans === null) throw new Cancelled();
+    const t = ans.trim().toLowerCase();
+    if (t !== 'yes' && t !== 'y') { io.out('\n  Nothing was changed.'); return false; }
+  } else if (await review(io, draft) !== 'yes') { io.out('\n  Nothing was changed.'); return false; }
   save(draft, state);
   io.out(SAVED(io));
   return true;
@@ -786,6 +837,8 @@ function selfcheck() {
         else if (/Luke|Franco|970-338-3120|833-337-0813|housecallprodemo|\[SET sender\.json/i.test(c.sent)) bad.push(`built-in text ${d.id} still holds the first author's words`);
       }
     }
+    if (parseOnOff('on').value !== 'on' || parseOnOff('OFF').value !== 'off' || !parseOnOff('maybe').error) bad.push('on/off for Claude drafts is not read right');
+    if (claudeDraftsOn({ claudeDrafts: 'on' }) !== true || claudeDraftsOn({ claudeDrafts: 'off' }) !== false || claudeDraftsOn({}) !== false) bad.push('claudeDraftsOn() is not right');
     if (bad.length) { console.error(`senderSetup self-check FAILED: ${bad.join('; ')}`); return 1; }
     console.log('senderSetup self-check OK');
     return 0;
@@ -795,7 +848,7 @@ function selfcheck() {
   }
 }
 
-module.exports = { FIELDS, REQUIRED, SIGNATURE_TEMPLATE, FILE, LIST_HOST, GENERIC_LIST, parseFullName, parseFirstName, parseTitle, parsePhone, parseLink, parseList, listUrl, listName, load, save, needsFirstRun, signatureLines, main, selfcheck,
+module.exports = { FIELDS, SETUP_FIELDS, REQUIRED, SIGNATURE_TEMPLATE, FILE, LIST_HOST, GENERIC_LIST, parseFullName, parseFirstName, parseTitle, parsePhone, parseLink, parseOnOff, parseList, listUrl, listName, claudeDraftsOn, load, save, needsFirstRun, signatureLines, main, selfcheck,
   TEXTS_FILE, DEFAULTS_FILE, MAX_TEXT, MAX_ADDED, REENGAGE_PREFIX, RESERVED_NAMES, RESERVED_PREFIXES, oddChar, expandTokens, checkText, checkName, loadTexts, saveTexts, loadDefaults, applyTextEdits, textsView, textsMenu };
 
 if (require.main === module) {
