@@ -11,7 +11,7 @@
  *   first launch      seven questions (the first name, the five lines of the email signature, and the pipeline list), then everything is shown EXACTLY as it will be used, and nothing is saved
  *                     until the person types "yes" (or fixes a line first). Pressing Enter alone never saves.
  *   every launch      a small box (who it sends as, which list opens): Enter starts the run, S opens Settings
- *   email --settings    opens Settings and stops: nothing is started
+ *   zw --settings       opens Settings and stops: nothing is started
  *   Settings > T      the TEXT MESSAGES: read the ready-made texts, change their wording, add texts of your own. Saved in text-templates.json (only what was changed or added). <first name>, <full name>,
  *                     <call number>, <text number> and <booking link> stand for the sender's own details and are filled in when a text is sent. The copy's program calls applyTextEdits() (below) right
  *                     after the built-in texts are set up, so an edited text is what the text campaign lists, types and sends. text-defaults.json (made by share/build-package.js) holds the built-in texts.
@@ -24,7 +24,7 @@
  * but were never confirmed here (typed by hand, or sent along with the folder) are asked about once too, with the old answers ready to keep.
  *
  * It talks only on a terminal, and never for --help, --yes, --inspect or --sent (nobody to answer; ASSISTANT_NO_SETUP=1 skips it too).
- * Exit status: 0 = go on with the run, 3 = finished, do NOT start the run (email --settings), 130 = cancelled (Ctrl-C, or the input ended): nothing was saved and nothing is started,
+ * Exit status: 0 = go on with the run, 3 = finished, do NOT start the run (zw --settings), 130 = cancelled (Ctrl-C, or the input ended): nothing was saved and nothing is started,
  * 4 = the details could not be saved (or Settings could not open): nothing is started. Any other status means this screen itself crashed: run.sh says so and the run carries on, because
  * a text or email that still lacks a detail is never sent (sender.js), so nothing goes out wrong.
  *
@@ -36,7 +36,7 @@ const os = require('os');
 const path = require('path');
 const readline = require('readline');
 
-const CMD = 'email';
+const CMD = 'zw';
 const FILE = process.env.ASSISTANT_SENDER_FILE || path.join(__dirname, 'sender.json');      // the very file sender.js reads
 const TEXTS_FILE = process.env.ASSISTANT_TEXTS_FILE || path.join(__dirname, 'text-templates.json');      // the texts this person changed or added (Settings > T)
 const DEFAULTS_FILE = path.join(__dirname, 'text-defaults.json');      // the built-in texts with <tokens> where the sender's details go (made by share/build-package.js)

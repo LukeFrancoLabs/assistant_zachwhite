@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pipeline Assistant launcher - starts the browser, then runs the bot.
+# Pipeline Assistant launcher for assistant_zachwhite — install with ./install-zw.sh, then type: zw
 # TEXT mode uses CDP 9323 / .browser-profile.
 # EMAIL mode (--email) uses CDP 9324 / .browser-profile-email so it can run at the
 # SAME TIME as a texting session on this machine (each gets its own Chrome + SF login).
@@ -10,14 +10,14 @@ cd "$SCRIPT_DIR"
 # Flags this version of Assistant does not have (--same-day / --today, --nocheck / --no-review / --no-check): Assistant.js refuses them before anything starts, so no Chrome is started (or closed) for them first.
 for a in "$@"; do case "$a" in --same-day|--today|--nocheck|--no-review|--no-check) exec node Assistant.js "$@" ;; esac; done
 
-# No flags = the EMAIL campaign (Pipeline Assistant opens on its welcome screen). Every flag works exactly as before: `email --text` is the text campaign, `email --board` the board, and so on.
-# --test (a practice run on your own list, always a dry run) and --dry-run do not name a campaign either, so `email --test` and `email --dry-run` are the email campaign too. So is `email --no-auto` (it only says: pick a template instead of writing each email from the account's notes).
+# No flags = the EMAIL campaign (Pipeline Assistant opens on its welcome screen). Every flag works exactly as before: `zw --text` is the text campaign, `zw --board` the board, and so on.
+# --test (a practice run on your own list, always a dry run) and --dry-run do not name a campaign either, so `zw --test` and `zw --dry-run` are the email campaign too. So is `zw --no-auto` (it only says: pick a template instead of writing each email from the account's notes).
 # Done HERE, before the port is picked below, so the email browser (9324) is the one started.
 ONLY_MODIFIERS=1
 for a in "$@"; do case "$a" in --test|--dry-run|--dryrun|--no-auto) ;; *) ONLY_MODIFIERS=0 ;; esac; done
 if [ $ONLY_MODIFIERS = 1 ]; then set -- --email "$@"; fi
 # FIRST LAUNCH and SETTINGS (senderSetup.js): the very first time it asks for your first name and your email signature, makes you check every letter and saves them in sender.json (once: nothing
-# is asked again). After that every launch starts with a small box: Enter starts, S opens Settings. email --settings opens Settings and stops. It only talks on a terminal, and never for
+# is asked again). After that every launch starts with a small box: Enter starts, S opens Settings. zw --settings opens Settings and stops. It only talks on a terminal, and never for
 # --help, --yes, --inspect or --sent. Cancelled with Ctrl-C (130) or not saved (4) = nothing is started. If the screen itself crashes, one warning line is printed and the run carries on:
 # nothing is sent while the name or numbers are missing (sender.js).
 if [ -f "$SCRIPT_DIR/senderSetup.js" ]; then
