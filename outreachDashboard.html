@@ -248,7 +248,6 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     return d && d.v === 1 && d.rows && typeof d.rows.length === 'number' ? d : null;
   }
   function href(u) { return typeof u === 'string' && /^https?:[/][/]/i.test(u) ? u : null; }
-  function pct(a, b) { return b ? (Math.round(1000 * a / b) / 10) + '%' : '—'; }
 
   function setView(view) {
     state.view = view;
