@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outreach</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%AC%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f5f6fa;--surface:#ffffff;--text:#19202e;--muted:#5b6578;--line:#e2e6ef;
+  --accent:#2457d6;--on-accent:#ffffff;--good:#178a4a;--bad:#b42318;
+  --text-fg:#0b6b60;--text-bg:#d5f5ee;--email-fg:#5b2bb8;--email-bg:#ece5fd;
+  --warn-fg:#8a4b00;--warn-bg:#fff1d1;--fresh:#fff1b8;
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0e131b;--surface:#161c27;--text:#e7ebf2;--muted:#98a3b6;--line:#263044;
+    --accent:#7ba3ff;--on-accent:#0b1220;--good:#4ade80;--bad:#f97066;
+    --text-fg:#5eead4;--text-bg:#0f3b36;--email-fg:#c4b1ff;--email-bg:#2b2150;
+    --warn-fg:#ffcc80;--warn-bg:#3a2a0c;--fresh:#4a4210;
+  }
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 48px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+h1{margin:0;font-size:22px;letter-spacing:-.01em}
+.sub{margin:4px 0 0;color:var(--muted);font-size:13px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:7px;vertical-align:1px}
+.dot.live{background:var(--good)}
+.link{color:var(--accent);font-size:13px;text-decoration:none;padding-top:6px}
+.link:hover{text-decoration:underline}
+.banner{margin:14px 0 0;padding:10px 14px;border-radius:10px;background:var(--warn-bg);color:var(--warn-fg);font-size:14px}
+.nav{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 0;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.nav button{border:0;background:transparent;color:var(--muted);padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;border-radius:8px}
+.nav button[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
+.cards.four{grid-template-columns:repeat(4,1fr)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.card .k{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.card .n{font-size:34px;font-weight:700;line-height:1.1;margin-top:4px;font-variant-numeric:tabular-nums}
+.card .s{font-size:13px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:18px 0 10px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;color:var(--muted);padding:8px 14px;font:inherit;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);font-weight:600}
+select,input[type=search],input[type=text],textarea{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+input[type=search]{flex:1;min-width:180px}
+textarea{width:100%;min-height:140px;resize:vertical;line-height:1.5;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tablewrap{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--line);font-weight:600}
+td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+tr.day td{background:var(--bg);color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:6px 14px}
+tr.row{cursor:pointer}
+tr.row:hover td{background:rgba(127,127,127,.07)}
+tr.fresh td{animation:flash 6s ease-out}
+@keyframes flash{0%,35%{background:var(--fresh)}100%{background:transparent}}
+.time{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+.ago{display:block;color:var(--muted);font-size:12px;white-space:nowrap}
+.who a{color:var(--text);font-weight:600;text-decoration:none}
+.who a:hover{text-decoration:underline}
+.who .nm{font-weight:600}
+.em{color:var(--muted);font-size:13px;word-break:break-all}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.text{background:var(--text-bg);color:var(--text-fg)}
+.pill.email{background:var(--email-bg);color:var(--email-fg)}
+.pill.ok{background:#d1fadf;color:#067647}
+.pill.warn{background:var(--warn-bg);color:var(--warn-fg)}
+.tpl{font-weight:600}
+.prev{display:block;color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:46ch}
+tr.detail td{background:var(--bg);padding:12px 14px 16px}
+.meta{color:var(--muted);font-size:12px;margin:0 0 8px}
+pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.empty{padding:34px 16px;text-align:center;color:var(--muted)}
+.foot{margin:12px 2px 0;color:var(--muted);font-size:12px}
+.tpl-list{display:grid;gap:10px;margin-top:12px}
+.tpl-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.tpl-card.editing{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.tpl-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.tpl-head h3{margin:0;font-size:16px}
+.tpl-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:10px;padding:8px 12px;font:inherit;font-weight:600;cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.tpl-body{margin:10px 0 0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted)}
+.tpl-edit label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 4px}
+.tpl-note{color:var(--muted);font-size:13px;margin:8px 0 0}
+.flash{margin:10px 0 0;padding:10px 12px;border-radius:10px;font-size:14px}
+.flash.ok{background:#d1fadf;color:#067647}
+.flash.err{background:#fee4e2;color:#b42318}
+.rep-text{white-space:pre-wrap;max-width:520px}
+@media (max-width:680px){
+  .wrap{padding:14px 12px 40px}
+  .cards,.cards.four{grid-template-columns:1fr 1fr;gap:8px}
+  .card{padding:10px 12px}
+  .card .n{font-size:26px}
+  .card .s{font-size:12px}
+  #view-sends thead{display:none}
+  #view-sends table,#view-sends tbody,#view-sends tr,#view-sends td{display:block;width:100%}
+  #view-sends tr.row{padding:10px 12px;border-bottom:1px solid var(--line)}
+  #view-sends td{border:0;padding:2px 0}
+  #view-sends tr.day td{padding:6px 12px}
+  #view-sends td.t{display:flex;gap:8px;align-items:baseline}
+  #view-sends .ago{display:inline}
+  #view-sends .prev{max-width:100%;white-space:normal}
+  #view-sends tr.detail{padding:0 12px 12px;border-bottom:1px solid var(--line)}
+  #view-sends tr.detail td{padding:8px 0}
+}
+@media (prefers-reduced-motion:reduce){tr.fresh td{animation:none}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <div>
+      <h1>Outreach</h1>
+      <p class="sub"><span class="dot" id="dot"></span><span id="status">Waiting for data …</span></p>
+    </div>
+    <a class="link" id="fullLog" href="/full-log" hidden>Full outreach log &rarr;</a>
+  </header>
+  <div class="banner" id="banner" hidden>Practice flag in use (--test / --dry-run). This page lists only sends that actually went out, so it stays empty unless one does.</div>
+  <div class="banner" id="fileMode" hidden>Opened as a file — Templates and Analytics need the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page to edit templates.</div>
+
+  <nav class="nav" role="tablist" aria-label="Dashboard sections">
+    <button type="button" role="tab" id="tab-sends" aria-selected="true" data-view="sends">Sends</button>
+    <button type="button" role="tab" id="tab-templates" aria-selected="false" data-view="templates">Templates</button>
+    <button type="button" role="tab" id="tab-analytics" aria-selected="false" data-view="analytics">Analytics</button>
+  </nav>
+
+  <section id="view-sends" role="tabpanel">
+    <div class="cards" aria-label="Totals">
+      <div class="card"><div class="k" id="kRun">This run</div><div class="n" id="nRun">0</div><div class="s" id="sRun"></div></div>
+      <div class="card"><div class="k">Today</div><div class="n" id="nToday">0</div><div class="s" id="sToday"></div></div>
+      <div class="card"><div class="k">All time</div><div class="n" id="nAll">0</div><div class="s" id="sAll"></div></div>
+    </div>
+    <section class="controls" aria-label="Filters">
+      <div class="seg" role="group" aria-label="Channel">
+        <button type="button" data-ch="all" aria-pressed="true">All</button>
+        <button type="button" data-ch="text" aria-pressed="false">Texts</button>
+        <button type="button" data-ch="email" aria-pressed="false">Emails</button>
+      </div>
+      <select id="range" aria-label="Time range">
+        <option value="run">This run</option>
+        <option value="today">Today</option>
+        <option value="week">Last 7 days</option>
+        <option value="all">Everything</option>
+      </select>
+      <input id="q" type="search" placeholder="Search name, address, message …" aria-label="Search">
+    </section>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>When</th><th>Who</th><th>How</th><th>What was sent</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty" hidden></div>
+    </div>
+    <p class="foot" id="foot"></p>
+  </section>
+
+  <section id="view-templates" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Every text and email template this copy uses. Edits save to disk and show up on the <b>next launch</b> (same as Settings &gt; T for texts).</p>
+    <div id="tplFlash" class="flash" hidden></div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Template kind">
+        <button type="button" data-tk="text" aria-pressed="true">Texts</button>
+        <button type="button" data-tk="email" aria-pressed="false">Emails</button>
+      </div>
+      <input id="tq" type="search" placeholder="Search templates …" aria-label="Search templates">
+      <button type="button" class="btn primary" id="tplAdd" hidden>+ Add text</button>
+    </div>
+    <div id="tplList" class="tpl-list"></div>
+    <p class="tpl-note" id="tplNote"></p>
+  </section>
+
+  <section id="view-analytics" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Sends and replies for this copy. Replies come from the SMS / email poller (<code>replies.jsonl</code>). Template reply rates credit each reply to the last message sent in that channel.</p>
+    <div class="cards four" aria-label="Analytics totals" id="anCards">
+      <div class="card"><div class="k">Sends (all time)</div><div class="n" id="anSends">0</div><div class="s" id="anSendsS"></div></div>
+      <div class="card"><div class="k">Replies</div><div class="n" id="anReplies">0</div><div class="s" id="anRepliesS"></div></div>
+      <div class="card"><div class="k">Interested</div><div class="n" id="anInterested">0</div><div class="s">👍 positive replies</div></div>
+      <div class="card"><div class="k">Opt-outs</div><div class="n" id="anOptout">0</div><div class="s">🚫 not interested</div></div>
+    </div>
+    <h2 style="font-size:16px;margin:22px 0 8px">Template scorecard</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Channel</th><th>Template</th><th>Messages</th><th>Replies</th><th>Reply %</th><th>Interested</th><th>Opt-outs</th></tr></thead>
+        <tbody id="anTpl"></tbody>
+      </table>
+      <div class="empty" id="anTplEmpty" hidden>No sends yet — scorecard fills in after outreach goes out.</div>
+    </div>
+    <h2 style="font-size:16px;margin:22px 0 8px">Recent replies</h2>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Reply filter">
+        <button type="button" data-rf="all" aria-pressed="true">All</button>
+        <button type="button" data-rf="interested" aria-pressed="false">Interested</button>
+        <button type="button" data-rf="optout" aria-pressed="false">Opt-out</button>
+        <button type="button" data-rf="gift" aria-pressed="false">Gift card</button>
+      </div>
+      <input id="aq" type="search" placeholder="Search replies …" aria-label="Search replies">
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>When</th><th>Who</th><th>Via</th><th>Outcome</th><th>They said</th></tr></thead>
+        <tbody id="anRep"></tbody>
+      </table>
+      <div class="empty" id="anRepEmpty" hidden>No replies yet. They appear once the poller reads SMS-Magic / email replies.</div>
+    </div>
+    <p class="foot" id="anFoot"></p>
+  </section>
+</main>
+<script src="data.js"></script>
+<script>
+(function () {
+  'use strict';
+  var POLL_MS = 3000, MAX_DRAWN = 500, LS = 'outreach-dashboard:';
+  var LIVE = location.protocol === 'http:' || location.protocol === 'https:';
+  var state = {
+    view: 'sends', channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0,
+    tk: 'text', tq: '', templates: null, editing: null,
+    analytics: null, rf: 'all', aq: ''
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function make(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined && text !== null) n.textContent = text; return n; }
+  function lsGet(k) { try { return window.localStorage.getItem(LS + k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { window.localStorage.setItem(LS + k, v); } catch (e) {} }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  var c0 = lsGet('channel'); if (c0 === 'text' || c0 === 'email') state.channel = c0;
+  var r0 = lsGet('range'); if (r0 === 'run' || r0 === 'today' || r0 === 'week' || r0 === 'all') state.range = r0;
+  var v0 = lsGet('view'); if (v0 === 'sends' || v0 === 'templates' || v0 === 'analytics') state.view = v0;
+
+  var fTime = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' });
+  var fTimeSec = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+  var fDay = new Intl.DateTimeFormat([], { weekday: 'short', month: 'short', day: 'numeric' });
+  var fFull = new Intl.DateTimeFormat([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' });
+  var fNum = new Intl.NumberFormat();
+
+  function startOfDay(t) { var d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
+  function dayLabel(t) {
+    var today = startOfDay(Date.now()), s = startOfDay(t);
+    if (s === today) return 'Today';
+    if (s === startOfDay(today - 12 * 3600 * 1000)) return 'Yesterday';
+    return fDay.format(new Date(t));
+  }
+  function stamp(t, withSeconds) {
+    var d = new Date(t), tm = (withSeconds ? fTimeSec : fTime).format(d);
+    return startOfDay(t) === startOfDay(Date.now()) ? tm : fDay.format(d) + ' ' + tm;
+  }
+  function ago(t) {
+    var s = Math.max(0, Math.round((Date.now() - t) / 1000));
+    if (s < 10) return 'just now';
+    if (s < 60) return s + ' s ago';
+    var m = Math.round(s / 60);
+    if (m < 60) return m + ' min ago';
+    var h = Math.floor(m / 60);
+    if (h < 24) return h + ' h ' + (m % 60) + ' min ago';
+    var dd = Math.floor(h / 24);
+    return dd + (dd === 1 ? ' day ago' : ' days ago');
+  }
+  function data() {
+    var d = window.OUTREACH_DATA;
+    return d && d.v === 1 && d.rows && typeof d.rows.length === 'number' ? d : null;
+  }
+  function href(u) { return typeof u === 'string' && /^https?:[/][/]/i.test(u) ? u : null; }
+  function pct(a, b) { return b ? (Math.round(1000 * a / b) / 10) + '%' : '—'; }
+
+  function setView(view) {
+    state.view = view;
+    lsSet('view', view);
+    ['sends', 'templates', 'analytics'].forEach(function (v) {
+      var pane = $('view-' + v), tab = $('tab-' + v);
+      if (pane) pane.hidden = v !== view;
+      if (tab) tab.setAttribute('aria-selected', v === view ? 'true' : 'false');
+    });
+    if (view === 'templates') loadTemplates();
+    if (view === 'analytics') loadAnalytics();
+  }
+
+  function ingest(d) {
+    var first = state.gen === null, prev = state.newest, now = Date.now(), i, r, e, newest = prev, rows = [];
+    for (i = 0; i < d.rows.length; i++) {
+      r = d.rows[i];
+      e = { r: r, t: Date.parse(r.at), key: r.at + '|' + r.channel + '|' + r.name };
+      e.hay = [r.name, r.email, r.template, r.subject, r.text, r.mode].join(' ').toLowerCase();
+      if (!isFinite(e.t)) continue;
+      if (e.t > newest) newest = e.t;
+      if (!first && e.t > prev) state.fresh[e.key] = now + 6000;
+      rows.push(e);
+    }
+    state.gen = d.generatedAt;
+    state.rows = rows;
+    state.newest = newest;
+  }
+
+  function inRange(t, d) {
+    if (state.range === 'all') return true;
+    if (state.range === 'run') { var s = Date.parse(d.run && d.run.startedAt); return isFinite(s) && t >= s; }
+    var today = startOfDay(Date.now());
+    if (state.range === 'today') return t >= today;
+    var wk = new Date(); wk.setDate(wk.getDate() - 6); wk.setHours(0, 0, 0, 0);
+    return t >= wk.getTime();
+  }
+
+  function tally(list) { var t = 0, m = 0, i; for (i = 0; i < list.length; i++) { if (list[i].r.channel === 'email') m++; else t++; } return { text: t, email: m, all: t + m }; }
+  function split(c) { return 'texts ' + fNum.format(c.text) + ' · emails ' + fNum.format(c.email); }
+
+  function renderCards(d) {
+    var today = startOfDay(Date.now()), rs = Date.parse(d.run && d.run.startedAt), a = [], b = [], i, e;
+    for (i = 0; i < state.rows.length; i++) {
+      e = state.rows[i];
+      if (e.t >= today) a.push(e);
+      if (isFinite(rs) && e.t >= rs) b.push(e);
+    }
+    var run = tally(b), tod = tally(a);
+    $('nRun').textContent = fNum.format(run.all); $('sRun').textContent = split(run);
+    $('nToday').textContent = fNum.format(tod.all); $('sToday').textContent = split(tod);
+    var t = d.totals || {};
+    $('nAll').textContent = fNum.format(t.sends || 0);
+    $('sAll').textContent = split({ text: t.texts || 0, email: t.emails || 0 }) + ' · people ' + fNum.format(t.people || 0);
+    $('kRun').textContent = 'This run' + (isFinite(rs) ? ' · since ' + stamp(rs, false) : '');
+    document.title = 'Outreach · ' + fNum.format(tod.all) + ' today';
+  }
+
+  function whatNodes(r) {
+    var box = document.createElement('div');
+    if (r.channel === 'email') {
+      box.appendChild(make('div', 'tpl', r.subject || r.template || 'Email'));
+      if (r.template && r.subject) box.appendChild(make('span', 'prev', r.template));
+    } else {
+      box.appendChild(make('div', 'tpl', r.template || 'Text'));
+      if (r.text) box.appendChild(make('span', 'prev', r.text));
+    }
+    return box;
+  }
+
+  function rowNodes(e) {
+    var r = e.r, tr = make('tr', 'row' + (state.fresh[e.key] > Date.now() ? ' fresh' : '')), det = make('tr', 'detail'), td, link, pill;
+    tr.setAttribute('tabindex', '0');
+    tr.setAttribute('aria-expanded', state.open[e.key] ? 'true' : 'false');
+    td = make('td', 't');
+    td.appendChild(make('span', 'time', fTime.format(new Date(e.t))));
+    var ag = make('span', 'ago', ago(e.t)); ag.setAttribute('data-t', String(e.t)); td.appendChild(ag);
+    tr.appendChild(td);
+    td = make('td', 'who');
+    var h = href(r.url);
+    if (h) { link = make('a', null, r.name); link.href = h; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.title = 'Open the account in Salesforce'; link.addEventListener('click', function (ev) { ev.stopPropagation(); }); td.appendChild(link); }
+    else td.appendChild(make('span', 'nm', r.name));
+    if (r.email) td.appendChild(make('div', 'em', r.email));
+    tr.appendChild(td);
+    td = make('td', 'how'); pill = make('span', 'pill ' + (r.channel === 'email' ? 'email' : 'text'), r.channel === 'email' ? 'Email' : 'Text'); td.appendChild(pill); tr.appendChild(td);
+    td = make('td', 'what'); td.appendChild(whatNodes(r)); tr.appendChild(td);
+
+    td = make('td'); td.colSpan = 4;
+    var bits = [fFull.format(new Date(e.t))];
+    if (r.template) bits.push(r.template);
+    if (r.mode) bits.push('mode: ' + r.mode);
+    if (r.step) bits.push('step ' + r.step);
+    td.appendChild(make('p', 'meta', bits.join(' · ')));
+    if (r.channel === 'email' && r.subject) td.appendChild(make('p', 'meta', 'Subject: ' + r.subject));
+    td.appendChild(make('pre', 'msg', r.text || '(no message was recorded)'));
+    det.appendChild(td);
+    det.hidden = !state.open[e.key];
+
+    function toggle() { var o = !state.open[e.key]; state.open[e.key] = o; det.hidden = !o; tr.setAttribute('aria-expanded', o ? 'true' : 'false'); }
+    tr.addEventListener('click', toggle);
+    tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(); } });
+    return [tr, det];
+  }
+
+  function renderTable(d) {
+    var body = $('rows'), q = state.q.toLowerCase(), list = [], i, e;
+    for (i = 0; i < state.rows.length; i++) {
+      e = state.rows[i];
+      if (state.channel !== 'all' && e.r.channel !== state.channel) continue;
+      if (!inRange(e.t, d)) continue;
+      if (q && e.hay.indexOf(q) < 0) continue;
+      list.push(e);
+    }
+    var frag = document.createDocumentFragment(), lastDay = null, n = Math.min(list.length, MAX_DRAWN), lab, dr, dtd, nodes;
+    for (i = 0; i < n; i++) {
+      lab = dayLabel(list[i].t);
+      if (lab !== lastDay) { lastDay = lab; dr = make('tr', 'day'); dtd = make('td', null, lab); dtd.colSpan = 4; dr.appendChild(dtd); frag.appendChild(dr); }
+      nodes = rowNodes(list[i]); frag.appendChild(nodes[0]); frag.appendChild(nodes[1]);
+    }
+    body.textContent = '';
+    body.appendChild(frag);
+    var em = $('empty');
+    if (!list.length) {
+      em.hidden = false;
+      em.textContent = !d.totals || !d.totals.sends ? 'Nothing has been sent yet. Everyone this script texts or emails will show up here, a few seconds after the send.' : 'No sends match these filters.';
+    } else em.hidden = true;
+    $('foot').textContent = (list.length > n ? 'Showing the newest ' + fNum.format(n) + ' of ' + fNum.format(list.length) + ' matching sends. ' : '') +
+      (d.truncated ? 'This page holds the newest ' + fNum.format(d.rows.length) + ' of ' + fNum.format(d.totals.sends) + ' sends: Today and This run are counted from those, All time counts the whole log. ' : '') +
+      'Source: texted-log.jsonl. Times are in this computer’s time zone.' + (d.dataLog && d.dataLog.file ? ' Your own data log, kept only on this computer: ' + d.dataLog.file + '.' : '');
+  }
+
+  var curDay = startOfDay(Date.now());
+  function renderStatus() {
+    var d = state.d, s = $('status'), dot = $('dot'), els, i, day = startOfDay(Date.now());
+    if (d && day !== curDay) { curDay = day; renderAll(); return; }
+    if (!d) { dot.className = 'dot'; s.textContent = 'Waiting for data …'; return; }
+    dot.className = 'dot live';
+    s.textContent = 'Updated ' + stamp(Date.parse(d.generatedAt), true) + ' · ' +
+      (state.rows.length ? 'last send ' + ago(state.rows[0].t) : 'nothing sent yet') +
+      (LIVE ? ' · localhost' : ' · file mode') +
+      ' · looks for new sends every ' + (POLL_MS / 1000) + ' s';
+    els = document.querySelectorAll('[data-t]');
+    for (i = 0; i < els.length; i++) els[i].textContent = ago(Number(els[i].getAttribute('data-t')));
+  }
+
+  function renderAll() {
+    var d = state.d;
+    if (!d) { $('rows').textContent = ''; $('empty').hidden = false; $('empty').textContent = 'Waiting for the first data …'; renderStatus(); return; }
+    $('banner').hidden = !(d.run && d.run.dryRun);
+    $('fullLog').hidden = !d.fullLog;
+    renderCards(d); renderTable(d); renderStatus();
+  }
+
+  function onData() {
+    var d = data();
+    if (d && (state.d === null || d.generatedAt > state.d.generatedAt)) { ingest(d); state.d = d; renderAll(); }
+    else if (!state.d) renderAll();
+    else renderStatus();
+  }
+
+  function syncControls() {
+    var b = document.querySelectorAll('#view-sends .seg button'), i;
+    for (i = 0; i < b.length; i++) b[i].setAttribute('aria-pressed', b[i].getAttribute('data-ch') === state.channel ? 'true' : 'false');
+    $('range').value = state.range;
+  }
+
+  function flashTpl(msg, ok) {
+    var el = $('tplFlash');
+    el.hidden = !msg;
+    el.className = 'flash ' + (ok ? 'ok' : 'err');
+    el.textContent = msg || '';
+  }
+
+  function loadTemplates() {
+    if (!LIVE) {
+      $('tplNote').textContent = 'Open this page via localhost (run zw) to load and edit templates.';
+      $('tplList').textContent = '';
+      $('tplAdd').hidden = true;
+      return;
+    }
+    fetch('/api/templates').then(function (r) { return r.json(); }).then(function (j) {
+      state.templates = j;
+      renderTemplates();
+    }).catch(function (e) {
+      flashTpl('Could not load templates: ' + (e && e.message ? e.message : 'error'), false);
+    });
+  }
+
+  function renderTemplates() {
+    var j = state.templates, list = $('tplList'), q = state.tq.toLowerCase(), i, items, item, card;
+    list.textContent = '';
+    if (!j) return;
+    $('tplAdd').hidden = state.tk !== 'text' || !LIVE;
+    items = state.tk === 'email' ? (j.emails || []) : (j.texts || []);
+    $('tplNote').textContent = state.tk === 'text'
+      ? 'Texts use <first name>, <full name>, <call number>, <text number>, <booking link>. Saved in text-templates.json — used on the next zw launch.'
+      : 'Emails use {{greeting}} / {{business|…}}. Saved in email-templates.json — used on the next zw launch.';
+    for (i = 0; i < items.length; i++) {
+      item = items[i];
+      if (q && [item.id || item.key, item.name, item.subject, item.text || item.body].join(' ').toLowerCase().indexOf(q) < 0) continue;
+      card = make('div', 'tpl-card' + (state.editing === (item.id || item.key) ? ' editing' : ''));
+      card.appendChild(renderTplCard(item));
+      list.appendChild(card);
+    }
+    if (!list.childNodes.length) list.appendChild(make('div', 'empty', 'No templates match.'));
+  }
+
+  function renderTplCard(item) {
+    var box = document.createElement('div');
+    var key = item.id || item.key;
+    var editing = state.editing === key;
+    var head = make('div', 'tpl-head');
+    var left = document.createElement('div');
+    var title = make('h3', null, (item.id ? '#' + item.id + ' · ' : '') + item.name);
+    left.appendChild(title);
+    if (item.kind === 'changed') left.appendChild(make('span', 'pill warn', 'edited'));
+    if (item.kind === 'yours') left.appendChild(make('span', 'pill ok', 'yours'));
+    if (item.subject) left.appendChild(make('div', 'meta', 'Subject: ' + item.subject));
+    head.appendChild(left);
+    var actions = make('div', 'tpl-actions');
+    if (!editing) {
+      var editBtn = make('button', 'btn', 'Edit');
+      editBtn.type = 'button';
+      editBtn.addEventListener('click', function () { state.editing = key; renderTemplates(); });
+      actions.appendChild(editBtn);
+      if (item.kind === 'changed') {
+        var resetBtn = make('button', 'btn', 'Reset');
+        resetBtn.type = 'button';
+        resetBtn.addEventListener('click', function () { apiResetText(item.id); });
+        actions.appendChild(resetBtn);
+      }
+      if (item.kind === 'yours') {
+        var delBtn = make('button', 'btn danger', 'Remove');
+        delBtn.type = 'button';
+        delBtn.addEventListener('click', function () {
+          if (confirm('Remove this text?')) apiRemoveText(item.id);
+        });
+        actions.appendChild(delBtn);
+      }
+    }
+    head.appendChild(actions);
+    box.appendChild(head);
+
+    if (!editing) {
+      box.appendChild(make('pre', 'tpl-body', item.channel === 'email' ? item.body : item.text));
+      return box;
+    }
+
+    var form = make('div', 'tpl-edit');
+    var nameIn = null, subIn = null, bodyIn, psIn = null;
+    if (item.channel === 'email' || item.kind === 'yours' || item._new) {
+      form.appendChild(make('label', null, item.channel === 'email' ? 'Name' : 'Name (as the list shows it)'));
+      nameIn = document.createElement('input');
+      nameIn.type = 'text';
+      nameIn.value = item.name || '';
+      form.appendChild(nameIn);
+    }
+    if (item.channel === 'email') {
+      form.appendChild(make('label', null, 'Subject'));
+      subIn = document.createElement('input');
+      subIn.type = 'text';
+      subIn.value = item.subject || '';
+      form.appendChild(subIn);
+    }
+    form.appendChild(make('label', null, item.channel === 'email' ? 'Body (one paragraph per line)' : 'Wording'));
+    bodyIn = document.createElement('textarea');
+    bodyIn.value = item.channel === 'email' ? (item.body || '') : (item.text || '');
+    form.appendChild(bodyIn);
+    if (item.channel === 'email') {
+      form.appendChild(make('label', null, 'P.S. (optional)'));
+      psIn = document.createElement('input');
+      psIn.type = 'text';
+      psIn.value = item.ps || '';
+      form.appendChild(psIn);
+    }
+    var row = make('div', 'tpl-actions');
+    row.style.marginTop = '10px';
+    var saveBtn = make('button', 'btn primary', 'Save');
+    saveBtn.type = 'button';
+    saveBtn.addEventListener('click', function () {
+      if (item._new) apiAddText(nameIn.value, bodyIn.value);
+      else if (item.channel === 'email') apiSaveEmail(item.key, { name: nameIn.value, subject: subIn.value, body: bodyIn.value, ps: psIn.value });
+      else apiSaveText(item.id, bodyIn.value);
+    });
+    var cancelBtn = make('button', 'btn', 'Cancel');
+    cancelBtn.type = 'button';
+    cancelBtn.addEventListener('click', function () {
+      state.editing = null;
+      if (state.templates && state.templates.texts) state.templates.texts = state.templates.texts.filter(function (x) { return !x._new; });
+      renderTemplates();
+    });
+    row.appendChild(saveBtn);
+    row.appendChild(cancelBtn);
+    form.appendChild(row);
+    box.appendChild(form);
+    return box;
+  }
+
+  function apiSaveText(id, text) {
+    fetch('/api/templates/text/' + encodeURIComponent(id), {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) { flashTpl(j.error || 'Save failed', false); return; }
+      flashTpl(j.unchanged ? 'Nothing changed — already that wording.' : 'Saved. It will be used on the next launch.', true);
+      state.editing = null;
+      loadTemplates();
+    }).catch(function (e) { flashTpl(e.message || 'Save failed', false); });
+  }
+  function apiResetText(id) {
+    fetch('/api/templates/text/' + encodeURIComponent(id) + '/reset', { method: 'POST' })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        if (!j.ok) { flashTpl(j.error || 'Reset failed', false); return; }
+        flashTpl('Original wording restored. Used on the next launch.', true);
+        loadTemplates();
+      }).catch(function (e) { flashTpl(e.message || 'Reset failed', false); });
+  }
+  function apiRemoveText(id) {
+    fetch('/api/templates/text/' + encodeURIComponent(id), { method: 'DELETE' })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        if (!j.ok) { flashTpl(j.error || 'Remove failed', false); return; }
+        flashTpl('Removed.', true);
+        loadTemplates();
+      }).catch(function (e) { flashTpl(e.message || 'Remove failed', false); });
+  }
+  function apiAddText(name, text) {
+    fetch('/api/templates/text', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, text: text })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) { flashTpl(j.error || 'Add failed', false); return; }
+      flashTpl('Added as text ' + (j.id || '') + '. Used on the next launch.', true);
+      state.editing = null;
+      loadTemplates();
+    }).catch(function (e) { flashTpl(e.message || 'Add failed', false); });
+  }
+  function apiSaveEmail(key, payload) {
+    fetch('/api/templates/email/' + encodeURIComponent(key), {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) { flashTpl(j.error || 'Save failed', false); return; }
+      flashTpl('Email template saved. Used on the next launch.', true);
+      state.editing = null;
+      loadTemplates();
+    }).catch(function (e) { flashTpl(e.message || 'Save failed', false); });
+  }
+
+  function loadAnalytics() {
+    if (!LIVE) {
+      $('anFoot').textContent = 'Open via localhost (run zw) to load analytics and replies.';
+      return;
+    }
+    fetch('/api/analytics').then(function (r) { return r.json(); }).then(function (j) {
+      state.analytics = j;
+      renderAnalytics();
+    }).catch(function (e) {
+      $('anFoot').textContent = 'Could not load analytics: ' + (e && e.message ? e.message : 'error');
+    });
+  }
+
+  function renderAnalytics() {
+    var j = state.analytics, i, t, body, tr, list, q, outcome;
+    if (!j) return;
+    $('anSends').textContent = fNum.format(j.sends || 0);
+    $('anSendsS').textContent = 'texts ' + fNum.format(j.texts || 0) + ' · emails ' + fNum.format(j.emails || 0);
+    $('anReplies').textContent = fNum.format(j.replyTotal || 0);
+    $('anRepliesS').textContent = 'today ' + fNum.format(j.repliesToday || 0);
+    $('anInterested').textContent = fNum.format(j.interested || 0);
+    $('anOptout').textContent = fNum.format(j.optout || 0);
+
+    body = $('anTpl');
+    body.textContent = '';
+    t = j.templates || [];
+    $('anTplEmpty').hidden = t.length > 0;
+    for (i = 0; i < t.length; i++) {
+      tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + (t[i].ch === 'email' ? '✉️ Email' : '💬 Text') + '</td>'
+        + '<td>' + escapeHtml(t[i].name) + '</td>'
+        + '<td>' + fNum.format(t[i].sends) + '</td>'
+        + '<td>' + fNum.format(t[i].replies) + '</td>'
+        + '<td>' + pct(t[i].replied, t[i].accounts) + '</td>'
+        + '<td>' + fNum.format(t[i].interested) + '</td>'
+        + '<td>' + fNum.format(t[i].optout) + '</td>';
+      body.appendChild(tr);
+    }
+
+    q = state.aq.toLowerCase();
+    list = (j.replies || []).filter(function (r) {
+      if (state.rf === 'interested' && !r.interested) return false;
+      if (state.rf === 'optout' && !r.optout) return false;
+      if (state.rf === 'gift' && !r.gift) return false;
+      if (q && [r.name, r.reply, r.ind].join(' ').toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+    body = $('anRep');
+    body.textContent = '';
+    $('anRepEmpty').hidden = list.length > 0;
+    for (i = 0; i < Math.min(list.length, 200); i++) {
+      tr = document.createElement('tr');
+      (function (r) {
+        var out = r.optout ? '🚫 Opt-out' : r.interested ? '👍 Interested' : r.gift ? '🎁 Gift card' : 'Other';
+        var name = escapeHtml(r.name || '(unknown)');
+        if (r.url) name += ' <a class="link" href="' + escapeHtml(r.url) + '" target="_blank" rel="noopener">↗</a>';
+        tr.innerHTML = '<td style="white-space:nowrap">' + escapeHtml(r.at ? fFull.format(new Date(r.at)) : '') + '</td>'
+          + '<td>' + name + '</td>'
+          + '<td>' + (r.ch === 'email' ? '✉️' : '💬') + '</td>'
+          + '<td>' + out + '</td>'
+          + '<td><div class="rep-text">' + escapeHtml(r.reply || '') + '</div></td>';
+      })(list[i]);
+      body.appendChild(tr);
+    }
+    $('anFoot').textContent = (j.note || '') + (list.length > 200 ? ' Showing the newest 200 matching replies.' : '');
+  }
+
+  // Wire UI
+  (function wire() {
+    var tabs = document.querySelectorAll('.nav button'), i, timer = null;
+    for (i = 0; i < tabs.length; i++) tabs[i].addEventListener('click', function () { setView(this.getAttribute('data-view')); });
+    var b = document.querySelectorAll('#view-sends .seg button');
+    for (i = 0; i < b.length; i++) b[i].addEventListener('click', function () { state.channel = this.getAttribute('data-ch'); lsSet('channel', state.channel); syncControls(); if (state.d) renderTable(state.d); });
+    $('range').addEventListener('change', function () { state.range = this.value; lsSet('range', state.range); if (state.d) renderTable(state.d); });
+    $('q').addEventListener('input', function () { var v = this.value; clearTimeout(timer); timer = setTimeout(function () { state.q = v.trim(); if (state.d) renderTable(state.d); }, 120); });
+
+    var tb = document.querySelectorAll('#view-templates .seg button');
+    for (i = 0; i < tb.length; i++) tb[i].addEventListener('click', function () {
+      state.tk = this.getAttribute('data-tk');
+      for (var j = 0; j < tb.length; j++) tb[j].setAttribute('aria-pressed', tb[j].getAttribute('data-tk') === state.tk ? 'true' : 'false');
+      state.editing = null;
+      renderTemplates();
+    });
+    $('tq').addEventListener('input', function () { state.tq = this.value.trim(); renderTemplates(); });
+    $('tplAdd').addEventListener('click', function () {
+      state.editing = '__new__';
+      state.templates = state.templates || { texts: [], emails: [] };
+      var texts = (state.templates.texts || []).filter(function (x) { return !x._new; });
+      texts.unshift({ id: '__new__', name: '', text: '', kind: 'yours', _new: true, channel: 'text' });
+      state.templates.texts = texts;
+      renderTemplates();
+    });
+
+    var rb = document.querySelectorAll('#view-analytics .seg button');
+    for (i = 0; i < rb.length; i++) rb[i].addEventListener('click', function () {
+      state.rf = this.getAttribute('data-rf');
+      for (var j = 0; j < rb.length; j++) rb[j].setAttribute('aria-pressed', rb[j].getAttribute('data-rf') === state.rf ? 'true' : 'false');
+      renderAnalytics();
+    });
+    $('aq').addEventListener('input', function () { state.aq = this.value.trim(); renderAnalytics(); });
+  })();
+
+  $('fileMode').hidden = LIVE;
+
+  var seq = 0;
+  function load(then) {
+    if (LIVE) {
+      fetch('/data.js?_=' + Date.now() + '-' + (seq++)).then(function (r) { return r.text(); }).then(function (txt) {
+        try { (0, eval)(txt); } catch (e) {}
+        try { onData(); } catch (e) {}
+        if (then) then();
+      }).catch(function () { if (then) then(); });
+      return;
+    }
+    var s = document.createElement('script');
+    function done() {
+      try { if (s.parentNode) s.parentNode.removeChild(s); onData(); }
+      catch (e) { try { $('status').textContent = 'Could not show the latest data · trying again'; } catch (e2) {} }
+      finally { if (then) then(); }
+    }
+    s.onload = done; s.onerror = done;
+    s.src = 'data.js?_=' + Date.now() + '-' + (seq++);
+    document.head.appendChild(s);
+  }
+  function poll() {
+    if (document.hidden) { setTimeout(poll, POLL_MS); return; }
+    load(function () { setTimeout(poll, POLL_MS); });
+  }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
+
+  syncControls();
+  setView(state.view);
+  try { onData(); } catch (e) {}
+  setTimeout(poll, POLL_MS);
+  setInterval(function () { try { renderStatus(); } catch (e) {} }, 1000);
+})();
+</script>
+</body>
+</html>

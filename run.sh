@@ -307,10 +307,9 @@ if [ $TOMORROW = 1 ] && [ -f "$SCRIPT_DIR/tomorrow.lock" ]; then
   fi
 fi
 
-# The OUTREACH DASHBOARD (outreachDashboard.js): a local HTML page, outreach-dashboard/index.html, that lists everyone this run texts or emails and updates itself a few seconds after
-# each send. It opens here, once per launch and BEFORE the browser below starts, so the Salesforce sign-in window still ends up on top. The read-only previews above (--inspect, and
-# --dry-run on --board / --holds ...) exec and never reach it; the script itself also skips --help, --inspect and --sent. It is a convenience: if it cannot be built or opened the run
-# carries on (one warning line is printed), and ASSISTANT_NO_DASHBOARD=1 switches it off (nothing opened, and no send writes it; empty, 0, false, no and off leave it on).
+# The OUTREACH DASHBOARD (outreachDashboard.js): http://127.0.0.1:9340/ — Sends (live log), Templates (view/edit texts + emails; saved for the next launch), Analytics (replies + scorecard).
+# Opens here once per launch BEFORE Chrome starts. A detached --serve keeps Templates/Analytics editable after this script moves on. Skipped for --help / --inspect / --sent.
+# If it cannot open, the run carries on (one warning). ASSISTANT_NO_DASHBOARD=1 turns it off; ASSISTANT_DASHBOARD_PORT overrides 9340.
 case "${ASSISTANT_NO_DASHBOARD:-}" in
   ''|0|false|FALSE|False|no|NO|No|off|OFF|Off)
     node "$SCRIPT_DIR/outreachDashboard.js" --launch "$@" >/dev/null 2>&1 || echo "⚠️  The outreach dashboard could not be opened (the run carries on without it; ASSISTANT_NO_DASHBOARD=1 stops it trying)."

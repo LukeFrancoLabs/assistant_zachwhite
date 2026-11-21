@@ -854,8 +854,55 @@ function selfcheck() {
   }
 }
 
+/**
+ * Dashboard HTML editor: save / reset / add / remove a text. Same rules as Settings > T (tokens, reserved names, length).
+ * → { ok: true, unchanged? } | { ok: false, error }
+ */
+function saveTextEdit(id, rawText) {
+  const view = textsView();
+  const item = view.items.find((x) => String(x.id) === String(id));
+  if (!item) return { ok: false, error: 'No text with that number.' };
+  let values = {};
+  try { values = load().values || {}; } catch (_) { /* preview without sender.json */ }
+  const c = checkText(rawText, values);
+  if (c.error) return { ok: false, error: c.error };
+  if (tidyBody(c.value) === tidyBody(item.text)) return { ok: true, unchanged: true };
+  storeEdit(view, item, { name: item.name, text: c.value });
+  return { ok: true };
+}
+function resetTextEdit(id) {
+  const view = textsView();
+  const item = view.items.find((x) => String(x.id) === String(id));
+  if (!item) return { ok: false, error: 'No text with that number.' };
+  if (item.kind !== 'changed') return { ok: false, error: 'That text is already the original.' };
+  const edited = { ...view.st.edited };
+  delete edited[item.id];
+  saveTexts(edited, view.st.added, view.st);
+  return { ok: true };
+}
+function addTextEdit(name, rawText) {
+  const view = textsView();
+  if (view.st.added.length >= MAX_ADDED) return { ok: false, error: `You already have ${MAX_ADDED} texts of your own.` };
+  let values = {};
+  try { values = load().values || {}; } catch (_) { /* preview without sender.json */ }
+  const n = checkName(name, view.items.map((x) => x.name));
+  if (n.error) return { ok: false, error: n.error };
+  const c = checkText(rawText, values);
+  if (c.error) return { ok: false, error: c.error };
+  saveTexts({ ...view.st.edited }, [...view.st.added, { name: n.value, text: c.value }], view.st);
+  return { ok: true, id: String(Number(view.items[view.items.length - 1].id) + 1) };
+}
+function removeTextEdit(id) {
+  const view = textsView();
+  const item = view.items.find((x) => String(x.id) === String(id));
+  if (!item || item.kind !== 'yours') return { ok: false, error: 'Only a text you added can be removed.' };
+  saveTexts(view.st.edited, view.st.added.filter((_, i) => i !== item.index), view.st);
+  return { ok: true };
+}
+
 module.exports = { FIELDS, SETUP_FIELDS, REQUIRED, SIGNATURE_TEMPLATE, FILE, LIST_HOST, GENERIC_LIST, BUILT_IN_REPORT, parseFullName, parseFirstName, parseTitle, parsePhone, parseLink, parseOnOff, parseReport, parseList, reportUrl, listUrl, listName, claudeDraftsOn, load, save, needsFirstRun, signatureLines, main, selfcheck,
-  TEXTS_FILE, DEFAULTS_FILE, MAX_TEXT, MAX_ADDED, REENGAGE_PREFIX, RESERVED_NAMES, RESERVED_PREFIXES, oddChar, expandTokens, checkText, checkName, loadTexts, saveTexts, loadDefaults, applyTextEdits, textsView, textsMenu };
+  TEXTS_FILE, DEFAULTS_FILE, MAX_TEXT, MAX_ADDED, REENGAGE_PREFIX, RESERVED_NAMES, RESERVED_PREFIXES, oddChar, expandTokens, checkText, checkName, loadTexts, saveTexts, loadDefaults, applyTextEdits, textsView, textsMenu,
+  saveTextEdit, resetTextEdit, addTextEdit, removeTextEdit };
 
 if (require.main === module) {
   main().then(
