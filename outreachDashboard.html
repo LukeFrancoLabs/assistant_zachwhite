@@ -127,12 +127,12 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     <a class="link" id="fullLog" href="/full-log" hidden>Full outreach log &rarr;</a>
   </header>
   <div class="banner" id="banner" hidden>Practice flag in use (--test / --dry-run). This page lists only sends that actually went out, so it stays empty unless one does.</div>
-  <div class="banner" id="fileMode" hidden>Opened as a file — Templates and Analytics need the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page to edit templates.</div>
+  <div class="banner" id="fileMode" hidden>Opened as a file — Templates and Scoreboard need the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page to edit templates.</div>
 
   <nav class="nav" role="tablist" aria-label="Dashboard sections">
     <button type="button" role="tab" id="tab-sends" aria-selected="true" data-view="sends">Sends</button>
     <button type="button" role="tab" id="tab-templates" aria-selected="false" data-view="templates">Templates</button>
-    <button type="button" role="tab" id="tab-analytics" aria-selected="false" data-view="analytics">Analytics</button>
+    <button type="button" role="tab" id="tab-analytics" aria-selected="false" data-view="analytics">Scoreboard</button>
   </nav>
 
   <section id="view-sends" role="tabpanel">
@@ -181,40 +181,14 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   </section>
 
   <section id="view-analytics" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Sends and replies for this copy. Sends are logged automatically. Replies need a Gmail feed into <code>replies.jsonl</code> (see <code>node replyPoller.js --setup</code>). Email <b>opens</b> are not tracked. Template reply rates credit each reply to the last message sent in that channel.</p>
-    <div class="banner" id="anSetup" hidden>No replies on disk yet. Sends still show below. To fill replies: run <code>node replyPoller.js --setup</code> (Claude Desktop Gmail connector, or a JSON ingest). Opens are not available.</div>
-    <div class="cards four" aria-label="Analytics totals" id="anCards">
-      <div class="card"><div class="k">Sends (all time)</div><div class="n" id="anSends">0</div><div class="s" id="anSendsS"></div></div>
-      <div class="card"><div class="k">Replies</div><div class="n" id="anReplies">0</div><div class="s" id="anRepliesS"></div></div>
-      <div class="card"><div class="k">Interested</div><div class="n" id="anInterested">0</div><div class="s">👍 positive replies</div></div>
-      <div class="card"><div class="k">Opt-outs</div><div class="n" id="anOptout">0</div><div class="s">🚫 not interested</div></div>
+    <p class="sub" style="margin:14px 0 0">Total sends from this copy — texts and emails that actually went out.</p>
+    <div class="cards four" aria-label="Sends scoreboard" id="anCards">
+      <div class="card"><div class="k">Today</div><div class="n" id="anDay">0</div><div class="s" id="anDayS"></div></div>
+      <div class="card"><div class="k">This week</div><div class="n" id="anWeek">0</div><div class="s" id="anWeekS"></div></div>
+      <div class="card"><div class="k">This month</div><div class="n" id="anMonth">0</div><div class="s" id="anMonthS"></div></div>
+      <div class="card"><div class="k">All time</div><div class="n" id="anAll">0</div><div class="s" id="anAllS"></div></div>
     </div>
-    <h2 style="font-size:16px;margin:22px 0 8px">Template scorecard</h2>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th>Channel</th><th>Template</th><th>Messages</th><th>Replies</th><th>Reply %</th><th>Interested</th><th>Opt-outs</th></tr></thead>
-        <tbody id="anTpl"></tbody>
-      </table>
-      <div class="empty" id="anTplEmpty" hidden>No sends yet — scorecard fills in after outreach goes out.</div>
-    </div>
-    <h2 style="font-size:16px;margin:22px 0 8px">Recent replies</h2>
-    <div class="controls">
-      <div class="seg" role="group" aria-label="Reply filter">
-        <button type="button" data-rf="all" aria-pressed="true">All</button>
-        <button type="button" data-rf="interested" aria-pressed="false">Interested</button>
-        <button type="button" data-rf="optout" aria-pressed="false">Opt-out</button>
-        <button type="button" data-rf="gift" aria-pressed="false">Gift card</button>
-      </div>
-      <input id="aq" type="search" placeholder="Search replies …" aria-label="Search replies">
-    </div>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th>When</th><th>Who</th><th>Via</th><th>Outcome</th><th>They said</th></tr></thead>
-        <tbody id="anRep"></tbody>
-      </table>
-      <div class="empty" id="anRepEmpty" hidden>No replies yet. They appear once the poller reads SMS-Magic / email replies.</div>
-    </div>
-    <p class="foot" id="anFoot"></p>
+    <p class="foot" id="anFoot">Week = last 7 days including today. Month = calendar month to date.</p>
   </section>
 </main>
 <script src="data.js"></script>
@@ -226,7 +200,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   var state = {
     view: 'sends', channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0,
     tk: 'text', tq: '', templates: null, editing: null,
-    analytics: null, rf: 'all', aq: ''
+    analytics: null
   };
 
   function $(id) { return document.getElementById(id); }
@@ -623,72 +597,35 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     }).catch(function (e) { flashTpl(e.message || 'Save failed', false); });
   }
 
+  function splitLabel(b) {
+    b = b || {};
+    return 'texts ' + fNum.format(b.texts || 0) + ' · emails ' + fNum.format(b.emails || 0);
+  }
   function loadAnalytics() {
     if (!LIVE) {
-      $('anFoot').textContent = 'Open via localhost (run zw) to load analytics and replies.';
+      $('anFoot').textContent = 'Open via localhost (run zw) to load the scoreboard.';
       return;
     }
     fetch('/api/analytics').then(function (r) { return r.json(); }).then(function (j) {
       state.analytics = j;
       renderAnalytics();
     }).catch(function (e) {
-      $('anFoot').textContent = 'Could not load analytics: ' + (e && e.message ? e.message : 'error');
+      $('anFoot').textContent = 'Could not load scoreboard: ' + (e && e.message ? e.message : 'error');
     });
   }
 
   function renderAnalytics() {
-    var j = state.analytics, i, t, body, tr, list, q, outcome;
+    var j = state.analytics;
     if (!j) return;
-    $('anSends').textContent = fNum.format(j.sends || 0);
-    $('anSendsS').textContent = 'texts ' + fNum.format(j.texts || 0) + ' · emails ' + fNum.format(j.emails || 0);
-    $('anReplies').textContent = fNum.format(j.replyTotal || 0);
-    $('anRepliesS').textContent = 'today ' + fNum.format(j.repliesToday || 0);
-    $('anInterested').textContent = fNum.format(j.interested || 0);
-    $('anOptout').textContent = fNum.format(j.optout || 0);
-    $('anSetup').hidden = (j.replyTotal || 0) > 0;
-
-    body = $('anTpl');
-    body.textContent = '';
-    t = j.templates || [];
-    $('anTplEmpty').hidden = t.length > 0;
-    for (i = 0; i < t.length; i++) {
-      tr = document.createElement('tr');
-      tr.innerHTML = '<td>' + (t[i].ch === 'email' ? '✉️ Email' : '💬 Text') + '</td>'
-        + '<td>' + escapeHtml(t[i].name) + '</td>'
-        + '<td>' + fNum.format(t[i].sends) + '</td>'
-        + '<td>' + fNum.format(t[i].replies) + '</td>'
-        + '<td>' + pct(t[i].replied, t[i].accounts) + '</td>'
-        + '<td>' + fNum.format(t[i].interested) + '</td>'
-        + '<td>' + fNum.format(t[i].optout) + '</td>';
-      body.appendChild(tr);
-    }
-
-    q = state.aq.toLowerCase();
-    list = (j.replies || []).filter(function (r) {
-      if (state.rf === 'interested' && !r.interested) return false;
-      if (state.rf === 'optout' && !r.optout) return false;
-      if (state.rf === 'gift' && !r.gift) return false;
-      if (q && [r.name, r.reply, r.ind].join(' ').toLowerCase().indexOf(q) < 0) return false;
-      return true;
-    });
-    body = $('anRep');
-    body.textContent = '';
-    $('anRepEmpty').hidden = list.length > 0;
-    for (i = 0; i < Math.min(list.length, 200); i++) {
-      tr = document.createElement('tr');
-      (function (r) {
-        var out = r.optout ? '🚫 Opt-out' : r.interested ? '👍 Interested' : r.gift ? '🎁 Gift card' : 'Other';
-        var name = escapeHtml(r.name || '(unknown)');
-        if (r.url) name += ' <a class="link" href="' + escapeHtml(r.url) + '" target="_blank" rel="noopener">↗</a>';
-        tr.innerHTML = '<td style="white-space:nowrap">' + escapeHtml(r.at ? fFull.format(new Date(r.at)) : '') + '</td>'
-          + '<td>' + name + '</td>'
-          + '<td>' + (r.ch === 'email' ? '✉️' : '💬') + '</td>'
-          + '<td>' + out + '</td>'
-          + '<td><div class="rep-text">' + escapeHtml(r.reply || '') + '</div></td>';
-      })(list[i]);
-      body.appendChild(tr);
-    }
-    $('anFoot').textContent = (j.note || '') + (list.length > 200 ? ' Showing the newest 200 matching replies.' : '');
+    $('anDay').textContent = fNum.format((j.daily && j.daily.sends) || 0);
+    $('anDayS').textContent = splitLabel(j.daily);
+    $('anWeek').textContent = fNum.format((j.weekly && j.weekly.sends) || 0);
+    $('anWeekS').textContent = splitLabel(j.weekly);
+    $('anMonth').textContent = fNum.format((j.monthly && j.monthly.sends) || 0);
+    $('anMonthS').textContent = splitLabel(j.monthly);
+    $('anAll').textContent = fNum.format((j.allTime && j.allTime.sends) || 0);
+    $('anAllS').textContent = splitLabel(j.allTime);
+    $('anFoot').textContent = 'Week = last 7 days including today. Month = calendar month to date. Source: texted-log.jsonl.';
   }
 
   // Wire UI
@@ -717,13 +654,6 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
       renderTemplates();
     });
 
-    var rb = document.querySelectorAll('#view-analytics .seg button');
-    for (i = 0; i < rb.length; i++) rb[i].addEventListener('click', function () {
-      state.rf = this.getAttribute('data-rf');
-      for (var j = 0; j < rb.length; j++) rb[j].setAttribute('aria-pressed', rb[j].getAttribute('data-rf') === state.rf ? 'true' : 'false');
-      renderAnalytics();
-    });
-    $('aq').addEventListener('input', function () { state.aq = this.value.trim(); renderAnalytics(); });
   })();
 
   $('fileMode').hidden = LIVE;

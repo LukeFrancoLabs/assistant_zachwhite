@@ -77,19 +77,10 @@ Every time you start `zw`, a small box shows who you are sending as and which re
 ## Changing your text messages
 The text campaign (`zw --text`) offers ready-made texts to pick from when Claude drafts are off (the default). To read them or change their wording, type **S** when `zw` starts (or run `zw --settings`), then **T**. Pick a text by its number, then **e** to change its wording (finish with a line that says `END`), check the preview, and type `yes` to save. A ready-made text keeps its name. `<first name>`, `<full name>`, `<call number>`, `<text number>` and `<booking link>` are filled in from your own details when a text is sent, so type them where your details go. You can also write a new text with **n** (it needs a name no other text has), put a changed text back to the original with **r**, or remove one of your own with **x**. Your changes are saved in `text-templates.json` and apply from the next run.
 
-You can also edit them in the browser: when `zw` starts it opens **http://127.0.0.1:9340/** — use the **Templates** tab for every text and email template (Edit → Save). Edits apply on the next launch.
-
-## Analytics, replies, and Gmail
-The **Analytics** tab on **http://127.0.0.1:9340/** shows what this copy sent (always) and what pros replied (only after a Gmail feed writes `replies.jsonl`).
-
-- **Sends** — automatic. Every text/email `zw` actually sends is logged.
-- **Replies** — need a Gmail poller. When a pro texts back, SMS-Magic emails your Gmail; when they reply to an outreach email, that lands in Gmail too. Luke’s Mac runs a Claude Desktop Gmail connector on a schedule and pipes those messages into `optOut.js`. A rep’s Mac does **not** get that unless you set it up. Run `node replyPoller.js --setup` for the steps (Claude Desktop connector, or a one-shot JSON ingest: `node replyPoller.js --sms emails.json` / `--email emails.json`). Then refresh Analytics.
-- **Opens** — not tracked. Gmail does not tell this tool who opened mail, and Salesforce Lightning email opens are not wired in. Do not expect an “opened” column.
-
-Check what is on disk: `node replyPoller.js --status`. Ambiguous matches: `node optOut.js --review`.
+You can also edit them in the browser: when `zw` starts it opens **http://127.0.0.1:9340/** — use the **Templates** tab for every text and email template (Edit → Save). Edits apply on the next launch. The **Scoreboard** tab shows total sends for today, this week, this month, and all time.
 
 ## Your outreach data log
-Every text and email this tool actually sends is also saved, one line each, in `outreach-data-log.jsonl` in this folder: when it went out, to whom, what was sent, and who sent it from which computer (your name from `sender.json` and this computer's name). It is your own record and it stays on this computer: nothing uploads it. The outreach page at **http://127.0.0.1:9340/** (Sends / Templates / Analytics) opens when you start `zw`. A practice run (`--test` or `--dry-run`) sends nothing, so it adds nothing. Keep the file when you are given a new version of the folder; to start a fresh log, quit the tool and delete the file.
+Every text and email this tool actually sends is also saved, one line each, in `outreach-data-log.jsonl` in this folder: when it went out, to whom, what was sent, and who sent it from which computer (your name from `sender.json` and this computer's name). It is your own record and it stays on this computer: nothing uploads it. The outreach page at **http://127.0.0.1:9340/** (Sends / Templates / Scoreboard) opens when you start `zw`. A practice run (`--test` or `--dry-run`) sends nothing, so it adds nothing. Keep the file when you are given a new version of the folder; to start a fresh log, quit the tool and delete the file.
 
 ## If something goes wrong
 - "command not found: zw": open a new Terminal window, or run `source ~/.zshrc`, and redo `./install-zw.sh` from `~/assistant_zachwhite`.

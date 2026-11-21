@@ -6,7 +6,7 @@
  * WHAT: run.sh opens http://127.0.0.1:9340/ (ASSISTANT_DASHBOARD_PORT). Tabs: Sends · Templates · Analytics.
  *   Sends     — every bot send, newest first; refreshes a few seconds after each send.
  *   Templates — every text (Settings > T / text-templates.json) and email (email-templates.json); edit in the browser; used on the next launch.
- *   Analytics — send + reply totals, template scorecard, recent replies (replies.jsonl).
+ *   Scoreboard — total sends: today, this week, this month, all time.
  * A detached `node outreachDashboard.js --serve` keeps the APIs up so edits work after the launch script exits.
  * File fallback (outreach-dashboard/index.html) still works for Sends only; Templates/Analytics need localhost.
  *
@@ -198,63 +198,26 @@ function saveEmailTemplate(key, payload) {
   return { ok: true };
 }
 
+/** Sends scoreboard: daily / weekly / monthly / all-time (texts + emails). */
 function analyticsPayload() {
   const all = readRows().filter((r) => r && r.mode !== 'manual' && Number.isFinite(Date.parse(r.at)));
-  let texts = 0, emails = 0;
-  for (const r of all) { if (r.channel === 'email') emails++; else texts++; }
-  let replies = [];
-  try { replies = require('./textLog').readReplyRows(); } catch (_) { replies = []; }
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const t0 = today.getTime();
-  let interested = 0, optout = 0, gift = 0, repliesToday = 0;
-  const NOTE_RE = /^\s*\[Top hit list\]/i;
-  const slim = [];
-  for (const r of replies) {
-    if (r.manual || NOTE_RE.test(r.reply || '')) continue;
+  const now = new Date();
+  const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
+  const week = new Date(startOfDay); week.setDate(week.getDate() - 6); // last 7 calendar days including today
+  const month = new Date(startOfDay); month.setDate(1); // calendar month to date
+  const tDay = startOfDay.getTime(), tWeek = week.getTime(), tMonth = month.getTime();
+  const bucket = () => ({ sends: 0, texts: 0, emails: 0 });
+  const daily = bucket(), weekly = bucket(), monthly = bucket(), allTime = bucket();
+  const add = (b, ch) => { b.sends++; if (ch === 'email') b.emails++; else b.texts++; };
+  for (const r of all) {
     const t = Date.parse(r.at);
-    if (Number.isFinite(t) && t >= t0) repliesToday++;
-    if (r.interested && !r.optout) interested++;
-    if (r.optout) optout++;
-    if (r.gift) gift++;
-    slim.push({
-      at: r.at,
-      name: r.accountName || '(unknown)',
-      ch: r.channel === 'email' ? 'email' : 'text',
-      reply: clip(r.reply || ''),
-      interested: !!r.interested,
-      optout: !!r.optout,
-      gift: !!r.gift,
-      ind: r.ind || null,
-      url: r.accountId ? (() => { try { return require('./sfId').fixUrl('https://housecallpro.lightning.force.com/lightning/r/Account/' + r.accountId + '/view'); } catch (_) { return null; } })() : null,
-    });
+    const ch = r.channel === 'email' ? 'email' : 'text';
+    add(allTime, ch);
+    if (t >= tMonth) add(monthly, ch);
+    if (t >= tWeek) add(weekly, ch);
+    if (t >= tDay) add(daily, ch);
   }
-  slim.sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0));
-  let templates = [];
-  let note = '';
-  try {
-    const textLog = require('./textLog');
-    const perf = require('./perfAnalytics').build({
-      rows: all,
-      replies,
-      won: [...textLog.readClosedWon().values()],
-      indOf: (name, id) => textLog.indFields(name, id),
-      zonesFor: (id) => textLog.zonesFor(id),
-      isBanned: (id) => textLog.isBanned(id),
-      sfUrl: (id) => require('./sfId').fixUrl('https://housecallpro.lightning.force.com/lightning/r/Account/' + id + '/view'),
-    });
-    templates = (perf.templates || []).slice(0, 40);
-    note = (perf.replyTotal || 0) + ' replies credited to a message; ' + (perf.unattributed || 0) + ' unmatched. ' + (perf.sendTotal || 0).toLocaleString() + ' messages in the log.';
-  } catch (e) {
-    note = 'Template scorecard unavailable (' + (e && e.message ? e.message : 'error') + '). Reply list still shows.';
-  }
-  return {
-    sends: all.length, texts, emails,
-    replyTotal: slim.length, repliesToday, interested, optout, gift,
-    templates,
-    replies: slim.slice(0, 300),
-    note,
-    generatedAt: new Date().toISOString(),
-  };
+  return { daily, weekly, monthly, allTime, generatedAt: new Date().toISOString() };
 }
 
 function readBody(req) {
