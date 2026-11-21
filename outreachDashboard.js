@@ -61,9 +61,16 @@ function readRows() {
 /** One log row, cut down to what the page shows. */
 function slim(r) {
   const channel = r.channel === 'email' ? 'email' : 'text';       // rows with no channel are old texts (same rule as textLog.rowChannel)
+  const accountId = str(r.accountId) || (() => {
+    try {
+      const m = String(r.accountUrl || '').match(/\/Account\/([A-Za-z0-9]{15,18})\b/);
+      return m ? m[1] : null;
+    } catch (_) { return null; }
+  })();
   return {
     at: r.at,
     channel,
+    accountId,
     name: str(r.accountName) || str(r.email) || '(no name)',
     url: safeUrl(r.accountUrl),
     email: str(r.email),
@@ -73,6 +80,91 @@ function slim(r) {
     mode: str(r.mode),
     step: r.step ? (Number(r.step) || null) : null,
   };
+}
+
+/** Active DNC list for the dashboard (banned and not greened). */
+function dncPayload() {
+  const textLog = require('./textLog');
+  const sfId = require('./sfId');
+  const bans = textLog.readBans();
+  const green = textLog.readGreen();
+  const rows = [];
+  const seen = new Set();
+  for (const [, b] of bans) {
+    if (!b || !b.accountId) continue;
+    const stem = String(b.accountId).toLowerCase().slice(0, 15);
+    if (seen.has(stem)) continue;
+    if (!textLog.isBanned(b.accountId, bans, green)) continue; // greened / not active
+    let best = b;
+    for (const [, other] of bans) {
+      if (!other || !other.accountId) continue;
+      if (String(other.accountId).toLowerCase().slice(0, 15) !== stem) continue;
+      if (String(other.accountId).length === 18) best = other;
+    }
+    seen.add(stem);
+    const id = sfId.fix(best.accountId) || best.accountId;
+    const url = sfId.fixUrl('https://housecallpro.lightning.force.com/lightning/r/Account/' + id + '/view');
+    rows.push({
+      accountId: id,
+      name: best.accountName || '(unnamed)',
+      reason: best.reason || null,
+      source: best.source || null,
+      at: best.at || null,
+      url: safeUrl(url),
+    });
+  }
+  rows.sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0));
+  return { rows, count: rows.length, generatedAt: new Date().toISOString() };
+}
+
+/** Parse a Salesforce account id or Account URL. → fixed id or null. */
+function parseAccountRef(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return null;
+  const sfId = require('./sfId');
+  try {
+    const m = s.match(/\/Account\/([A-Za-z0-9]{15,18})\b/);
+    if (m) return sfId.fix(m[1]) || m[1];
+  } catch (_) { /* fall through */ }
+  if (/^[A-Za-z0-9]{15}([A-Za-z0-9]{3})?$/.test(s)) {
+    try { return sfId.fix(s) || s; } catch (_) { return s; }
+  }
+  return null;
+}
+
+/** Put on DNC (banlist). Bans both 18- and 15-char forms. */
+function dncAdd({ accountId, accountName, reason }) {
+  const id = parseAccountRef(accountId);
+  if (!id) return { ok: false, error: 'Need a Salesforce account link or id.' };
+  const textLog = require('./textLog');
+  if (textLog.isBanned(id)) return { ok: true, already: true, accountId: id };
+  const sfId = require('./sfId');
+  const fixed = sfId.fix(id) || id;
+  const ids = String(fixed).length === 18 ? [fixed, fixed.slice(0, 15)] : [String(id).slice(0, 15)];
+  const why = String(reason || 'added from outreach dashboard').trim() || 'added from outreach dashboard';
+  let wrote = 0;
+  for (const one of ids) {
+    if (textLog.recordBan({ accountId: one, accountName: accountName || null, reason: why, source: 'dashboard' })) wrote++;
+  }
+  return { ok: true, accountId: fixed, wrote };
+}
+
+/** Take off DNC (green banlist override). */
+function dncClear({ accountId, accountName, reason }) {
+  const id = parseAccountRef(accountId);
+  if (!id) return { ok: false, error: 'Need a Salesforce account link or id.' };
+  const textLog = require('./textLog');
+  if (!textLog.isBanned(id)) return { ok: true, already: true, accountId: id, note: 'Not on the DNC list (or already cleared).' };
+  const sfId = require('./sfId');
+  const fixed = sfId.fix(id) || id;
+  const bans = textLog.readBans();
+  const name = accountName
+    || (bans.get(String(fixed).toLowerCase()) || bans.get(String(fixed).toLowerCase().slice(0, 15)) || {}).accountName
+    || null;
+  const ids = String(fixed).length === 18 ? [fixed, fixed.slice(0, 15)] : [String(id).slice(0, 15)];
+  const why = String(reason || 'cleared from outreach dashboard').trim() || 'cleared from outreach dashboard';
+  for (const one of ids) textLog.recordGreen({ accountId: one, accountName: name, reason: why });
+  return { ok: true, accountId: fixed };
 }
 
 function readRun() {
@@ -250,6 +342,19 @@ async function handleApi(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/analytics') {
     try { return sendJson(res, 200, analyticsPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }
+  if (req.method === 'GET' && url.pathname === '/api/dnc') {
+    try { return sendJson(res, 200, dncPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/dnc') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, dncAdd(j));
+  }
+  if (req.method === 'POST' && url.pathname === '/api/dnc/clear') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, dncClear(j));
+  }
   if (req.method === 'POST' && url.pathname === '/api/templates/text') {
     const raw = await readBody(req);
     let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
@@ -399,7 +504,7 @@ async function launch(flags = []) {
 }
 
 
-module.exports = { touch, build, launch, openPage, buildData, ensureServing, dashUrl, runServe, templatesPayload, analyticsPayload, PAGE, DATA, DIR, PORT, HOST };
+module.exports = { touch, build, launch, openPage, buildData, ensureServing, dashUrl, runServe, templatesPayload, analyticsPayload, dncPayload, dncAdd, dncClear, PAGE, DATA, DIR, PORT, HOST };
 
 if (require.main === module) {
   const [cmd, ...rest] = process.argv.slice(2);

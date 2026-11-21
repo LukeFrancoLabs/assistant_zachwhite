@@ -127,12 +127,13 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     <a class="link" id="fullLog" href="/full-log" hidden>Full outreach log &rarr;</a>
   </header>
   <div class="banner" id="banner" hidden>Practice flag in use (--test / --dry-run). This page lists only sends that actually went out, so it stays empty unless one does.</div>
-  <div class="banner" id="fileMode" hidden>Opened as a file — Templates and Scoreboard need the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page to edit templates.</div>
+  <div class="banner" id="fileMode" hidden>Opened as a file — Templates, Scoreboard, and DNC need the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page.</div>
 
   <nav class="nav" role="tablist" aria-label="Dashboard sections">
     <button type="button" role="tab" id="tab-sends" aria-selected="true" data-view="sends">Sends</button>
     <button type="button" role="tab" id="tab-templates" aria-selected="false" data-view="templates">Templates</button>
     <button type="button" role="tab" id="tab-analytics" aria-selected="false" data-view="analytics">Scoreboard</button>
+    <button type="button" role="tab" id="tab-dnc" aria-selected="false" data-view="dnc">DNC</button>
   </nav>
 
   <section id="view-sends" role="tabpanel">
@@ -190,6 +191,34 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     </div>
     <p class="foot" id="anFoot">Week = last 7 days including today. Month = calendar month to date.</p>
   </section>
+
+  <section id="view-dnc" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Do-not-contact list for this copy. Accounts here are skipped on the next launch. You can also add someone from a send row.</p>
+    <div id="dncFlash" class="flash" hidden></div>
+    <div class="controls" style="align-items:flex-end">
+      <div style="flex:1;min-width:220px">
+        <label for="dncRef" class="meta" style="display:block;margin:0 0 4px">Salesforce account link or id</label>
+        <input id="dncRef" type="text" placeholder="https://…/Account/001…/view or 001…" aria-label="Account link or id" style="width:100%">
+      </div>
+      <div style="flex:1;min-width:160px">
+        <label for="dncName" class="meta" style="display:block;margin:0 0 4px">Name (optional)</label>
+        <input id="dncName" type="text" placeholder="Business name" aria-label="Account name" style="width:100%">
+      </div>
+      <button type="button" class="btn danger" id="dncAddBtn">Add to DNC</button>
+    </div>
+    <div class="controls">
+      <input id="dncQ" type="search" placeholder="Search DNC …" aria-label="Search DNC" style="flex:1;min-width:180px">
+      <span class="sub" id="dncCount"></span>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>When</th><th>Who</th><th>Why</th><th></th></tr></thead>
+        <tbody id="dncRows"></tbody>
+      </table>
+      <div class="empty" id="dncEmpty" hidden></div>
+    </div>
+    <p class="foot" id="dncFoot">Stored in banlist.jsonl. Taking someone off writes green_banlist.jsonl so they can be contacted again.</p>
+  </section>
 </main>
 <script src="data.js"></script>
 <script>
@@ -200,7 +229,8 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   var state = {
     view: 'sends', channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0,
     tk: 'text', tq: '', templates: null, editing: null,
-    analytics: null
+    analytics: null,
+    dnc: null, dncQ: ''
   };
 
   function $(id) { return document.getElementById(id); }
@@ -213,7 +243,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 
   var c0 = lsGet('channel'); if (c0 === 'text' || c0 === 'email') state.channel = c0;
   var r0 = lsGet('range'); if (r0 === 'run' || r0 === 'today' || r0 === 'week' || r0 === 'all') state.range = r0;
-  var v0 = lsGet('view'); if (v0 === 'sends' || v0 === 'templates' || v0 === 'analytics') state.view = v0;
+  var v0 = lsGet('view'); if (v0 === 'sends' || v0 === 'templates' || v0 === 'analytics' || v0 === 'dnc') state.view = v0;
 
   var fTime = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' });
   var fTimeSec = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
@@ -252,13 +282,14 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   function setView(view) {
     state.view = view;
     lsSet('view', view);
-    ['sends', 'templates', 'analytics'].forEach(function (v) {
+    ['sends', 'templates', 'analytics', 'dnc'].forEach(function (v) {
       var pane = $('view-' + v), tab = $('tab-' + v);
       if (pane) pane.hidden = v !== view;
       if (tab) tab.setAttribute('aria-selected', v === view ? 'true' : 'false');
     });
     if (view === 'templates') loadTemplates();
     if (view === 'analytics') loadAnalytics();
+    if (view === 'dnc') loadDnc();
   }
 
   function ingest(d) {
@@ -343,6 +374,26 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     td.appendChild(make('p', 'meta', bits.join(' · ')));
     if (r.channel === 'email' && r.subject) td.appendChild(make('p', 'meta', 'Subject: ' + r.subject));
     td.appendChild(make('pre', 'msg', r.text || '(no message was recorded)'));
+    if (LIVE && (r.accountId || r.url)) {
+      var dncRow = make('div', 'tpl-actions');
+      dncRow.style.marginTop = '10px';
+      var dncBtn = make('button', 'btn danger', 'Add to DNC');
+      dncBtn.type = 'button';
+      dncBtn.title = 'Do not contact — skip this account on the next launch';
+      dncBtn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var id = r.accountId || r.url;
+        if (!id) { alert('No Salesforce account id on this send.'); return; }
+        if (!confirm('Add ' + (r.name || 'this account') + ' to the do-not-contact list?')) return;
+        dncBtn.disabled = true;
+        apiDncAdd(id, r.name, 'added from send row').then(function (ok) {
+          dncBtn.disabled = false;
+          if (ok) { dncBtn.textContent = 'On DNC'; dncBtn.disabled = true; }
+        });
+      });
+      dncRow.appendChild(dncBtn);
+      td.appendChild(dncRow);
+    }
     det.appendChild(td);
     det.hidden = !state.open[e.key];
 
@@ -627,6 +678,109 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     $('anFoot').textContent = 'Week = last 7 days including today. Month = calendar month to date. Source: texted-log.jsonl.';
   }
 
+  function flashDnc(msg, ok) {
+    var el = $('dncFlash');
+    el.hidden = !msg;
+    el.className = 'flash ' + (ok ? 'ok' : 'err');
+    el.textContent = msg || '';
+  }
+
+  function apiDncAdd(accountId, accountName, reason) {
+    return fetch('/api/dnc', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: accountId, accountName: accountName || null, reason: reason || null })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) { flashDnc(j.error || 'Could not add to DNC', false); return false; }
+      flashDnc(j.already ? 'Already on the DNC list.' : 'Added to DNC. Skipped on the next launch.', true);
+      if (state.view === 'dnc') loadDnc();
+      return true;
+    }).catch(function (e) { flashDnc(e.message || 'Could not add to DNC', false); return false; });
+  }
+
+  function apiDncClear(accountId, accountName) {
+    return fetch('/api/dnc/clear', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: accountId, accountName: accountName || null })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) { flashDnc(j.error || 'Could not clear DNC', false); return false; }
+      flashDnc(j.already ? (j.note || 'Not on DNC.') : 'Taken off DNC. Can be contacted again on the next launch.', true);
+      loadDnc();
+      return true;
+    }).catch(function (e) { flashDnc(e.message || 'Could not clear DNC', false); return false; });
+  }
+
+  function loadDnc() {
+    if (!LIVE) {
+      $('dncEmpty').hidden = false;
+      $('dncEmpty').textContent = 'Open via localhost (run zw) to manage DNC.';
+      $('dncRows').textContent = '';
+      $('dncCount').textContent = '';
+      return;
+    }
+    fetch('/api/dnc').then(function (r) { return r.json(); }).then(function (j) {
+      state.dnc = j;
+      renderDnc();
+    }).catch(function (e) {
+      flashDnc('Could not load DNC: ' + (e && e.message ? e.message : 'error'), false);
+    });
+  }
+
+  function renderDnc() {
+    var j = state.dnc, body = $('dncRows'), q = state.dncQ.toLowerCase(), i, r, tr, td, link, btn, list = [], frag;
+    body.textContent = '';
+    if (!j) return;
+    list = (j.rows || []).filter(function (row) {
+      if (!q) return true;
+      return [row.name, row.accountId, row.reason, row.source].join(' ').toLowerCase().indexOf(q) >= 0;
+    });
+    $('dncCount').textContent = list.length === (j.rows || []).length
+      ? (fNum.format(j.count || 0) + ' on DNC')
+      : (fNum.format(list.length) + ' of ' + fNum.format(j.count || 0));
+    frag = document.createDocumentFragment();
+    for (i = 0; i < list.length; i++) {
+      r = list[i];
+      tr = make('tr', 'row');
+      tr.style.cursor = 'default';
+      td = make('td', 't');
+      if (r.at) {
+        td.appendChild(make('span', 'time', fTime.format(new Date(r.at))));
+        td.appendChild(make('span', 'ago', ago(Date.parse(r.at))));
+      } else td.appendChild(make('span', 'ago', '—'));
+      tr.appendChild(td);
+      td = make('td', 'who');
+      if (r.url) {
+        link = make('a', null, r.name || r.accountId);
+        link.href = r.url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+        td.appendChild(link);
+      } else td.appendChild(make('span', 'nm', r.name || r.accountId));
+      if (r.accountId) td.appendChild(make('div', 'em', r.accountId));
+      tr.appendChild(td);
+      td = make('td');
+      td.appendChild(make('div', null, r.reason || '—'));
+      if (r.source) td.appendChild(make('div', 'meta', 'via ' + r.source));
+      tr.appendChild(td);
+      td = make('td');
+      btn = make('button', 'btn', 'Take off DNC');
+      btn.type = 'button';
+      (function (row, el) {
+        el.addEventListener('click', function () {
+          if (!confirm('Take ' + (row.name || row.accountId) + ' off the do-not-contact list?')) return;
+          el.disabled = true;
+          apiDncClear(row.accountId, row.name).then(function () { el.disabled = false; });
+        });
+      })(r, btn);
+      td.appendChild(btn);
+      tr.appendChild(td);
+      frag.appendChild(tr);
+    }
+    body.appendChild(frag);
+    var em = $('dncEmpty');
+    if (!list.length) {
+      em.hidden = false;
+      em.textContent = (j.rows && j.rows.length) ? 'No DNC entries match this search.' : 'Nobody is on the DNC list yet.';
+    } else em.hidden = true;
+  }
+
   // Wire UI
   (function wire() {
     var tabs = document.querySelectorAll('.nav button'), i, timer = null;
@@ -651,6 +805,22 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
       texts.unshift({ id: '__new__', name: '', text: '', kind: 'yours', _new: true, channel: 'text' });
       state.templates.texts = texts;
       renderTemplates();
+    });
+
+    $('dncAddBtn').addEventListener('click', function () {
+      var ref = $('dncRef').value.trim(), name = $('dncName').value.trim();
+      if (!ref) { flashDnc('Paste a Salesforce account link or id first.', false); return; }
+      $('dncAddBtn').disabled = true;
+      apiDncAdd(ref, name || null, 'added from DNC tab').then(function (ok) {
+        $('dncAddBtn').disabled = false;
+        if (ok) { $('dncRef').value = ''; $('dncName').value = ''; loadDnc(); }
+      });
+    });
+    var dncTimer = null;
+    $('dncQ').addEventListener('input', function () {
+      var v = this.value;
+      clearTimeout(dncTimer);
+      dncTimer = setTimeout(function () { state.dncQ = v.trim(); renderDnc(); }, 120);
     });
 
   })();
