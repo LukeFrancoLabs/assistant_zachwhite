@@ -816,14 +816,15 @@ function resolveEmailContent(args) {
 async function launchBrowser(opts = {}) {
   const CDP_PORT = opts.cdpPort || CONFIG.cdpPort;
   const PROFILE_DIR = opts.userDataDir || CONFIG.userDataDir;
+  const quiet = !!opts.quiet; // interactive email/text menu: hide Browser link / CDP noise
   let context;
 
   try {
     const browser = await chromium.connectOverCDP(`http://localhost:${CDP_PORT}`);
     context = browser.contexts()[0] || (await browser.newContext());
-    commandLog('🟢', 'Browser link', `Connected on CDP port ${CDP_PORT}`);
+    if (!quiet) commandLog('🟢', 'Browser link', `Connected on CDP port ${CDP_PORT}`);
   } catch (cdpErr) {
-    commandLog('🛰️', 'Browser fallback', 'Launching persistent profile');
+    if (!quiet) commandLog('🛰️', 'Browser fallback', 'Launching persistent profile');
     try {
       const lockFile = path.join(PROFILE_DIR, 'SingletonLock');
       if (fs.existsSync(lockFile)) fs.unlinkSync(lockFile);
@@ -839,7 +840,7 @@ async function launchBrowser(opts = {}) {
         ],
         viewport: { width: 1920, height: 1080 }
       });
-      commandLog('🟢', 'Browser link', 'Persistent profile online');
+      if (!quiet) commandLog('🟢', 'Browser link', 'Persistent profile online');
     } catch (e) {
       throw new Error('Could not launch browser: ' + e.message);
     }
@@ -854,11 +855,27 @@ async function launchBrowser(opts = {}) {
   return { context, page, cleanup };
 }
 
-// The welcome screen of the EMAIL campaign: what `zw` with no flags opens on, right after run.sh's H→C→P letter countdown. DR's own words, kept exactly as given, printed in yellow with a rocket at the end.
-// The colour codes are left out when the output is not a terminal or NO_COLOR is set (FORCE_COLOR=1 turns them on for a test).
-const WELCOME_EMAIL_TEXT = 'Welcome ' + (sender.firstName || 'there') + ', lets send out an email campaign!\n\nHit Enter when you sign into salesforce — your campaign report opens by itself. Wait until the rows are visible, then press Enter 🚀';
+// Friendly interactive menu after the HCP launch banners. Colour is left out when stdout is not a terminal (or NO_COLOR); FORCE_COLOR=1 turns it on for a test.
 const YELLOW = (!process.env.NO_COLOR && (process.stdout.isTTY || process.env.FORCE_COLOR)) ? ['\x1b[1;33m', '\x1b[0m'] : ['', ''];
-const WELCOME_EMAIL = `\n${YELLOW[0]}${WELCOME_EMAIL_TEXT}${YELLOW[1]}\n`;
+const CYAN = (!process.env.NO_COLOR && (process.stdout.isTTY || process.env.FORCE_COLOR)) ? ['\x1b[1;36m', '\x1b[0m'] : ['', ''];
+const WELCOME_EMAIL = `
+${CYAN[0]}╔══════════════════════════════════════════════════════════╗
+║  ${CYAN[1]}${YELLOW[0]}EMAIL CAMPAIGN${YELLOW[1]}  ·  Welcome ${sender.firstName || 'there'}
+${CYAN[0]}║${CYAN[1]}
+${CYAN[0]}║${CYAN[1]}  1. Sign into Salesforce in the Chrome window
+${CYAN[0]}║${CYAN[1]}  2. Your campaign report opens by itself — wait for rows
+${CYAN[0]}║${CYAN[1]}  3. Press Enter here when you're ready
+${CYAN[0]}╚══════════════════════════════════════════════════════════╝${CYAN[1]}
+`;
+const WELCOME_TEXT = `
+${CYAN[0]}╔══════════════════════════════════════════════════════════╗
+║  ${CYAN[1]}${YELLOW[0]}TEXT CAMPAIGN${YELLOW[1]}  ·  Welcome ${sender.firstName || 'there'}
+${CYAN[0]}║${CYAN[1]}
+${CYAN[0]}║${CYAN[1]}  1. Sign into Salesforce in the Chrome window
+${CYAN[0]}║${CYAN[1]}  2. Your campaign report opens by itself — wait for rows
+${CYAN[0]}║${CYAN[1]}  3. Press Enter here when you're ready
+${CYAN[0]}╚══════════════════════════════════════════════════════════╝${CYAN[1]}
+`;
 
 /**
  * `--test`: a practice run. Uses CONFIG.reportUrl (your campaign report), and it is ALWAYS a dry run (--yes cannot change that): the composers are filled in on
@@ -932,10 +949,7 @@ async function resolveCampaignReportPage(context, initialPage, o = {}) {
   let page = null;
   for (let first = true; !page; first = false) {
     await ask(first
-      ? (o.email ? WELCOME_EMAIL : (
-        '\nIn the Chrome window: log in (if needed). Your campaign REPORT opens by itself —\n' +
-        'wait until its detail rows are visible, then press Enter here to continue... '
-      ))
+      ? (o.email ? WELCOME_EMAIL : WELCOME_TEXT)
       : '\nChrome is not signed in to Salesforce yet. Finish signing in in the Chrome window, then hit Enter... ');
     const lightning = context.pages().filter(onLightning);
     const onRep = lightning.filter(onReportUrl);
@@ -4959,7 +4973,8 @@ async function main() {
     : (args.zones || args.zone) ? { cdpPort: CONFIG.zonesCdpPort, userDataDir: CONFIG.zonesUserDataDir }
     : args.holds ? { cdpPort: CONFIG.holdsCdpPort, userDataDir: CONFIG.holdsUserDataDir }
     : (args.reengage || args.review || args.reviewReport || args.threadProbe || args.harvest || args.auto || args.lists || args.followup) ? { cdpPort: CONFIG.reengageCdpPort, userDataDir: CONFIG.reengageUserDataDir }
-    : args.email ? { cdpPort: CONFIG.emailCdpPort, userDataDir: CONFIG.emailUserDataDir } : {};
+    : args.email ? { cdpPort: CONFIG.emailCdpPort, userDataDir: CONFIG.emailUserDataDir, quiet: true }
+    : { quiet: true }; // plain text / email interactive menu: no Browser link / Email browser / Salesforce link noise
   // --evening: ONE run at a time, checked BEFORE the browser is touched: a second start would otherwise attach to the live run's Chrome and load a page in the tab it is texting from
   if (args.evening && !require('./eveningShark').acquireLock(commandLog)) return;
   if (args.board && !require('./boardRun').acquireLock(commandLog)) return;      // ONE board run at a time, refused BEFORE the browser is touched (a second start would load a page in the live run's tab)
@@ -4967,6 +4982,7 @@ async function main() {
   if (args.tomorrow && !require('./tomorrowSend').acquireLock(commandLog)) return;
   const { context, page: initialPage, cleanup } = await launchBrowser(browserOpts);
   try {
+    // Specialized modes still announce their own browser; interactive email/text stay quiet (menu is the welcome).
     if (args.tomorrow) commandLog('🌙', 'Overnight browser', `CDP ${CONFIG.tomorrowCdpPort} • its own Chrome and profile (no other mode can restart it; sign in to Salesforce once the first time)`);
     else if (args.evening) commandLog('🌙', 'Evening browser', `CDP ${CONFIG.eveningCdpPort} • its own Chrome and profile (no other mode can restart it; a healthy one is reused, so its Salesforce login stays)`);
     else if (args.board) commandLog('🗂', 'Board browser', `CDP ${CONFIG.boardCdpPort} • its own Chrome and profile (no other mode can restart it; a healthy one is reused, so its Salesforce login stays)`);
@@ -4977,8 +4993,8 @@ async function main() {
     else if (args.zones || args.zone) commandLog('🕐', 'Time-zone browser', `CDP ${CONFIG.zonesCdpPort} • own profile (independent of every other run)`);
     else if (args.holds) commandLog('🧵', 'Holds browser', `CDP ${CONFIG.holdsCdpPort} • own profile (never touches a running --followup; sign in to Salesforce once the first time)`);
     else if (args.reengage || args.review || args.reviewReport || args.threadProbe || args.harvest || args.auto || args.lists || args.followup) commandLog('🔁', 'Re-engage browser', `CDP ${CONFIG.reengageCdpPort} • own profile (independent of text and email browsers)`);
-    else if (args.email) commandLog('✉️', 'Email browser', `CDP ${CONFIG.emailCdpPort} • separate profile (safe to run alongside texting)`);
-    commandLog('🟢', 'Salesforce link', `Loading command environment (${viewLabel} mode)`);
+    // email / plain text: no Email browser or Salesforce link line — the interactive menu is the welcome
+    if (!browserOpts.quiet) commandLog('🟢', 'Salesforce link', `Loading command environment (${viewLabel} mode)`);
     try { await initialPage.goto(CONFIG.startUrl, { waitUntil: 'domcontentloaded' }); } catch (_) {}
 
     // --tomorrow: the OVERNIGHT run (tomorrowSend.js): every queued pro is texted at their own NEXT 8:00 AM, hands-off, in its own Chrome. Used by --shark13 --send, --shark --send --tomorrow and --queue --send --tomorrow.

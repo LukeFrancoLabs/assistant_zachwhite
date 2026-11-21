@@ -32,10 +32,10 @@ if [ -f "$SCRIPT_DIR/senderSetup.js" ]; then
 fi
 # (end of the first-launch setup)
 
-# Big colored H → C → P countdown while Chrome finishes loading. Each letter carries its line.
+# Big colored H → C → P countdown while Chrome finishes loading. Finale: huge HCP + "champion the pro" banners.
 # H = do the work · C = enjoy the journey · P = champion the pro
 hcp_letter_countdown() {
-  local RESET='\033[0m' DIM='\033[2m' BOLD='\033[1m'
+  local RESET='\033[0m' BOLD='\033[1m'
   local H_COLOR='\033[38;5;208m'   # orange
   local C_COLOR='\033[1;36m'       # cyan
   local P_COLOR='\033[1;32m'       # green
@@ -45,7 +45,7 @@ hcp_letter_countdown() {
   _hcp_show_letter() {
     local color="$1" letter="$2" tagline="$3"
     if [ "$is_tty" = 1 ]; then
-      printf '\033[2J\033[H'      # clear screen for a real countdown beat
+      printf '\033[2J\033[H'
       printf '\n%b%b' "$color" "$BOLD"
       case "$letter" in
         H) cat <<'HART'
@@ -90,11 +90,37 @@ PART
   _hcp_show_letter "$H_COLOR" H 'do the work'
   _hcp_show_letter "$C_COLOR" C 'enjoy the journey'
   _hcp_show_letter "$P_COLOR" P 'champion the pro'
+
+  # Finale: huge HCP wordmark + champion the pro banner (the launch "ready" screen).
   if [ "$is_tty" = 1 ]; then
     printf '\033[2J\033[H'
-    printf '\n%b%b  H  C  P%b\n' "$BOLD" '\033[1;36m' "$RESET"
-    printf '  %bready%b\n\n' "$DIM" "$RESET"
-    sleep 0.35
+    printf '\n%b%b' "$BOLD" '\033[1;36m'
+    cat <<'HCPBANNER'
+  ██   ██   ██████   ██████
+  ██   ██  ██       ██   ██
+  ███████  ██       ██████
+  ██   ██  ██       ██
+  ██   ██   ██████  ██
+HCPBANNER
+    printf '%b\n\n' "$RESET"
+    printf '%b%b' "$BOLD" "$P_COLOR"
+    cat <<'CHAMPBANNER'
+   ██████ ██   ██  █████  ███    ███ ██████  ██  ██████  ███    ██
+  ██      ██   ██ ██   ██ ████  ████ ██   ██ ██ ██    ██ ████   ██
+  ██      ███████ ███████ ██ ████ ██ ██████  ██ ██    ██ ██ ██  ██
+  ██      ██   ██ ██   ██ ██  ██  ██ ██      ██ ██    ██ ██  ██ ██
+   ██████ ██   ██ ██   ██ ██      ██ ██      ██  ██████  ██   ████
+
+  ████████ ██   ██ ███████     ██████  ██████   ██████
+     ██    ██   ██ ██          ██   ██ ██   ██ ██    ██
+     ██    ███████ █████       ██████  ██████  ██    ██
+     ██    ██   ██ ██          ██      ██   ██ ██    ██
+     ██    ██   ██ ███████     ██      ██   ██  ██████
+CHAMPBANNER
+    printf '%b\n\n' "$RESET"
+    sleep 0.8
+  else
+    printf '\nHCP\nchampion the pro\n\n'
   fi
 }
 
