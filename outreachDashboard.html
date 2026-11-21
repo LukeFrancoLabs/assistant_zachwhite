@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Outreach</title>
+<title>Day Desk</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%AC%3C/text%3E%3C/svg%3E">
 <style>
 :root{
@@ -97,6 +97,20 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 .flash.ok{background:#d1fadf;color:#067647}
 .flash.err{background:#fee4e2;color:#b42318}
 .rep-text{white-space:pre-wrap;max-width:520px}
+.desk-list{display:grid;gap:10px;margin-top:12px}
+.desk-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.desk-card.due{border-color:var(--accent)}
+.desk-card .desk-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 4px}
+.desk-card h3{margin:0;font-size:16px}
+.desk-card .desk-detail{margin:8px 0 0;color:var(--muted);font-size:13px;white-space:pre-wrap;word-break:break-word}
+.desk-card .desk-meta{margin:8px 0 0;font-size:12px;color:var(--muted)}
+.desk-card .desk-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.desk-cmd{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;color:var(--muted);word-break:break-all}
+.prio{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;margin-right:6px}
+.prio.hold{background:#fee4e2;color:#b42318}
+.prio.interested{background:#d1fadf;color:#067647}
+.prio.board{background:var(--email-bg);color:var(--email-fg)}
+.kit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:12px}
 @media (max-width:680px){
   .wrap{padding:14px 12px 40px}
   .cards,.cards.four{grid-template-columns:1fr 1fr;gap:8px}
@@ -121,22 +135,92 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 <main class="wrap">
   <header class="top">
     <div>
-      <h1>Outreach</h1>
+      <h1>Day Desk</h1>
       <p class="sub"><span class="dot" id="dot"></span><span id="status">Waiting for data …</span></p>
     </div>
     <a class="link" id="fullLog" href="/full-log" hidden>Full outreach log &rarr;</a>
   </header>
   <div class="banner" id="banner" hidden>Practice flag in use (--test / --dry-run). This page lists only sends that actually went out, so it stays empty unless one does.</div>
-  <div class="banner" id="fileMode" hidden>Opened as a file — Templates, Scoreboard, and DNC need the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page.</div>
+  <div class="banner" id="fileMode" hidden>Opened as a file — Day Desk needs the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page.</div>
+  <div class="banner" id="deskHint" hidden></div>
 
   <nav class="nav" role="tablist" aria-label="Dashboard sections">
-    <button type="button" role="tab" id="tab-sends" aria-selected="true" data-view="sends">Sends</button>
+    <button type="button" role="tab" id="tab-morning" aria-selected="true" data-view="morning">Morning</button>
+    <button type="button" role="tab" id="tab-replies" aria-selected="false" data-view="replies">Replies</button>
+    <button type="button" role="tab" id="tab-kit" aria-selected="false" data-view="kit">Quick kit</button>
+    <button type="button" role="tab" id="tab-myleads" aria-selected="false" data-view="myleads">My leads</button>
+    <button type="button" role="tab" id="tab-today" aria-selected="false" data-view="today">Today</button>
+    <button type="button" role="tab" id="tab-sends" aria-selected="false" data-view="sends">Sends</button>
     <button type="button" role="tab" id="tab-templates" aria-selected="false" data-view="templates">Templates</button>
     <button type="button" role="tab" id="tab-analytics" aria-selected="false" data-view="analytics">Scoreboard</button>
     <button type="button" role="tab" id="tab-dnc" aria-selected="false" data-view="dnc">DNC</button>
   </nav>
 
-  <section id="view-sends" role="tabpanel">
+  <section id="view-morning" role="tabpanel">
+    <p class="sub" style="margin:14px 0 0">What needs you today — held threads, interested replies waiting on a follow-up, and personal board touches that are due.</p>
+    <div class="cards" aria-label="Morning counts" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card"><div class="k">Needs you</div><div class="n" id="mNeed">0</div><div class="s" id="mNeedS"></div></div>
+      <div class="card"><div class="k">Holds</div><div class="n" id="mHold">0</div><div class="s">paused sends</div></div>
+      <div class="card"><div class="k">Board due</div><div class="n" id="mBoard">0</div><div class="s">your hand-added leads</div></div>
+    </div>
+    <div id="morningList" class="desk-list"></div>
+    <div class="empty" id="morningEmpty" hidden>Nothing queued — nice. Add a lead under My leads after a call, or wait for a reply.</div>
+  </section>
+
+  <section id="view-replies" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Inbound replies this copy knows about. Interested ones that still need a follow-up also show on Morning.</p>
+    <div class="controls">
+      <input id="rq" type="search" placeholder="Search replies …" aria-label="Search replies" style="flex:1;min-width:180px">
+      <span class="sub" id="replyCount"></span>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>When</th><th>Who</th><th>How</th><th>What they said</th></tr></thead>
+        <tbody id="replyRows"></tbody>
+      </table>
+      <div class="empty" id="replyEmpty" hidden></div>
+    </div>
+    <p class="foot" id="replyFoot">Replies come from a Gmail feed (<code>node replyPoller.js --setup</code>). Holds still appear on Morning without that.</p>
+  </section>
+
+  <section id="view-kit" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Post-call / post-demo helpers. Copy the command, open Salesforce from Morning or My leads, then paste into a terminal — or send from the usual <code>zw</code> menu.</p>
+    <div id="kitList" class="kit-grid"></div>
+    <p class="foot">Luke can change this kit for everyone: edit <code>team-shared/day-desk.json</code>, then each machine runs <code>node teamSync.js --pull</code>.</p>
+  </section>
+
+  <section id="view-myleads" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Your personal follow-up board — leads you added by hand after a call or demo.</p>
+    <div id="addLeadBox" class="desk-card" style="margin-top:12px">
+      <div class="desk-title">Add after a call</div>
+      <h3>Put someone on your board</h3>
+      <p class="desk-detail" id="addLeadHint"></p>
+      <div class="desk-cmd" id="addLeadCmd"></div>
+      <div class="desk-actions">
+        <button type="button" class="btn" id="copyAddLead">Copy command</button>
+      </div>
+    </div>
+    <div id="myLeadsList" class="desk-list"></div>
+    <div class="empty" id="myLeadsEmpty" hidden>No hand-added leads yet. After a good call, use the command above.</div>
+  </section>
+
+  <section id="view-today" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">What already went out from this copy today.</p>
+    <div class="cards" aria-label="Today totals">
+      <div class="card"><div class="k">Today</div><div class="n" id="tSends">0</div><div class="s" id="tSplit"></div></div>
+      <div class="card"><div class="k">Texts</div><div class="n" id="tTexts">0</div><div class="s">sent today</div></div>
+      <div class="card"><div class="k">Emails</div><div class="n" id="tEmails">0</div><div class="s">sent today</div></div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>When</th><th>Who</th><th>How</th><th>What</th></tr></thead>
+        <tbody id="todayRows"></tbody>
+      </table>
+      <div class="empty" id="todayEmpty" hidden>Nothing sent yet today.</div>
+    </div>
+  </section>
+
+  <section id="view-sends" role="tabpanel" hidden>
     <div class="cards" aria-label="Totals">
       <div class="card"><div class="k" id="kRun">This run</div><div class="n" id="nRun">0</div><div class="s" id="sRun"></div></div>
       <div class="card"><div class="k">Today</div><div class="n" id="nToday">0</div><div class="s" id="sToday"></div></div>
@@ -226,11 +310,13 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   'use strict';
   var POLL_MS = 3000, MAX_DRAWN = 500, LS = 'outreach-dashboard:';
   var LIVE = location.protocol === 'http:' || location.protocol === 'https:';
+  var DESK_VIEWS = ['morning', 'replies', 'kit', 'myleads', 'today', 'sends', 'templates', 'analytics', 'dnc'];
   var state = {
-    view: 'sends', channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0,
+    view: 'morning', channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0,
     tk: 'text', tq: '', templates: null, editing: null,
     analytics: null,
-    dnc: null, dncQ: ''
+    dnc: null, dncQ: '',
+    desk: null, rq: ''
   };
 
   function $(id) { return document.getElementById(id); }
@@ -243,7 +329,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 
   var c0 = lsGet('channel'); if (c0 === 'text' || c0 === 'email') state.channel = c0;
   var r0 = lsGet('range'); if (r0 === 'run' || r0 === 'today' || r0 === 'week' || r0 === 'all') state.range = r0;
-  var v0 = lsGet('view'); if (v0 === 'sends' || v0 === 'templates' || v0 === 'analytics' || v0 === 'dnc') state.view = v0;
+  var v0 = lsGet('view'); if (DESK_VIEWS.indexOf(v0) >= 0) state.view = v0;
 
   var fTime = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' });
   var fTimeSec = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
@@ -280,9 +366,10 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   function href(u) { return typeof u === 'string' && /^https?:[/][/]/i.test(u) ? u : null; }
 
   function setView(view) {
+    if (DESK_VIEWS.indexOf(view) < 0) view = 'morning';
     state.view = view;
     lsSet('view', view);
-    ['sends', 'templates', 'analytics', 'dnc'].forEach(function (v) {
+    DESK_VIEWS.forEach(function (v) {
       var pane = $('view-' + v), tab = $('tab-' + v);
       if (pane) pane.hidden = v !== view;
       if (tab) tab.setAttribute('aria-selected', v === view ? 'true' : 'false');
@@ -290,6 +377,188 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     if (view === 'templates') loadTemplates();
     if (view === 'analytics') loadAnalytics();
     if (view === 'dnc') loadDnc();
+    if (view === 'morning' || view === 'replies' || view === 'kit' || view === 'myleads' || view === 'today') loadDayDesk();
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    return Promise.reject();
+  }
+
+  function personLink(name, url) {
+    var wrap = document.createElement('span');
+    var h = href(url);
+    if (h) {
+      var a = make('a', null, name || 'Open');
+      a.href = h; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.title = 'Open in Salesforce';
+      wrap.appendChild(a);
+    } else wrap.appendChild(make('span', 'nm', name || '(unknown)'));
+    return wrap;
+  }
+
+  function renderMorning() {
+    var j = state.desk || {};
+    var list = j.morning || [];
+    var holds = 0, board = 0, interested = 0, i;
+    for (i = 0; i < list.length; i++) {
+      if (list[i].kind === 'hold') holds++;
+      else if (list[i].kind === 'board') board++;
+      else interested++;
+    }
+    $('mNeed').textContent = fNum.format(list.length);
+    $('mNeedS').textContent = interested + ' interested · ' + holds + ' holds · ' + board + ' board';
+    $('mHold').textContent = fNum.format(holds);
+    $('mBoard').textContent = fNum.format(board);
+    var box = $('morningList'); box.innerHTML = '';
+    for (i = 0; i < list.length; i++) {
+      var m = list[i];
+      var card = make('div', 'desk-card' + (m.kind === 'hold' || m.kind === 'interested' ? ' due' : ''));
+      var title = make('div', 'desk-title');
+      title.appendChild(make('span', 'prio ' + (m.kind || ''), m.kind === 'hold' ? 'Hold' : m.kind === 'interested' ? 'Interested' : 'Board'));
+      title.appendChild(document.createTextNode(m.title || ''));
+      card.appendChild(title);
+      var h = make('h3'); h.appendChild(personLink(m.name, m.url)); card.appendChild(h);
+      if (m.detail) card.appendChild(make('div', 'desk-detail', m.detail));
+      var meta = [];
+      if (m.at) meta.push(ago(Date.parse(m.at)));
+      if (m.ageDays != null) meta.push(m.ageDays + 'd since reply');
+      if (m.action) meta.push(m.action);
+      if (meta.length) card.appendChild(make('div', 'desk-meta', meta.join(' · ')));
+      box.appendChild(card);
+    }
+    $('morningEmpty').hidden = list.length > 0;
+    var hint = $('deskHint');
+    if (j.meta && j.meta.replyHint) { hint.hidden = false; hint.textContent = j.meta.replyHint; }
+    else hint.hidden = true;
+  }
+
+  function renderReplies() {
+    var j = state.desk || {};
+    var rows = j.replies || [];
+    var q = state.rq.toLowerCase();
+    var body = $('replyRows'); body.innerHTML = '';
+    var frag = document.createDocumentFragment(), n = 0, i, r, tr, td, pill;
+    for (i = 0; i < rows.length; i++) {
+      r = rows[i];
+      if (q && [r.name, r.reply, r.accountId].join(' ').toLowerCase().indexOf(q) < 0) continue;
+      n++;
+      tr = make('tr', 'row');
+      td = make('td', 't');
+      var t = Date.parse(r.at);
+      td.appendChild(make('span', 'time', isFinite(t) ? stamp(t, false) : '—'));
+      if (isFinite(t)) { var ag = make('span', 'ago', ago(t)); td.appendChild(ag); }
+      tr.appendChild(td);
+      td = make('td', 'who'); td.appendChild(personLink(r.name, r.url)); tr.appendChild(td);
+      td = make('td', 'how');
+      pill = make('span', 'pill ' + (r.ch === 'email' ? 'email' : 'text'), r.ch === 'email' ? 'Email' : 'Text');
+      td.appendChild(pill);
+      if (r.interested) td.appendChild(make('span', 'pill ok', ' Interested'));
+      if (r.optout) td.appendChild(make('span', 'pill warn', ' Opt-out'));
+      tr.appendChild(td);
+      td = make('td'); td.appendChild(make('div', 'rep-text', r.reply || '')); tr.appendChild(td);
+      frag.appendChild(tr);
+    }
+    body.appendChild(frag);
+    $('replyCount').textContent = n + ' shown';
+    var em = $('replyEmpty');
+    if (!n) {
+      em.hidden = false;
+      em.textContent = rows.length ? 'No replies match this search.' : 'No replies yet. Set up the Gmail feed: node replyPoller.js --setup';
+    } else em.hidden = true;
+  }
+
+  function renderKit() {
+    var kit = (state.desk && state.desk.kit) || [];
+    var box = $('kitList'); box.innerHTML = '';
+    for (var i = 0; i < kit.length; i++) {
+      (function (k) {
+        var card = make('div', 'desk-card');
+        card.appendChild(make('div', 'desk-title', k.kind === 'email' ? 'Email' : 'Text'));
+        card.appendChild(make('h3', null, k.label || k.id));
+        if (k.hint) card.appendChild(make('div', 'desk-meta', k.hint));
+        if (k.subject) card.appendChild(make('div', 'tpl', k.subject));
+        if (k.preview) card.appendChild(make('div', 'desk-detail', k.preview));
+        if (k.command) {
+          card.appendChild(make('div', 'desk-cmd', k.command));
+          var actions = make('div', 'desk-actions');
+          var btn = make('button', 'btn', 'Copy command');
+          btn.type = 'button';
+          btn.addEventListener('click', function () {
+            copyText(k.command).then(function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy command'; }, 1200); }).catch(function () {});
+          });
+          actions.appendChild(btn);
+          card.appendChild(actions);
+        }
+        box.appendChild(card);
+      })(kit[i]);
+    }
+  }
+
+  function renderMyLeads() {
+    var j = state.desk || {};
+    var add = j.addLead || {};
+    $('addLeadHint').textContent = add.hint || '';
+    $('addLeadCmd').textContent = add.command || '';
+    var list = j.myLeads || [];
+    var box = $('myLeadsList'); box.innerHTML = '';
+    for (var i = 0; i < list.length; i++) {
+      var m = list[i];
+      var card = make('div', 'desk-card' + (m.dueNow ? ' due' : ''));
+      card.appendChild(make('div', 'desk-title', m.dueNow ? 'Due now' : (m.state || 'On board')));
+      var h = make('h3'); h.appendChild(personLink(m.name, m.url)); card.appendChild(h);
+      var bits = [];
+      if (m.next) bits.push('Next: ' + m.next);
+      if (m.tags && m.tags.length) bits.push('#' + m.tags.join(' #'));
+      if (m.hold) bits.push(m.hold);
+      if (bits.length) card.appendChild(make('div', 'desk-meta', bits.join(' · ')));
+      box.appendChild(card);
+    }
+    $('myLeadsEmpty').hidden = list.length > 0;
+  }
+
+  function renderTodayDesk() {
+    var t = (state.desk && state.desk.today) || { sends: 0, texts: 0, emails: 0, rows: [] };
+    $('tSends').textContent = fNum.format(t.sends || 0);
+    $('tTexts').textContent = fNum.format(t.texts || 0);
+    $('tEmails').textContent = fNum.format(t.emails || 0);
+    $('tSplit').textContent = 'texts ' + fNum.format(t.texts || 0) + ' · emails ' + fNum.format(t.emails || 0);
+    var body = $('todayRows'); body.innerHTML = '';
+    var rows = t.rows || [], frag = document.createDocumentFragment(), i, r, tr, td;
+    for (i = 0; i < rows.length; i++) {
+      r = rows[i];
+      tr = make('tr', 'row');
+      td = make('td', 't');
+      var ts = Date.parse(r.at);
+      td.appendChild(make('span', 'time', isFinite(ts) ? stamp(ts, false) : '—'));
+      tr.appendChild(td);
+      td = make('td', 'who'); td.appendChild(personLink(r.name, r.url)); tr.appendChild(td);
+      td = make('td', 'how'); td.appendChild(make('span', 'pill ' + (r.channel === 'email' ? 'email' : 'text'), r.channel === 'email' ? 'Email' : 'Text')); tr.appendChild(td);
+      td = make('td');
+      td.appendChild(make('div', 'tpl', r.subject || r.template || (r.channel === 'email' ? 'Email' : 'Text')));
+      if (r.preview) td.appendChild(make('span', 'prev', r.preview));
+      tr.appendChild(td);
+      frag.appendChild(tr);
+    }
+    body.appendChild(frag);
+    $('todayEmpty').hidden = rows.length > 0;
+  }
+
+  function renderDayDesk() {
+    if (!state.desk) return;
+    renderMorning();
+    renderReplies();
+    renderKit();
+    renderMyLeads();
+    renderTodayDesk();
+  }
+
+  function loadDayDesk() {
+    if (!LIVE) return;
+    fetch('/api/daydesk').then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || j.ok === false) return;
+      state.desk = j;
+      renderDayDesk();
+    }).catch(function () {});
   }
 
   function ingest(d) {
@@ -334,7 +603,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     $('nAll').textContent = fNum.format(t.sends || 0);
     $('sAll').textContent = split({ text: t.texts || 0, email: t.emails || 0 }) + ' · people ' + fNum.format(t.people || 0);
     $('kRun').textContent = 'This run' + (isFinite(rs) ? ' · since ' + stamp(rs, false) : '');
-    document.title = 'Outreach · ' + fNum.format(tod.all) + ' today';
+    document.title = 'Day Desk · ' + fNum.format(tod.all) + ' today';
   }
 
   function whatNodes(r) {
@@ -821,6 +1090,21 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
       var v = this.value;
       clearTimeout(dncTimer);
       dncTimer = setTimeout(function () { state.dncQ = v.trim(); renderDnc(); }, 120);
+    });
+
+    var rqTimer = null;
+    $('rq').addEventListener('input', function () {
+      var v = this.value;
+      clearTimeout(rqTimer);
+      rqTimer = setTimeout(function () { state.rq = v.trim(); renderReplies(); }, 120);
+    });
+    $('copyAddLead').addEventListener('click', function () {
+      var cmd = $('addLeadCmd').textContent || '';
+      if (!cmd) return;
+      copyText(cmd).then(function () {
+        $('copyAddLead').textContent = 'Copied';
+        setTimeout(function () { $('copyAddLead').textContent = 'Copy command'; }, 1200);
+      }).catch(function () {});
     });
 
   })();

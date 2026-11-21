@@ -336,6 +336,9 @@ function sendText(res, status, type, text) {
 async function handleApi(req, res, url) {
   const setup = require('./senderSetup');
   if (req.method === 'GET' && url.pathname === '/api/health') return sendJson(res, 200, { ok: true, port: PORT });
+  if (req.method === 'GET' && url.pathname === '/api/daydesk') {
+    try { return sendJson(res, 200, require('./dayDesk').build()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
   if (req.method === 'GET' && url.pathname === '/api/templates') {
     try { return sendJson(res, 200, templatesPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }

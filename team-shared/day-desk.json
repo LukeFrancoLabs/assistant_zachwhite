@@ -1,0 +1,40 @@
+{
+  "_comment": "Managed Day Desk kit. Luke edits this (or copies via teamSync); each rep pulls with: node teamSync.js --pull",
+  "kit": [
+    {
+      "id": "day-after-demo",
+      "kind": "email",
+      "key": "day-after-demo",
+      "label": "Day-after-demo email",
+      "hint": "Send after a demo while it’s fresh"
+    },
+    {
+      "id": "book-demo",
+      "kind": "text",
+      "template": "9",
+      "label": "Book a demo text",
+      "hint": "Short booking-link text"
+    },
+    {
+      "id": "account-idea",
+      "kind": "text",
+      "template": "10",
+      "label": "Account idea + book demo",
+      "hint": "Longer first-touch style text"
+    },
+    {
+      "id": "respectful",
+      "kind": "text",
+      "template": "5",
+      "label": "Respectful follow-up",
+      "hint": "Soft close / timing check"
+    },
+    {
+      "id": "curiosity",
+      "kind": "email",
+      "key": "curiosity",
+      "label": "Curiosity email",
+      "hint": "Campaigns + Pipeline angle"
+    }
+  ]
+}
