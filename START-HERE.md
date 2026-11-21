@@ -1,11 +1,11 @@
 # assistant_zachwhite: set up on your MacBook (about 15 minutes, once)
 
-You start the tool by typing `zw` in Terminal. It opens its own browser window, you sign in to Salesforce there, and it works through Zach White’s Official Fire Pipeline list.
+You start the tool by typing `zw` in Terminal. It opens its own browser window, you sign in to Salesforce there, and it works through your **campaign Salesforce report**. A short install guide also lives in [`README.md`](./README.md).
 
 ## What you need
 - A Mac with internet (Apple Silicon or Intel).
 - Your Salesforce login (the same Okta sign-in you use every day).
-- Your pipeline list is already set for this copy (`Zach_White_Official_Fire_Pipeline`). You can change it later in Settings if needed.
+- Your campaign report is already set for this copy (change it later in Settings → line 7 if needed).
 - Node.js 18 or newer (step 1).
 
 ## 1. Check Node.js
@@ -52,7 +52,7 @@ Check it: `type zw` should say `zw` is an alias for `.../assistant_zachwhite/run
 zw --test
 ```
 
-**The very first time**, a setup screen opens first and asks for your details, one at a time: your full name (exactly as Salesforce shows it on your texts), your first name (what your texts call you), your job title, your call number, your text number, your booking link and your **pipeline list** (this copy already offers Zach’s Official Fire Pipeline — confirm it or paste another Opportunities list). Then it shows everything, with your email signature exactly as it will be sent, and asks you to check every letter: type `yes` to save, or the number of a line to fix it (pressing Enter alone does not save). You do this once: it is saved in `sender.json` and never asked again.
+**The very first time**, a setup screen opens first and asks for your details, one at a time: your full name (exactly as Salesforce shows it on your texts), your first name (what your texts call you), your job title, your call number, your text number, your booking link and your **campaign report** (this copy already offers the built-in report — confirm it or paste another `/lightning/r/Report/…/view` link). Then it shows everything, with your email signature exactly as it will be sent, and asks you to check every letter: type `yes` to save, or the number of a line to fix it (pressing Enter alone does not save). You do this once: it is saved in `sender.json` and never asked again.
 
 Then a colored **H → C → P** countdown shows while the browser finishes loading (**do the work** / **enjoy the journey** / **champion the pro**), then a welcome message. In the browser window that opened, sign in to Salesforce. Your **campaign report** opens by itself (and the tool scrolls its virtualized grid the same way as report mode). Back in Terminal press Enter and give a small range such as 1-3. The tool reads each account in that range (see **How the messages are written** below), and you read every draft before anything goes out. In `--test` the tool fills in each email on the account page and stops: **nothing is sent.**
 
@@ -92,4 +92,4 @@ Every text and email this tool actually sends is also saved, one line each, in `
 - "Claude (cli) isn't answering": Claude drafts are on in Settings but Claude Code is not signed in. Run `claude auth login --sso`, finish the sign-in in the browser, then run again — or set **Claude drafts** to **off** in Settings to use a template (no Claude).
 - Stop a run any time with Ctrl-C.
 
-Your name, numbers and booking link in every text and email, and the list that opens by itself, come from `sender.json`, which the setup screen writes (change them in Settings). What you send is recorded in files ending in `.jsonl` in this folder: keep them (and `sender.json`, `text-templates.json` and `.browser-profile-email`) when you are given a new version of the folder.
+Your name, numbers and booking link in every text and email, and the report that opens by itself, come from `sender.json`, which the setup screen writes (change them in Settings). What you send is recorded in files ending in `.jsonl` in this folder: keep them (and `sender.json`, `text-templates.json` and `.browser-profile-email`) when you are given a new version of the folder.
