@@ -181,7 +181,8 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   </section>
 
   <section id="view-analytics" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Sends and replies for this copy. Replies come from the SMS / email poller (<code>replies.jsonl</code>). Template reply rates credit each reply to the last message sent in that channel.</p>
+    <p class="sub" style="margin:14px 0 0">Sends and replies for this copy. Sends are logged automatically. Replies need a Gmail feed into <code>replies.jsonl</code> (see <code>node replyPoller.js --setup</code>). Email <b>opens</b> are not tracked. Template reply rates credit each reply to the last message sent in that channel.</p>
+    <div class="banner" id="anSetup" hidden>No replies on disk yet. Sends still show below. To fill replies: run <code>node replyPoller.js --setup</code> (Claude Desktop Gmail connector, or a JSON ingest). Opens are not available.</div>
     <div class="cards four" aria-label="Analytics totals" id="anCards">
       <div class="card"><div class="k">Sends (all time)</div><div class="n" id="anSends">0</div><div class="s" id="anSendsS"></div></div>
       <div class="card"><div class="k">Replies</div><div class="n" id="anReplies">0</div><div class="s" id="anRepliesS"></div></div>
@@ -644,6 +645,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     $('anRepliesS').textContent = 'today ' + fNum.format(j.repliesToday || 0);
     $('anInterested').textContent = fNum.format(j.interested || 0);
     $('anOptout').textContent = fNum.format(j.optout || 0);
+    $('anSetup').hidden = (j.replyTotal || 0) > 0;
 
     body = $('anTpl');
     body.textContent = '';
