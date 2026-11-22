@@ -334,22 +334,14 @@ function sendText(res, status, type, text) {
   res.end(text);
 }
 
-function readCadenceFile() {
-  const file = require('./cadence').FILE;
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')) || {}; } catch (_) { return {}; }
-}
-
-function writeCadenceFile(obj) {
-  writeAtomic(require('./cadence').FILE, JSON.stringify(obj, null, 2) + '\n');
-}
-
-/** Follow-up board stages + which template each one uses (editable → follow-up-cadence.json). */
+/** Modular boards (post-demo, cold drip, …) — stages, day offsets, templates. */
 function boardPayload() {
+  const boards = require('./boards');
   const cadence = require('./cadence');
-  const cfg = cadence.loadConfig();
-  const defById = Object.fromEntries(cadence.DEFAULT_STAGES.map((s) => [s.id, s]));
-  const rawFile = readCadenceFile();
-  const over = (rawFile.stages && typeof rawFile.stages === 'object') ? rawFile.stages : {};
+  const active = boards.loadActive();
+  const basePack = boards.loadPackFile(active.id) || active;
+  const defById = Object.fromEntries((basePack.stages || []).map((s) => [s.id, s]));
+  const over = active.overrides || {};
   const tpl = templatesPayload();
   const textMap = {};
   for (const t of tpl.texts || []) textMap[String(t.id)] = { name: t.name, text: t.text };
@@ -359,15 +351,19 @@ function boardPayload() {
     name: t.name || t.key,
     preview: clip((t.subject || '') + (t.body ? ' — ' + (Array.isArray(t.body) ? t.body.join(' ') : t.body) : ''), 140),
   }));
-  const stages = cfg.stages.map((s) => {
+  const tip = boards.suggestNextStepsDay();
+  const stages = active.stages.map((s) => {
     const d = defById[s.id] || {};
     const o = over[s.id] && typeof over[s.id] === 'object' ? over[s.id] : {};
     const copy = cadence.copyOf(s, textMap);
-    const customized = o.template !== undefined || o.emailTemplate !== undefined || o.message !== undefined;
+    const customized = o.template !== undefined || o.emailTemplate !== undefined || o.message !== undefined || o.day !== undefined || o.afterMin !== undefined;
     return {
       id: s.id,
+      outreach: s.outreach != null ? s.outreach : null,
       label: s.label,
       day: s.day,
+      defaultDay: d.day,
+      afterMin: s.afterMin || 0,
       ch: s.ch,
       n: s.n,
       byHand: !!s.byHand,
@@ -376,56 +372,72 @@ function boardPayload() {
       emailTemplate: s.emailTemplate || null,
       defaultTemplate: d.template != null ? String(d.template) : null,
       defaultEmailTemplate: d.emailTemplate || null,
+      preferWeekdays: s.preferWeekdays || null,
       customized: !!customized,
       copyName: copy ? copy.name : null,
       preview: copy ? clip(copy.text || copy.subject || '', 220) : null,
+      hint: s.hint || null,
       note: s.byHand ? 'By hand — board skips sending this stage' : (s.manual ? 'Marked manual (board can still send)' : null),
     };
   });
   return {
+    activeBoard: active.id,
+    boardName: active.name,
+    boardDescription: active.description || '',
+    packs: boards.listPacks(),
     stages,
     textOptions,
     emailOptions,
-    file: path.basename(cadence.FILE),
+    nextStepsTip: tip,
     generatedAt: new Date().toISOString(),
   };
 }
 
-/** Assign a text/email template to one board stage, or reset that stage to the built-in default. */
+/** Save day / template for one stage on the active (or named) board pack. */
 function saveBoardStage(id, payload) {
-  const cadence = require('./cadence');
-  const stage = cadence.DEFAULT_STAGES.find((s) => s.id === id);
+  const boards = require('./boards');
+  const packId = (payload && payload.board) || boards.activeBoardId();
+  const pack = boards.loadPackFile(packId);
+  if (!pack) return { ok: false, error: 'Unknown board "' + packId + '".' };
+  const stage = pack.stages.find((s) => s.id === id);
   if (!stage) return { ok: false, error: 'Unknown stage "' + id + '".' };
-  const user = readCadenceFile();
-  if (!user.stages || typeof user.stages !== 'object') user.stages = {};
-  const cur = { ...(user.stages[id] || {}) };
 
   if (payload && payload.reset) {
-    delete cur.template;
-    delete cur.emailTemplate;
-    delete cur.message;
-    if (Object.keys(cur).length) user.stages[id] = cur; else delete user.stages[id];
-    try { writeCadenceFile(user); } catch (e) { return { ok: false, error: 'Could not save: ' + e.message }; }
+    const r = boards.saveStage(packId, id, { reset: true });
+    if (!r.ok) return r;
     return { ok: true, board: boardPayload() };
   }
 
+  const body = {};
+  if (payload && payload.day !== undefined) body.day = payload.day;
+  if (payload && payload.afterMin !== undefined) body.afterMin = payload.afterMin;
+
   if (stage.ch === 'text') {
-    const tid = payload && payload.template != null ? String(payload.template).trim() : '';
-    if (!tid) return { ok: false, error: 'Pick a text template.' };
-    const texts = templatesPayload().texts || [];
-    if (!texts.some((t) => String(t.id) === tid)) return { ok: false, error: 'No text template "' + tid + '".' };
-    cur.template = tid;
-    delete cur.message;
-    user.stages[id] = cur;
-  } else {
-    const key = payload && payload.emailTemplate != null ? String(payload.emailTemplate).trim() : '';
-    if (!key) return { ok: false, error: 'Pick an email template.' };
+    if (payload && payload.template != null && String(payload.template).trim()) {
+      const tid = String(payload.template).trim();
+      const texts = templatesPayload().texts || [];
+      if (!texts.some((t) => String(t.id) === tid)) return { ok: false, error: 'No text template "' + tid + '".' };
+      body.template = tid;
+    } else if (payload && payload.day === undefined && payload.afterMin === undefined) {
+      return { ok: false, error: 'Pick a text template (or change the day).' };
+    }
+  } else if (payload && payload.emailTemplate != null && String(payload.emailTemplate).trim()) {
+    const key = String(payload.emailTemplate).trim();
     const emails = templatesPayload().emails || [];
     if (!emails.some((t) => t.key === key)) return { ok: false, error: 'No email template "' + key + '".' };
-    cur.emailTemplate = key;
-    user.stages[id] = cur;
+    body.emailTemplate = key;
+  } else if (payload && payload.day === undefined && payload.afterMin === undefined) {
+    return { ok: false, error: 'Pick an email template (or change the day).' };
   }
-  try { writeCadenceFile(user); } catch (e) { return { ok: false, error: 'Could not save: ' + e.message }; }
+
+  const r = boards.saveStage(packId, id, body);
+  if (!r.ok) return r;
+  return { ok: true, board: boardPayload() };
+}
+
+function setActiveBoard(id) {
+  const r = require('./boards').setActiveBoard(id);
+  if (!r.ok) return r;
   return { ok: true, board: boardPayload() };
 }
 
@@ -438,6 +450,11 @@ async function handleApi(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/board') {
     try { return sendJson(res, 200, boardPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }
+  if (req.method === 'PUT' && url.pathname === '/api/board/active') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, setActiveBoard(j.id || j.board));
+  }
   const boardStage = url.pathname.match(/^\/api\/board\/stages\/([^/]+)$/);
   if (boardStage && req.method === 'PUT') {
     const raw = await readBody(req);
@@ -445,7 +462,6 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, saveBoardStage(decodeURIComponent(boardStage[1]), j));
   }
   if (boardStage && req.method === 'POST') {
-    // reset: POST /api/board/stages/:id with { reset: true }
     const raw = await readBody(req);
     let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
     return sendJson(res, 200, saveBoardStage(decodeURIComponent(boardStage[1]), j));
@@ -642,7 +658,7 @@ async function launch(flags = []) {
 }
 
 
-module.exports = { touch, build, launch, openPage, buildData, ensureServing, dashUrl, runServe, templatesPayload, analyticsPayload, dncPayload, dncAdd, dncClear, boardPayload, saveBoardStage, PAGE, DATA, DIR, PORT, HOST };
+module.exports = { touch, build, launch, openPage, buildData, ensureServing, dashUrl, runServe, templatesPayload, analyticsPayload, dncPayload, dncAdd, dncClear, boardPayload, saveBoardStage, setActiveBoard, PAGE, DATA, DIR, PORT, HOST };
 
 if (require.main === module) {
   const [cmd, ...rest] = process.argv.slice(2);

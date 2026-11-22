@@ -10,7 +10,7 @@ Personal day management for every AE — morning queue, replies, post-call kit, 
 | **Replies** | Inbound replies this copy knows about |
 | **Quick kit** | Day-after-demo email, book-demo text, soft follow-ups — copy a command |
 | **My leads** | Hand-added follow-ups + next stage |
-| **Board** | Follow-up stages — assign any text/email template per stage |
+| **Board** | Modular boards (Post-demo default) — change **Day** + template per outreach |
 | **Today** | What already went out today |
 | Sends / Templates / Scoreboard / DNC | Same as before |
 

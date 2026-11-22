@@ -206,10 +206,18 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   </section>
 
   <section id="view-board" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Your follow-up board — each stage can use any text or email template. Changes save to <code>follow-up-cadence.json</code> and apply on the next board run.</p>
+    <p class="sub" style="margin:14px 0 0">Modular follow-up boards — change the day and template on any outreach. Post-demo is the default for after a live demo.</p>
     <div id="boardFlash" class="flash" hidden></div>
+    <div class="controls" style="align-items:flex-end">
+      <div style="flex:1;min-width:200px">
+        <label for="boardPack" class="meta" style="display:block;margin:0 0 4px">Active board</label>
+        <select id="boardPack" aria-label="Active board" style="width:100%"></select>
+      </div>
+      <span class="sub" id="boardPackDesc" style="flex:2"></span>
+    </div>
+    <p class="desk-meta" id="boardTip" style="margin:8px 0 0"></p>
     <div id="boardList" class="desk-list"></div>
-    <p class="foot" id="boardFoot">Text stages pick from Templates → Texts. Email stages pick from Templates → Emails. Reset restores the built-in default for that stage.</p>
+    <p class="foot" id="boardFoot">Change <b>Day</b> to move an outreach (e.g. Outreach 3 on day 5 instead of day 1). Templates come from the Templates tab. Saves to <code>boards-local.json</code>.</p>
   </section>
 
   <section id="view-today" role="tabpanel" hidden>
@@ -427,6 +435,24 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     var stages = j.stages || [];
     var textOpts = j.textOptions || [];
     var emailOpts = j.emailOptions || [];
+    var packs = j.packs || [];
+    var packSel = $('boardPack');
+    var prev = packSel.value;
+    packSel.innerHTML = '';
+    for (var p = 0; p < packs.length; p++) {
+      var opt = document.createElement('option');
+      opt.value = packs[p].id;
+      opt.textContent = packs[p].name + ' (' + packs[p].stageCount + ' stages)';
+      if (packs[p].id === j.activeBoard) opt.selected = true;
+      packSel.appendChild(opt);
+    }
+    if (prev && prev !== j.activeBoard) { /* kept selected from server */ }
+    $('boardPackDesc').textContent = j.boardDescription || '';
+    var tip = j.nextStepsTip;
+    $('boardTip').textContent = tip
+      ? ('Tue/Fri tip: aim for Day ' + tip.dayOffset + ' (' + tip.weekday + '). ' + tip.reason)
+      : '';
+
     var box = $('boardList'); box.innerHTML = '';
     for (var i = 0; i < stages.length; i++) {
       (function (s) {
@@ -437,13 +463,36 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
         if (s.customized) title.appendChild(make('span', 'pill ok', ' Custom'));
         if (s.byHand) title.appendChild(make('span', 'pill warn', ' By hand'));
         card.appendChild(title);
-        card.appendChild(make('h3', null, s.copyName || (s.ch === 'email' ? 'Email sequence / template' : 'Text template')));
+        card.appendChild(make('h3', null, s.copyName || (s.ch === 'email' ? 'Email template' : 'Text template')));
 
+        var row = document.createElement('div');
+        row.className = 'controls';
+        row.style.margin = '10px 0 0';
+
+        var dayWrap = document.createElement('div');
+        dayWrap.style.minWidth = '100px';
+        var dayLab = make('label', 'meta');
+        dayLab.setAttribute('for', 'board-day-' + s.id);
+        dayLab.textContent = 'Day (after demo / start)';
+        dayWrap.appendChild(dayLab);
+        var dayIn = document.createElement('input');
+        dayIn.type = 'number';
+        dayIn.min = '0';
+        dayIn.max = '365';
+        dayIn.id = 'board-day-' + s.id;
+        dayIn.value = String(s.day != null ? s.day : 0);
+        dayIn.style.width = '100%';
+        dayIn.style.marginTop = '4px';
+        dayWrap.appendChild(dayIn);
+        row.appendChild(dayWrap);
+
+        var tplWrap = document.createElement('div');
+        tplWrap.style.flex = '1';
+        tplWrap.style.minWidth = '180px';
         var lab = make('label', 'meta');
         lab.setAttribute('for', 'board-sel-' + s.id);
-        lab.textContent = s.ch === 'email' ? 'Email template for this stage' : 'Text template for this stage';
-        card.appendChild(lab);
-
+        lab.textContent = s.ch === 'email' ? 'Email template' : 'Text template';
+        tplWrap.appendChild(lab);
         var sel = document.createElement('select');
         sel.id = 'board-sel-' + s.id;
         sel.style.width = '100%';
@@ -466,12 +515,18 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
         if (cur && !opts.some(function (x) { return String(x.id) === String(cur); })) {
           var miss = document.createElement('option');
           miss.value = cur;
-          miss.textContent = (cur + ' (missing — pick another)');
+          miss.textContent = cur + ' (missing — pick another)';
           miss.selected = true;
           sel.appendChild(miss);
         }
-        card.appendChild(sel);
+        tplWrap.appendChild(sel);
+        row.appendChild(tplWrap);
+        card.appendChild(row);
 
+        if (s.hint) card.appendChild(make('div', 'desk-meta', s.hint));
+        if (s.preferWeekdays && s.preferWeekdays.length) {
+          card.appendChild(make('div', 'desk-meta', 'Prefer: ' + s.preferWeekdays.join(' / ')));
+        }
         if (s.preview) card.appendChild(make('div', 'desk-detail', s.preview));
         if (s.note) card.appendChild(make('div', 'desk-meta', s.note));
 
@@ -479,16 +534,16 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
         var save = make('button', 'btn primary', 'Save');
         save.type = 'button';
         save.addEventListener('click', function () {
+          var body = { day: Number(dayIn.value) };
           var val = sel.value;
           if (s.ch === 'email') {
-            if (!val) { flashBoard('Pick an email template (or use Reset for the default sequence)', false); return; }
-            save.disabled = true;
-            saveBoardStage(s.id, { emailTemplate: val }).then(function () { save.disabled = false; });
+            if (val) body.emailTemplate = val;
           } else {
             if (!val) { flashBoard('Pick a text template', false); return; }
-            save.disabled = true;
-            saveBoardStage(s.id, { template: val }).then(function () { save.disabled = false; });
+            body.template = val;
           }
+          save.disabled = true;
+          saveBoardStage(s.id, body).then(function () { save.disabled = false; });
         });
         actions.appendChild(save);
         if (s.customized) {
@@ -1234,6 +1289,21 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
         $('copyAddLead').textContent = 'Copied';
         setTimeout(function () { $('copyAddLead').textContent = 'Copy command'; }, 1200);
       }).catch(function () {});
+    });
+
+    $('boardPack').addEventListener('change', function () {
+      var id = this.value;
+      if (!id || !LIVE) return;
+      fetch('/api/board/active', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        if (!j || !j.ok) { flashBoard((j && j.error) || 'Could not switch board', false); return; }
+        state.board = j.board;
+        renderBoard();
+        flashBoard('Switched to ' + ((j.board && j.board.boardName) || id), true);
+      }).catch(function () { flashBoard('Could not switch board', false); });
     });
 
   })();

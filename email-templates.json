@@ -12,6 +12,66 @@
       "If you have any questions about what we covered, just reply here. When you are ready to get started, grab a time that works using the link below."
     ]
   },
+  "demo-outline": {
+    "name": "Post-demo: outline",
+    "subject": "Outline from today's Housecall Pro demo",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Great meeting you today. Here's a short outline of what we covered on Housecall Pro:",
+      "",
+      "• Scheduling and dispatch from your phone",
+      "• Estimates, invoices, and getting paid on the spot (card, ACH, or financing)",
+      "• Online booking + Pipeline so leads don't slip",
+      "• Campaigns and reviews so past customers come back",
+      "",
+      "{{outline_note}}",
+      "",
+      "If anything here looks off or you want a deeper look at one piece, just reply. When you're ready for next steps, grab a time with the link below."
+    ]
+  },
+  "demo-callout": {
+    "name": "Post-demo: what you said",
+    "subject": "Quick follow-up from our demo",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Thanks again for the time yesterday.",
+      "",
+      "You mentioned {{demo_note|something that stuck with me from the demo}} — that is exactly the kind of day-to-day Housecall Pro is built to take off your plate.",
+      "",
+      "I put a short note below on how Pros usually handle that inside the product. If I have it wrong, tell me and I'll adjust.",
+      "",
+      "Reply here anytime, or grab a time that works using the link below."
+    ]
+  },
+  "demo-feature": {
+    "name": "Post-demo: feature deep-dive",
+    "subject": "How {{feature|that feature}} looks for {{business|your shop}}",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Quick add-on from our demo — focusing on {{feature|the piece you cared about most}}.",
+      "",
+      "{{feature_note|Here is how it usually works in Housecall Pro for a shop like yours: set it up once, then it runs in the background so you are not chasing it between jobs.}}",
+      "",
+      "If you want, I can walk you through a 10-minute screen share on just this. Reply here, or use the booking link below."
+    ]
+  },
+  "demo-next-steps": {
+    "name": "Post-demo: next steps / decision maker",
+    "subject": "Next steps with {{decision_maker|your team}}",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Circling back after our demo — hoping you had a chance to sit with the outline.",
+      "",
+      "Typical next step from here is a short call with {{decision_maker|whoever else needs to weigh in}} so we can line up onboarding, pricing, and timeline without you having to re-explain the product.",
+      "",
+      "Does {{next_window|Tuesday or Friday}} work for a quick next-steps call? Reply with a time, or grab a slot with the link below.",
+      ""
+    ]
+  },
   "research-reengage": {
     "name": "Research: re-engage past customers",
     "subject": "Some research on repeat jobs",

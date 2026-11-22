@@ -142,7 +142,8 @@ function loadConfig(file = FILE) {
   const stages = DEFAULT_STAGES.map((s) => {
     const o = over[s.id] && typeof over[s.id] === 'object' ? over[s.id] : {};
     const out = { ...s };
-    for (const k of ['template', 'message', 'afterMin', 'label', 'emailTemplate', 'byHand', 'byHandSince', 'manual', 'addedSince']) if (o[k] !== undefined) out[k] = o[k];
+    for (const k of ['template', 'message', 'afterMin', 'label', 'emailTemplate', 'day', 'byHand', 'byHandSince', 'manual', 'addedSince']) if (o[k] !== undefined) out[k] = o[k];
+    if (o.day !== undefined) { const d = Number(o.day); if (Number.isFinite(d) && d >= 0) out.day = d; }      // modular: Board tab can move a stage (e.g. outreach 3 from day 1 → day 5)
     if (o.message) out.template = null;             // a literal message wins over a template id
     return out;
   });

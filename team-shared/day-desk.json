@@ -2,6 +2,13 @@
   "_comment": "Managed Pipeline Assistant kit. Luke edits this (or copies via teamSync); each rep pulls with: node teamSync.js --pull",
   "kit": [
     {
+      "id": "demo-outline",
+      "kind": "email",
+      "key": "demo-outline",
+      "label": "Post-demo outline",
+      "hint": "Outreach 1 — same day as the demo"
+    },
+    {
       "id": "day-after-demo",
       "kind": "email",
       "key": "day-after-demo",
