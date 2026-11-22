@@ -3,6 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+/* Apply a saved theme before paint. No saved choice follows the system preference in CSS. */
+(function () {
+  try {
+    var t = localStorage.getItem('outreach-dashboard:theme');
+    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
 <title>Pipeline Assistant</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%AC%3C/text%3E%3C/svg%3E">
 <style>
@@ -11,14 +20,25 @@
   --accent:#2457d6;--on-accent:#ffffff;--good:#178a4a;--bad:#b42318;
   --text-fg:#0b6b60;--text-bg:#d5f5ee;--email-fg:#5b2bb8;--email-bg:#ece5fd;
   --warn-fg:#8a4b00;--warn-bg:#fff1d1;--fresh:#fff1b8;
-  color-scheme:light dark;
+  --ok-bg:#d1fadf;--ok-fg:#067647;--err-bg:#fee4e2;--err-fg:#b42318;
+  color-scheme:light;
+}
+html[data-theme="dark"]{
+  --bg:#0e131b;--surface:#161c27;--text:#e7ebf2;--muted:#98a3b6;--line:#263044;
+  --accent:#7ba3ff;--on-accent:#0b1220;--good:#4ade80;--bad:#f97066;
+  --text-fg:#5eead4;--text-bg:#0f3b36;--email-fg:#c4b1ff;--email-bg:#2b2150;
+  --warn-fg:#ffcc80;--warn-bg:#3a2a0c;--fresh:#4a4210;
+  --ok-bg:#123524;--ok-fg:#86efac;--err-bg:#3f1d1b;--err-fg:#fca5a5;
+  color-scheme:dark;
 }
 @media (prefers-color-scheme:dark){
-  :root{
+  html:not([data-theme]){
     --bg:#0e131b;--surface:#161c27;--text:#e7ebf2;--muted:#98a3b6;--line:#263044;
     --accent:#7ba3ff;--on-accent:#0b1220;--good:#4ade80;--bad:#f97066;
     --text-fg:#5eead4;--text-bg:#0f3b36;--email-fg:#c4b1ff;--email-bg:#2b2150;
     --warn-fg:#ffcc80;--warn-bg:#3a2a0c;--fresh:#4a4210;
+    --ok-bg:#123524;--ok-fg:#86efac;--err-bg:#3f1d1b;--err-fg:#fca5a5;
+    color-scheme:dark;
   }
 }
 *{box-sizing:border-box}
@@ -26,7 +46,22 @@
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 .wrap{max-width:1100px;margin:0 auto;padding:20px 16px 48px}
-.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;padding-right:36px}
+.theme-switch{
+  position:fixed;top:12px;right:12px;z-index:40;
+  width:28px;height:28px;padding:0;display:grid;place-items:center;
+  border:1px solid transparent;border-radius:999px;
+  background:transparent;color:var(--muted);cursor:pointer;opacity:.45;
+}
+.theme-switch:hover,.theme-switch:focus-visible{opacity:1;background:var(--surface);border-color:var(--line)}
+.theme-switch svg{width:15px;height:15px;display:block}
+.theme-switch .sun{display:none}
+html[data-theme="dark"] .theme-switch .moon{display:none}
+html[data-theme="dark"] .theme-switch .sun{display:block}
+@media (prefers-color-scheme:dark){
+  html:not([data-theme]) .theme-switch .moon{display:none}
+  html:not([data-theme]) .theme-switch .sun{display:block}
+}
 h1{margin:0;font-size:22px;letter-spacing:-.01em}
 .sub{margin:4px 0 0;color:var(--muted);font-size:13px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:7px;vertical-align:1px}
@@ -71,7 +106,7 @@ tr.fresh td{animation:flash 6s ease-out}
 .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
 .pill.text{background:var(--text-bg);color:var(--text-fg)}
 .pill.email{background:var(--email-bg);color:var(--email-fg)}
-.pill.ok{background:#d1fadf;color:#067647}
+.pill.ok{background:var(--ok-bg);color:var(--ok-fg)}
 .pill.warn{background:var(--warn-bg);color:var(--warn-fg)}
 .tpl{font-weight:600}
 .prev{display:block;color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:46ch}
@@ -94,8 +129,8 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 .tpl-edit label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 4px}
 .tpl-note{color:var(--muted);font-size:13px;margin:8px 0 0}
 .flash{margin:10px 0 0;padding:10px 12px;border-radius:10px;font-size:14px}
-.flash.ok{background:#d1fadf;color:#067647}
-.flash.err{background:#fee4e2;color:#b42318}
+.flash.ok{background:var(--ok-bg);color:var(--ok-fg)}
+.flash.err{background:var(--err-bg);color:var(--err-fg)}
 .rep-text{white-space:pre-wrap;max-width:520px}
 .desk-list{display:grid;gap:10px;margin-top:12px}
 .desk-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
@@ -107,8 +142,8 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 .desk-card .desk-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
 .desk-cmd{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;color:var(--muted);word-break:break-all}
 .prio{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;margin-right:6px}
-.prio.hold{background:#fee4e2;color:#b42318}
-.prio.interested{background:#d1fadf;color:#067647}
+.prio.hold{background:var(--err-bg);color:var(--err-fg)}
+.prio.interested{background:var(--ok-bg);color:var(--ok-fg)}
 .prio.board{background:var(--email-bg);color:var(--email-fg)}
 .kit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:12px}
 @media (max-width:680px){
@@ -132,6 +167,10 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 </style>
 </head>
 <body>
+<button type="button" class="theme-switch" id="themeSwitch" aria-pressed="false" aria-label="Use dark mode" title="Dark mode">
+  <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21 14.5A8.5 8.5 0 0 1 9.5 3 7 7 0 1 0 21 14.5z"/></svg>
+  <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="currentColor"/><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3.2v2.2M12 18.6V20.8M3.2 12h2.2M18.6 12h2.2M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"/></g></svg>
+</button>
 <main class="wrap">
   <header class="top">
     <div>
@@ -372,6 +411,37 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   function lsSet(k, v) { try { window.localStorage.setItem(LS + k, v); } catch (e) {} }
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function themeNow() {
+    var set = document.documentElement.getAttribute('data-theme');
+    if (set === 'dark' || set === 'light') return set;
+    try { return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+    catch (e) { return 'light'; }
+  }
+  function syncThemeSwitch() {
+    var btn = $('themeSwitch');
+    if (!btn) return;
+    var dark = themeNow() === 'dark';
+    btn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+    btn.setAttribute('aria-label', dark ? 'Use light mode' : 'Use dark mode');
+    btn.title = dark ? 'Light mode' : 'Dark mode';
+  }
+  function bindThemeSwitch() {
+    var btn = $('themeSwitch');
+    if (!btn) return;
+    syncThemeSwitch();
+    btn.addEventListener('click', function () {
+      var next = themeNow() === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      lsSet('theme', next);
+      syncThemeSwitch();
+    });
+    try {
+      var mq = window.matchMedia('(prefers-color-scheme: dark)');
+      var onScheme = function () { if (!document.documentElement.getAttribute('data-theme')) syncThemeSwitch(); };
+      if (mq.addEventListener) mq.addEventListener('change', onScheme);
+    } catch (e) {}
   }
 
   var c0 = lsGet('channel'); if (c0 === 'text' || c0 === 'email') state.channel = c0;
@@ -1507,6 +1577,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
 
+  bindThemeSwitch();
   syncControls();
   setView(state.view);
   try { onData(); } catch (e) {}
