@@ -401,6 +401,8 @@ function boardPayload() {
     activeBoard: active.id,
     boardName: active.name,
     boardDescription: active.description || '',
+    industry: active.industry || null,
+    tag: active.tag || null,
     packs: boards.listPacks(),
     stages,
     textOptions,

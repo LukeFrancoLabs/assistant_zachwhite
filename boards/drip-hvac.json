@@ -1,7 +1,7 @@
 {
   "id": "drip-hvac",
-  "name": "HVAC drip (2 weeks)",
-  "description": "Industry drip for HVAC — texts + emails over ~14 days (season, booking, financing, pipeline, soft close). Change any Day or template on the Board tab.",
+  "name": "HVAC board (2 weeks)",
+  "description": "Our HVAC cadence — texts + emails over ~14 days (season → booking → financing → pipeline → reviews → soft close). Shown as a flow graph on the Board tab.",
   "tag": "hvac",
   "industry": "HVAC",
   "stages": [

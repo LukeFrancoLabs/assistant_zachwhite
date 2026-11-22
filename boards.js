@@ -72,7 +72,7 @@ function loadPackFile(id) {
 }
 
 function listPacks() {
-  const ORDER = ['post-demo', 'nurture', 'drip-hvac', 'drip-plumbing', 'drip-electrical', 'drip'];
+  const ORDER = ['drip-hvac', 'post-demo', 'nurture', 'drip-plumbing', 'drip-electrical', 'drip'];
   const byId = new Map();
   byId.set('drip', dripPack());
   try {
@@ -108,7 +108,7 @@ function writeLocal(obj) {
 function activeBoardId() {
   const local = readLocal();
   if (local.activeBoard && loadPackFile(local.activeBoard)) return local.activeBoard;
-  return 'post-demo'; // default for Pipeline Assistant reps: post-demo board
+  return 'drip-hvac'; // default for this team: HVAC drip board
 }
 
 function setActiveBoard(id) {

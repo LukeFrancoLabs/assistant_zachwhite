@@ -10,7 +10,7 @@ Personal day management for every AE — morning queue, replies, post-call kit, 
 | **Replies** | Inbound replies this copy knows about |
 | **Quick kit** | Day-after-demo email, book-demo text, soft follow-ups — copy a command |
 | **My leads** | Hand-added follow-ups + next stage |
-| **Board** | Modular boards — Post-demo, **Nurture (slow ~90-day)**, **HVAC / Plumbing / Electrical** 2-week drips, cold drip; change **Day** + template per outreach |
+| **Board** | Default **HVAC board** as an n8n-style flow graph (nodes + day gaps). Also Post-demo, Nurture, Plumbing / Electrical, cold drip — switch pack, edit Day/template |
 | **Content** | Sales Content Finder library — filter by trade / need / competitor, copy link or subject |
 | **Today** | What already went out today |
 | Sends / Templates / Scoreboard / DNC | Same as before |
