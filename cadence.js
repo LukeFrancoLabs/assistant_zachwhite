@@ -148,13 +148,42 @@ function loadConfig(file = FILE) {
     return out;
   });
   const num = (v, d) => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : d);
-  return { stages, file, autoDays: num(user.autoDays, 7) };
+  return { stages, file, autoDays: num(user.autoDays, 7), boardId: 'drip', boardFresh: false };
+}
+
+/**
+ * Per-lead cadence config: a hand lead marked #nurture / board=nurture uses the slow nurture pack.
+ * Others keep the default (or active) drip stages passed in.
+ */
+function resolveConfig(lead, baseCfg) {
+  const base = baseCfg || loadConfig();
+  const own = lead && Array.isArray(lead.own) ? lead.own : [];
+  const boardId = (lead && lead.board) || (own.includes('nurture') ? 'nurture' : null);
+  if (!boardId || boardId === 'drip') return base;
+  try {
+    const packCfg = require('./boards').configForPack(boardId, base);
+    if (packCfg) return packCfg;
+  } catch (_) { /* boards missing — fall through */ }
+  return base;
 }
 
 /**
  * What a stage sends: { name, text } for a text, { name, email: true, touch } for an email, or null when no copy is written yet.
  * `templates` = Assistant.js's TEMPLATES ({ id: { name, text } }).
  */
+function industryText(id) {
+  try {
+    const f = path.join(__dirname, 'industry-drip-texts.json');
+    let sig; try { const st = fs.statSync(f); sig = `${st.mtimeMs}:${st.size}`; } catch (_) { return null; }
+    if (!industryText.cache || industryText.cache.sig !== sig) {
+      const all = readJson(f, {}) || {};
+      industryText.cache = { sig, data: all };
+    }
+    const t = industryText.cache.data[String(id)];
+    return t && t.text ? { name: t.name || String(id), text: sender.apply(String(t.text)) } : null;
+  } catch (_) { return null; }
+}
+
 function copyOf(stage, templates = {}, emailSteps = null) {
   if (stage.ch === 'email') {
     if (stage.emailTemplate) {      // this stage sends a named email of email-templates.json (boardRun.js hands the key to the sender as `wantTemplate`); null = it is not written, so the stage is held like a text with no copy
@@ -165,8 +194,12 @@ function copyOf(stage, templates = {}, emailSteps = null) {
     return { name: e ? e.name : `Email touch ${stage.n}`, email: true, touch: stage.n, subject: e ? e.subject : null };
   }
   if (stage.message) return { name: `${stage.label}`, text: String(stage.message) };
-  const t = stage.template != null ? templates[String(stage.template)] : null;
-  return t && t.text ? { name: t.name, text: t.text } : null;
+  const key = stage.template != null ? String(stage.template) : '';
+  const t = key ? templates[key] : null;
+  if (t && t.text) return { name: t.name, text: t.text };
+  // Named industry / nurture texts (hvac-t1, nurture-t1, …) live in industry-drip-texts.json
+  const named = key ? industryText(key) : null;
+  return named || null;
 }
 
 // ============================================================================
@@ -184,7 +217,13 @@ function evaluate(lead, cfg, now = new Date(), env = {}) {
   const tz = (lead.zones && lead.zones[0]) || ZONE;
   const today = dayOf(now, ZONE);
   // A `--same-day` text (mode 'same-day') is not part of the cadence (Luke: "keep it in the same stage it's at"): it is left out of the counts, of "our last touch" and of "sent today", so the lead stays exactly where it was. The same goes for a `--blast` email (mode 'blast'): a manual one-off the board never counts.
-  const real = (lead.touches || []).filter((t) => t && t.at && Number.isFinite(Date.parse(t.at)) && t.mode !== SAME_DAY_MODE && t.mode !== BLAST_MODE).slice().sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  let real = (lead.touches || []).filter((t) => t && t.at && Number.isFinite(Date.parse(t.at)) && t.mode !== SAME_DAY_MODE && t.mode !== BLAST_MODE).slice().sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  // Fresh boards (nurture): only touches AFTER joining the board count toward stage progress, so a busy cold drip doesn't mark every nurture stage done.
+  const boardAtMs = lead.boardAt ? Date.parse(lead.boardAt) : NaN;
+  const allReal = real;
+  if (cfg.boardFresh && Number.isFinite(boardAtMs)) {
+    real = real.filter((t) => Date.parse(t.at) >= boardAtMs);
+  }
   const hand = real.filter((t) => t.mode === MANUAL_MODE);
   const handAt = hand.length ? hand[0].at : null;
 
@@ -232,7 +271,13 @@ function evaluate(lead, cfg, now = new Date(), env = {}) {
 
   // Our last touch, and which stage it was (so the next stage knows how many days apart it must be).
   const lastReal = real.length ? real[real.length - 1] : null;
-  const lastAt = lastReal ? lastReal.at : handAt;
+  // For fresh boards, gap timing still respects any overall last touch (don't ping right after a cold-drip send).
+  const lastOverall = allReal.length ? allReal[allReal.length - 1] : null;
+  let lastAt = lastReal ? lastReal.at : handAt;
+  if (cfg.boardFresh && Number.isFinite(boardAtMs)) {
+    const candidates = [lastAt, lead.boardAt, lastOverall && lastOverall.at].filter(Boolean);
+    lastAt = candidates.sort((a, b) => Date.parse(b) - Date.parse(a))[0] || lastAt;
+  }
   let lastStage = null;
   if (lastReal) {
     const lastMs = Date.parse(lastReal.at), own = stages.filter((s) => s.ch === lastReal.ch && !byCopy.has(s.id));
@@ -240,7 +285,7 @@ function evaluate(lead, cfg, now = new Date(), env = {}) {
     lastStage = (lastReal.ch === 'email' && stages.find((s) => s.emailTemplate && gotNamedEmail({ touches: [lastReal] }, s))) || own[n - 1] || own[own.length - 1] || null;      /* an email that IS a stage's own named email counts as that stage whatever its place in the lead's count, so the gap to the next stage is the plan's */                            // more touches than stages: the last stage of that kind
   }
 
-  const out = { lead, done, doneAt, viaCopy: [...byCopy], noMail: [...noMail], next, nextIdx: nextIdx >= 0 ? nextIdx : stages.length, lastAt, lastStage: lastStage ? lastStage.id : null, sentToday, count, readyAt: null, opensAt: null, dueNow: false, hold: null, state: 'waiting' };
+  const out = { lead, done, doneAt, viaCopy: [...byCopy], noMail: [...noMail], next, nextIdx: nextIdx >= 0 ? nextIdx : stages.length, lastAt, lastStage: lastStage ? lastStage.id : null, sentToday, count, readyAt: null, opensAt: null, dueNow: false, hold: null, state: 'waiting', boardId: cfg.boardId || null };
   if (!next) { out.state = 'finished'; return out; }
 
   // Held for a reason a person should know about: the stage has no copy yet, or the lead asked us to stop. (A reply and a teammate's text hold nothing: see below.)
@@ -257,7 +302,9 @@ function evaluate(lead, cfg, now = new Date(), env = {}) {
   // When the gap since our last touch has passed.
   if (!lastAt) out.readyAt = null;
   else {
-    const gapDays = Math.max(0, next.day - (lastStage ? lastStage.day : next.day));
+    // Fresh boards (nurture): with no nurture stage done yet, count days from day 0 so Day 14 waits ~14 days after joining.
+    const gapBase = lastStage ? lastStage.day : (cfg.boardFresh ? 0 : next.day);
+    const gapDays = Math.max(0, next.day - gapBase);
     if (gapDays === 0) out.readyAt = new Date(Date.parse(lastAt) + (next.afterMin || 0) * 60000).toISOString();
     else out.readyAt = instantAt(addDays(dayOf(lastAt, tz), gapDays), '00:00', tz).toISOString();
   }
@@ -323,9 +370,17 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
   const isMe = (sender) => !!sender && String(sender).toLowerCase().includes(me);
   const manual = new Map();
   for (const a of tl.readManualRecords().adds) {
-    const k = k15(a.accountId), cur = manual.get(k), one = { id: a.id, at: a.at, on: a.on, did: a.did || [] };
+    const k = k15(a.accountId), cur = manual.get(k), one = { id: a.id, at: a.at, on: a.on, did: a.did || [], board: a.board || null, boardAt: a.boardAt || null };
     if (!cur) manual.set(k, { ...one, tags: [...tl.manualTags(a)] });
-    else { for (const t of tl.manualTags(a)) if (!cur.tags.includes(t)) cur.tags.push(t); if (String(a.on) >= String(cur.on)) Object.assign(cur, one); }
+    else {
+      for (const t of tl.manualTags(a)) if (!cur.tags.includes(t)) cur.tags.push(t);
+      if (String(a.on) >= String(cur.on)) Object.assign(cur, one);
+      // Newest board assignment wins across adds of the same account
+      if (a.boardAt && (!cur.boardAt || String(a.boardAt) >= String(cur.boardAt))) {
+        cur.board = a.board || null;
+        cur.boardAt = a.boardAt;
+      }
+    }
   }
   // Replies: by account id; the ones the poller could not link to an account (no id: the contact's own name came with the SMS) by exact name or email, when they match a lead on the board.
   const lastReply = new Map(), unlinked = new Map(), giftAsk = new Map();
@@ -348,6 +403,9 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
     const m = manual.get(k15(id)) || null;
     const own = m ? m.tags.filter((t) => !tl.MANUAL_TAG_KINDS[t]) : [];
     if (!kinds.length && !own.length) continue;
+    const board = (m && m.board) || (own.includes('nurture') ? 'nurture' : null);
+    const boardAt = (m && m.boardAt) || null;
+    const onNurture = board === 'nurture' || own.includes('nurture');
     const touches = (a.touches || []).map((t) => ({ ch: t.ch, at: t.at, mode: t.mode || null, title: t.title || null }));
     const ownTouches = touches.filter((t) => t.mode !== BLAST_MODE);      // what the board counts: a --blast email is a manual one-off, it neither starts a lead nor says when its cadence began
     const sn = snaps.get(k15(id));
@@ -375,8 +433,9 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
       repliedAt: Number.isFinite(lr) ? new Date(lr).toISOString() : null, teammateAt: tmAt, optedOut,
       repliedRecent: Number.isFinite(lr) && now.getTime() - lr <= BOARD_ACTIVE_DAYS * 864e5 && !giftAsk.get(k15(id)),      // the lead replied in the last 30 days (a real reply, not a hand note, and not a gift-card complaint): like boardWorked it is never parked as "older", so a pro who answered "why?" and went quiet is still reached (Luke, 2026-11-03: "Yes, include them")
       boardWorked: boardLast.has(k15(id)) && now.getTime() - boardLast.get(k15(id)) <= BOARD_ACTIVE_DAYS * 864e5,      // the board texted or emailed this lead in the last 30 days: it is mid-drip and keeps going past the 7-day window (see board())
-      labelOnly: !kinds.length,       // tagged only with a label of his own (#referral): on the board, but not on a list, so nothing goes out on its own
-      startable: !!(ownTouches.length || kinds.includes('Shark') || m || startNewLds),
+      board, boardAt, onNurture,
+      labelOnly: !kinds.length && !onNurture,       // tagged only with a label (#referral): held. #nurture is a real slow-drip board, not a hold label.
+      startable: !!(ownTouches.length || kinds.includes('Shark') || m || startNewLds || onNurture),
     });
   }
   return out;
@@ -387,13 +446,18 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
  * and one whose cadence started more than `cfg.autoDays` days ago and that the board itself has never texted or emailed (`old: true`; a reply still shows as 'paused'). A lead the board texted or emailed in the last 30 days, or that replied in the last 30 days (`repliedRecent`; a reply no longer pauses a lead, and a pro who answered "why?" and went quiet is still reached), keeps going whatever its age: the drip runs 60 days.
  */
 function board(leads, cfg, now = new Date(), env = {}) {
-  const autoDays = cfg.autoDays == null ? 7 : cfg.autoDays;
+  const base = cfg || loadConfig();
   return leads.map((l) => {
-    const e = evaluate(l, cfg, now, env);
+    const leadCfg = resolveConfig(l, base);
+    const autoDays = leadCfg.autoDays == null ? 7 : leadCfg.autoDays;
+    const e = evaluate(l, leadCfg, now, env);
+    e.boardId = leadCfg.boardId || null;
+    e.boardName = leadCfg.boardName || null;
     const open = e.state === 'due' || e.state === 'waiting' || e.state === 'blocked';
     if (!l.startable && open && !e.lastAt) { e.state = 'held'; e.hold = 'an LDS lead nobody has contacted yet: not started on its own'; e.dueNow = false; }
-    if (l.labelOnly && open && e.state !== 'held') { e.state = 'held'; e.dueNow = false; e.hold = `only tagged ${(l.own || []).map((t) => '#' + t).join(' ')}: a label, not a list. Nothing goes out on its own (add #shark or #lds to start the cadence)`; }
-    const since = l.enrolledAt ? Date.parse(l.enrolledAt) : NaN;
+    if (l.labelOnly && open && e.state !== 'held') { e.state = 'held'; e.dueNow = false; e.hold = `only tagged ${(l.own || []).map((t) => '#' + t).join(' ')}: a label, not a list. Nothing goes out on its own (add #shark or #lds, or Move to Nurture)`; }
+    // Nurture: clock the auto window from when they joined the slow board, not original enroll
+    const since = (l.onNurture && l.boardAt) ? Date.parse(l.boardAt) : (l.enrolledAt ? Date.parse(l.enrolledAt) : NaN);
     e.old = Number.isFinite(since) && Number.isFinite(autoDays) && now.getTime() - since > autoDays * 864e5 && !l.boardWorked && !l.repliedRecent;      // (a lead the board has already worked, or that replied in the last 30 days, is never "older": it is mid-drip / engaged)
     if (e.old && open && e.state !== 'held') {
       e.state = 'held'; e.dueNow = false;
@@ -403,7 +467,7 @@ function board(leads, cfg, now = new Date(), env = {}) {
   });
 }
 
-module.exports = { DEFAULT_STAGES, FILE, ZONE, SAME_DAY_MODE, BLAST_MODE, loadConfig, copyOf, evaluate, members, board, instantAt, dayOf, addDays, dayNum, k15 };
+module.exports = { DEFAULT_STAGES, FILE, ZONE, SAME_DAY_MODE, BLAST_MODE, loadConfig, resolveConfig, copyOf, evaluate, members, board, instantAt, dayOf, addDays, dayNum, k15 };
 
 if (require.main === module) {
   const cfg = loadConfig();

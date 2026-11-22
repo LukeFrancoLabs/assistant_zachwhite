@@ -102,9 +102,30 @@ const manualTags = (a) => (a && Array.isArray(a.tags) && a.tags.length ? a.tags 
 function readManualRecords() {
   let sig; try { const st = fs.statSync(MANUAL_FILE); sig = `${st.size}:${st.mtimeMs}`; } catch (_) { return { adds: [], removed: new Set() }; }
   if (_manualRec && _manualRec.sig === sig) return _manualRec.val;
-  const adds = [], removed = new Set(), retag = new Map();
-  for (const r of readRows(MANUAL_FILE)) { if (!r || !r.id) continue; if (r.type === 'remove') removed.add(r.id); else if (r.type === 'add') adds.push(r); else if (r.type === 'tags' && Array.isArray(r.tags)) retag.set(r.id, r.tags); }
-  _manualRec = { sig, val: { adds: adds.filter((a) => !removed.has(a.id)).map((a) => ({ ...a, tags: manualTags(retag.has(a.id) ? { tags: retag.get(a.id) } : a) })), removed } };
+  const adds = [], removed = new Set(), retag = new Map(), reboard = new Map();
+  for (const r of readRows(MANUAL_FILE)) {
+    if (!r || !r.id) continue;
+    if (r.type === 'remove') removed.add(r.id);
+    else if (r.type === 'add') adds.push(r);
+    else if (r.type === 'tags' && Array.isArray(r.tags)) retag.set(r.id, r.tags);
+    else if (r.type === 'board') reboard.set(r.id, { board: r.board || null, boardAt: r.at || null });
+  }
+  _manualRec = {
+    sig,
+    val: {
+      adds: adds.filter((a) => !removed.has(a.id)).map((a) => {
+        const tags = manualTags(retag.has(a.id) ? { tags: retag.get(a.id) } : a);
+        const b = reboard.get(a.id);
+        return {
+          ...a,
+          tags,
+          board: b ? b.board : (a.board || null),
+          boardAt: b ? b.boardAt : (a.boardAt || null),
+        };
+      }),
+      removed,
+    },
+  };
   return _manualRec.val;
 }
 
@@ -3598,7 +3619,7 @@ if (require.main === module) {
   // node textLog.js --add-lead <Salesforce account link or id> […] --tag shark,lds,referral   a lead you worked by hand (stage 1 done by you), #tagged with its kind, tracked for stage 2 (manualShark.js)
   // node textLog.js --tag-lead <link or id> --tag lds   change its tags  ·  --remove-lead <link or id>   take it back out  ·  --manual-leads   who was added, and when stage 2 starts
   // (--add-shark / --remove-shark / --manual-shark are the first names of the same three: --add-shark means --tag shark)
-  if (['--add-lead', '--tag-lead', '--remove-lead', '--manual-leads', '--add-shark', '--remove-shark', '--manual-shark'].includes(argv[0])) {
+  if (['--add-lead', '--tag-lead', '--remove-lead', '--manual-leads', '--nurture-lead', '--set-board', '--add-shark', '--remove-shark', '--manual-shark'].includes(argv[0])) {
     const res = require('./manualShark').cli(argv);
     if (res.changed) console.log('dashboard written:', generateDashboard());
     process.exit(res.code);

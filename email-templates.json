@@ -198,6 +198,48 @@
       ""
     ]
   },
+  "nurture-checkin": {
+    "name": "Nurture · soft check-in",
+    "subject": "No rush — checking in from Housecall Pro",
+    "body": [
+      "{{greeting}}",
+      "",
+      "No pressure on our end — I know timing has to be right.",
+      "",
+      "Whenever {{business|your shop}} wants a quieter look at putting scheduling, booking, and getting paid in one place, I'm happy to walk through it at your pace.",
+      "",
+      "Reply here if useful, or grab a time with the link below when you're ready. If now still isn't it, no worries.",
+      ""
+    ]
+  },
+  "nurture-research": {
+    "name": "Nurture · research note",
+    "subject": "A quick note for when timing is better",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Sharing something Pros often find useful between busy seasons: past customers and reviews are usually the first things that slip when the board is full.",
+      "",
+      "Housecall Pro can run thank-you texts, review asks, and light campaigns in the background so that work still happens while you're on jobs.",
+      "",
+      "No ask today — just parking this for when timing is better. Reply anytime, or use the link below if you want a short walkthrough.",
+      ""
+    ]
+  },
+  "nurture-why-now": {
+    "name": "Nurture · gentle why-now",
+    "subject": "Still here when {{business|you}} are ready",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Circling back gently — still happy to help {{business|your team}} see Housecall Pro whenever it makes sense.",
+      "",
+      "Short version: online booking + Pipeline for new work, campaigns for past customers, and getting paid on the spot. First month is $26 with no contracts if you ever want to try it.",
+      "",
+      "If now isn't the time, tell me and I'll ease off. Otherwise reply here or grab a slot with the link below.",
+      ""
+    ]
+  },
   "hvac-drip-1": {
     "name": "HVAC drip · opener",
     "subject": "Keeping {{business|your HVAC shop}} booked when the heat hits",

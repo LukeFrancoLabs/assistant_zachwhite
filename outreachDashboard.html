@@ -192,7 +192,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   </section>
 
   <section id="view-myleads" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Your personal follow-up board — leads you added by hand after a call or demo.</p>
+    <p class="sub" style="margin:14px 0 0">Your personal follow-up board — leads you added by hand after a call or demo. Not ready to push? <b>Move to Nurture</b> puts them on the slow ~90-day drip.</p>
     <div id="addLeadBox" class="desk-card" style="margin-top:12px">
       <div class="desk-title">Add after a call</div>
       <h3>Put someone on your board</h3>
@@ -830,6 +830,23 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     }
   }
 
+  function setLeadBoard(accountId, board) {
+    if (!LIVE || !accountId) return Promise.resolve(false);
+    return fetch('/api/leads/board', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: accountId, board: board })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.ok) {
+        alert((j && j.error) || 'Could not update board');
+        return false;
+      }
+      if (state.desk) state.desk.myLeads = j.myLeads || state.desk.myLeads;
+      renderMyLeads();
+      return true;
+    }).catch(function () { alert('Could not update board'); return false; });
+  }
+
   function renderMyLeads() {
     var j = state.desk || {};
     var add = j.addLead || {};
@@ -838,16 +855,44 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     var list = j.myLeads || [];
     var box = $('myLeadsList'); box.innerHTML = '';
     for (var i = 0; i < list.length; i++) {
-      var m = list[i];
-      var card = make('div', 'desk-card' + (m.dueNow ? ' due' : ''));
-      card.appendChild(make('div', 'desk-title', m.dueNow ? 'Due now' : (m.state || 'On board')));
-      var h = make('h3'); h.appendChild(personLink(m.name, m.url)); card.appendChild(h);
-      var bits = [];
-      if (m.next) bits.push('Next: ' + m.next);
-      if (m.tags && m.tags.length) bits.push('#' + m.tags.join(' #'));
-      if (m.hold) bits.push(m.hold);
-      if (bits.length) card.appendChild(make('div', 'desk-meta', bits.join(' · ')));
-      box.appendChild(card);
+      (function (m) {
+        var card = make('div', 'desk-card' + (m.dueNow ? ' due' : '') + (m.onNurture ? ' nurture' : ''));
+        var title = make('div', 'desk-title');
+        if (m.onNurture) title.appendChild(make('span', 'pill ok', 'Nurture'));
+        title.appendChild(document.createTextNode(m.dueNow ? 'Due now' : (m.state || 'On board')));
+        card.appendChild(title);
+        var h = make('h3'); h.appendChild(personLink(m.name, m.url)); card.appendChild(h);
+        var bits = [];
+        if (m.boardName) bits.push(m.boardName);
+        if (m.next) bits.push('Next: ' + m.next);
+        if (m.tags && m.tags.length) bits.push('#' + m.tags.join(' #'));
+        if (m.hold) bits.push(m.hold);
+        if (bits.length) card.appendChild(make('div', 'desk-meta', bits.join(' · ')));
+        var actions = make('div', 'desk-actions');
+        if (!m.onNurture) {
+          var nur = make('button', 'btn', 'Move to Nurture');
+          nur.type = 'button';
+          nur.title = 'Slow ~90-day drip — soft check-ins instead of the active cadence';
+          nur.addEventListener('click', function () {
+            if (!confirm('Move ' + (m.name || 'this lead') + ' to the Nurture slow drip? Active cadence stops; soft touches start in ~14 days.')) return;
+            nur.disabled = true;
+            setLeadBoard(m.accountId, 'nurture').then(function (ok) { if (!ok) nur.disabled = false; });
+          });
+          actions.appendChild(nur);
+        } else {
+          var back = make('button', 'btn', 'Leave Nurture');
+          back.type = 'button';
+          back.title = 'Clear the nurture board assignment (keeps the lead on My leads)';
+          back.addEventListener('click', function () {
+            if (!confirm('Take ' + (m.name || 'this lead') + ' off the Nurture drip?')) return;
+            back.disabled = true;
+            setLeadBoard(m.accountId, 'none').then(function (ok) { if (!ok) back.disabled = false; });
+          });
+          actions.appendChild(back);
+        }
+        card.appendChild(actions);
+        box.appendChild(card);
+      })(list[i]);
     }
     $('myLeadsEmpty').hidden = list.length > 0;
   }

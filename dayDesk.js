@@ -172,19 +172,26 @@ function myLeadsPayload(now = new Date()) {
     const cfg = cadence.loadConfig();
     const members = cadence.members({ textLog, now }).filter((m) => m.hand);
     const evaluated = cadence.board(members, cfg, now);
-    return evaluated.map((e) => ({
-      name: e.lead.name,
-      accountId: e.lead.accountId,
-      url: e.lead.url || sfUrl(e.lead.accountId),
-      tags: e.lead.own || [],
-      state: e.state,
-      next: e.next ? e.next.label : (e.state === 'finished' ? 'Finished' : null),
-      dueNow: !!e.dueNow,
-      hold: e.hold || null,
-      lastAt: e.lastAt || null,
-      enrolledAt: e.lead.enrolledAt || null,
-      addCommand: null,
-    })).sort((a, b) => (b.dueNow ? 1 : 0) - (a.dueNow ? 1 : 0) || String(a.name).localeCompare(String(b.name)));
+    return evaluated.map((e) => {
+      const onNurture = !!(e.lead.onNurture || e.boardId === 'nurture' || (e.lead.own || []).includes('nurture'));
+      return {
+        name: e.lead.name,
+        accountId: e.lead.accountId,
+        url: e.lead.url || sfUrl(e.lead.accountId),
+        tags: e.lead.own || [],
+        state: e.state,
+        next: e.next ? e.next.label : (e.state === 'finished' ? 'Finished' : null),
+        dueNow: !!e.dueNow,
+        hold: e.hold || null,
+        lastAt: e.lastAt || null,
+        enrolledAt: e.lead.enrolledAt || null,
+        board: e.boardId || e.lead.board || null,
+        boardName: e.boardName || null,
+        onNurture,
+        nurtureCommand: 'node textLog.js --nurture-lead ' + (e.lead.accountId || ''),
+        addCommand: null,
+      };
+    }).sort((a, b) => (b.dueNow ? 1 : 0) - (a.dueNow ? 1 : 0) || String(a.name).localeCompare(String(b.name)));
   } catch (_) { return []; }
 }
 
@@ -238,9 +245,23 @@ function todayPayload() {
 
 function howToAddLead() {
   return {
-    hint: 'After you talk to a pro, add them to your personal board so the next touch shows up here.',
+    hint: 'After you talk to a pro, add them to your personal board so the next touch shows up here. Not ready now? Use Move to Nurture for the slow ~90-day drip.',
     command: 'node textLog.js --add-lead <Salesforce account link> --tag referral --did email,text,call',
     alt: 'Or open the full outreach log (email --sent) → Tools → Follow-up board → ➕ Add a lead.',
+    nurture: 'node textLog.js --nurture-lead <Salesforce account link>',
+  };
+}
+
+function setLeadBoard(accountId, board) {
+  const manualShark = require('./manualShark');
+  const r = manualShark.setLeadBoard({ ref: accountId, board: board || null });
+  if (!r.ok) return { ok: false, error: r.reason };
+  return {
+    ok: true,
+    board: r.board,
+    boardAt: r.boardAt,
+    tags: r.tags,
+    myLeads: myLeadsPayload(new Date()),
   };
 }
 
@@ -271,7 +292,7 @@ function build() {
   };
 }
 
-module.exports = { build, loadKit, DEFAULT_KIT, SHARED_DIR, DESK_FILE };
+module.exports = { build, loadKit, DEFAULT_KIT, SHARED_DIR, DESK_FILE, setLeadBoard, myLeadsPayload };
 
 if (require.main === module) {
   const d = build();

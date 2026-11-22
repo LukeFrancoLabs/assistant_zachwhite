@@ -10,10 +10,12 @@ Personal day management for every AE — morning queue, replies, post-call kit, 
 | **Replies** | Inbound replies this copy knows about |
 | **Quick kit** | Day-after-demo email, book-demo text, soft follow-ups — copy a command |
 | **My leads** | Hand-added follow-ups + next stage |
-| **Board** | Modular boards — Post-demo, **HVAC / Plumbing / Electrical** 2-week drips, cold drip; change **Day** + template per outreach |
+| **Board** | Modular boards — Post-demo, **Nurture (slow ~90-day)**, **HVAC / Plumbing / Electrical** 2-week drips, cold drip; change **Day** + template per outreach |
 | **Content** | Sales Content Finder library — filter by trade / need / competitor, copy link or subject |
 | **Today** | What already went out today |
 | Sends / Templates / Scoreboard / DNC | Same as before |
+
+**Nurture (slow drip):** On **My leads**, hit **Move to Nurture** when an opp isn’t ready. That tags `#nurture`, puts them on the ~90-day soft board (check-in → research → why-now), and pauses the active cadence for that lead. CLI: `node textLog.js --nurture-lead <SF link>`.
 
 Opens are not tracked (no pixels). Replies need a one-time Gmail feed per machine (`node replyPoller.js --setup`).
 

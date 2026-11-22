@@ -225,6 +225,47 @@ function tagLead({ ref, tags = null, dryRun = false } = {}) {
   return { ok: true, dryRun: !!dryRun, adds, before, after: pt.tags };
 }
 
+/**
+ * Put a hand-added lead on a cadence board (e.g. nurture slow drip), or clear it.
+ * Always keeps / adds the board's tag so My leads can show it. → { ok, board, boardAt, adds, tags }
+ */
+function setLeadBoard({ ref, board = null, dryRun = false, now = new Date() } = {}) {
+  const p = parseAccountRef(ref); if (p.error) return { ok: false, reason: p.error };
+  let boardId = board == null || board === '' || board === false ? null : String(board).trim().toLowerCase();
+  if (boardId === 'none' || boardId === 'clear' || boardId === 'off') boardId = null;
+  if (boardId) {
+    const pack = require('./boards').loadPackFile(boardId);
+    if (!pack) return { ok: false, reason: `unknown board "${boardId}" (try nurture, post-demo, drip-hvac, …)` };
+  }
+  const adds = textLog.readManualRecords().adds.filter((a) => k15(a.accountId) === k15(p.id));
+  if (!adds.length) return { ok: false, reason: 'no lead added by hand matches that account — add them first (My leads / --add-lead), then mark Nurture' };
+  const at = (now instanceof Date ? now : new Date(now)).toISOString();
+  // Keep existing tags, ensure board tag is present when assigning; drop nurture tag when clearing nurture.
+  const beforeTags = [...new Set(adds.flatMap((a) => textLog.manualTags(a)))];
+  let afterTags = beforeTags.slice();
+  if (boardId) {
+    if (!afterTags.includes(boardId)) afterTags.push(boardId);
+  } else if (beforeTags.includes('nurture')) {
+    afterTags = afterTags.filter((t) => t !== 'nurture');
+    if (!afterTags.length) afterTags = ['referral'];
+  }
+  if (dryRun) return { ok: true, dryRun: true, board: boardId, boardAt: boardId ? at : null, adds, tags: afterTags, beforeTags };
+  const lines = [];
+  for (const a of adds) {
+    lines.push(JSON.stringify({ type: 'board', id: a.id, at, accountId: a.accountId, accountName: a.accountName, board: boardId }));
+    if (afterTags.join(',') !== textLog.manualTags(a).join(',')) {
+      lines.push(JSON.stringify({ type: 'tags', id: a.id, at, accountId: a.accountId, accountName: a.accountName, tags: afterTags }));
+    }
+  }
+  fs.appendFileSync(textLog.MANUAL_FILE, lines.join('\n') + '\n', 'utf8');
+  return { ok: true, dryRun: false, board: boardId, boardAt: boardId ? at : null, adds, tags: afterTags, beforeTags };
+}
+
+/** Shortcut: move a hand lead onto the slow nurture board. */
+function nurtureLead({ ref, dryRun = false, now = new Date() } = {}) {
+  return setLeadBoard({ ref, board: 'nurture', dryRun, now });
+}
+
 /** Take a lead added by hand back out: its touches are voided (readAll skips them) and it leaves the lists it was tagged into unless a real report has it too. → { ok, removed:[adds] } */
 function removeLead({ ref, dryRun = false } = {}) {
   const p = parseAccountRef(ref); if (p.error) return { ok: false, reason: p.error };
@@ -286,7 +327,7 @@ function emailStanding(leads, { minDays = 3 } = {}) {
 }
 
 // ---- command line ------------------------------------------------------------------------------------------------------------------------------------------------
-const VALUE_FLAGS = new Set(['--did', '--on', '--name', '--note', '--tag']);
+const VALUE_FLAGS = new Set(['--did', '--on', '--name', '--note', '--tag', '--board']);
 const BOOL_FLAGS = new Set(['--dry-run', '--again']);
 function parseArgs(tokens) {
   const o = { refs: [], flags: {} };
@@ -330,6 +371,22 @@ function cli(argv, out = console.log) {
     out('');
     return { code: 0, changed: !dry };
   }
+  if (cmd === '--nurture-lead' || cmd === '--set-board') {
+    if (a.refs.length !== 1) {
+      out(cmd === '--nurture-lead'
+        ? '\nUsage:  node textLog.js --nurture-lead <Salesforce account link or id> [--dry-run]\n        Puts a hand-added lead on the slow Nurture drip (~90 days).\n'
+        : '\nUsage:  node textLog.js --set-board <Salesforce account link or id> --board nurture|none [--dry-run]\n');
+      return { code: 1, changed: false };
+    }
+    const board = cmd === '--nurture-lead' ? 'nurture' : (a.flags['--board'] || null);
+    if (cmd === '--set-board' && board == null) { out('\n❌ --set-board needs --board nurture (or --board none to clear)\n'); return { code: 1, changed: false }; }
+    const r = setLeadBoard({ ref: a.refs[0], board, dryRun: dry });
+    if (!r.ok) { out(`\n❌ ${r.reason}\n`); return { code: 1, changed: false }; }
+    const name = (r.adds[0] && (r.adds[0].accountName || r.adds[0].accountId)) || a.refs[0];
+    if (r.board) out(`\n${dry ? '(dry run) would move' : '🌱 Moved'} ${name} onto the ${r.board} board (${hashTags(r.tags)}). Slow drip starts from this moment.\n`);
+    else out(`\n${dry ? '(dry run) would clear' : 'Cleared'} the board assignment for ${name} (${hashTags(r.tags)}).\n`);
+    return { code: 0, changed: !dry };
+  }
   if (cmd === '--tag-lead') {
     if (a.refs.length !== 1 || !a.flags['--tag']) { out('\nUsage:  node textLog.js --tag-lead <Salesforce account link or id> --tag shark|lds|<your own tag>[,…]     (replaces the lead\'s tags)\n'); return { code: 1, changed: false }; }
     const r = tagLead({ ref: a.refs[0], tags: a.flags['--tag'], dryRun: dry });
@@ -369,4 +426,4 @@ function cli(argv, out = console.log) {
   return { code: failed && !added ? 1 : 0, changed: added > 0 && !dry };
 }
 
-module.exports = { parseAccountRef, parseWhen, parseTags, addLead, tagLead, removeLead, listLeads, emailLeads, emailStanding, stage2Day, stage2Lines, cli, STAGE2_DAYS, DIDS, MAX_TAGS };
+module.exports = { parseAccountRef, parseWhen, parseTags, addLead, tagLead, setLeadBoard, nurtureLead, removeLead, listLeads, emailLeads, emailStanding, stage2Day, stage2Lines, cli, STAGE2_DAYS, DIDS, MAX_TAGS };

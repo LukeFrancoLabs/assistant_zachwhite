@@ -464,6 +464,15 @@ async function handleApi(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/daydesk') {
     try { return sendJson(res, 200, require('./dayDesk').build()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }
+  if (req.method === 'PUT' && url.pathname === '/api/leads/board') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    const id = j.accountId || j.id || j.ref;
+    if (!id) return sendJson(res, 400, { ok: false, error: 'accountId required' });
+    try {
+      return sendJson(res, 200, require('./dayDesk').setLeadBoard(id, j.board != null ? j.board : 'nurture'));
+    } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
   if (req.method === 'GET' && url.pathname === '/api/board') {
     try { return sendJson(res, 200, boardPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }

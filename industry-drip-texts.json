@@ -47,5 +47,17 @@
   "electrical-t4": {
     "name": "Electrical · Day 14 soft close",
     "text": "Last note (<first name> / Housecall Pro) — $26 first month, no contracts. Helps electrical shops book more service work and close panel jobs faster. Grab time or say stop: <booking link> / <call number>"
+  },
+  "nurture-t1": {
+    "name": "Nurture · Day 28 soft text",
+    "text": "Hey, it's <first name> at Housecall Pro — no rush on our end. Whenever timing's better for a look at scheduling / booking / getting paid in one place, I'm around: <booking link>"
+  },
+  "nurture-t2": {
+    "name": "Nurture · Day 60 soft text",
+    "text": "<first name> at HCP again. Still happy to walk through anything that would help the shop when you're ready — or tell me to pause. <booking link> / <call number>"
+  },
+  "nurture-t3": {
+    "name": "Nurture · Day 90 soft close",
+    "text": "Last soft note from me (<first name> @ Housecall Pro). Door's open if you ever want 15 mins on HCP — otherwise I'll leave you alone. <booking link>"
   }
 }
