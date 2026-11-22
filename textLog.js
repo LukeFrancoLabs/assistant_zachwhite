@@ -108,7 +108,14 @@ function readManualRecords() {
     if (r.type === 'remove') removed.add(r.id);
     else if (r.type === 'add') adds.push(r);
     else if (r.type === 'tags' && Array.isArray(r.tags)) retag.set(r.id, r.tags);
-    else if (r.type === 'board') reboard.set(r.id, { board: r.board || null, boardAt: r.at || null });
+    else if (r.type === 'board') {
+      reboard.set(r.id, {
+        board: r.board || null,
+        boardAt: r.at || null,
+        boardExpiresAt: r.expiresAt || r.boardExpiresAt || null,
+        graduatedFrom: r.graduatedFrom || null,
+      });
+    }
   }
   _manualRec = {
     sig,
@@ -121,6 +128,8 @@ function readManualRecords() {
           tags,
           board: b ? b.board : (a.board || null),
           boardAt: b ? b.boardAt : (a.boardAt || null),
+          boardExpiresAt: b ? b.boardExpiresAt : (a.boardExpiresAt || a.expiresAt || null),
+          graduatedFrom: b ? b.graduatedFrom : (a.graduatedFrom || null),
         };
       }),
       removed,
@@ -3619,7 +3628,7 @@ if (require.main === module) {
   // node textLog.js --add-lead <Salesforce account link or id> […] --tag shark,lds,referral   a lead you worked by hand (stage 1 done by you), #tagged with its kind, tracked for stage 2 (manualShark.js)
   // node textLog.js --tag-lead <link or id> --tag lds   change its tags  ·  --remove-lead <link or id>   take it back out  ·  --manual-leads   who was added, and when stage 2 starts
   // (--add-shark / --remove-shark / --manual-shark are the first names of the same three: --add-shark means --tag shark)
-  if (['--add-lead', '--tag-lead', '--remove-lead', '--manual-leads', '--nurture-lead', '--set-board', '--add-shark', '--remove-shark', '--manual-shark'].includes(argv[0])) {
+  if (['--add-lead', '--tag-lead', '--remove-lead', '--manual-leads', '--nurture-lead', '--set-board', '--graduate-nurture', '--add-shark', '--remove-shark', '--manual-shark'].includes(argv[0])) {
     const res = require('./manualShark').cli(argv);
     if (res.changed) console.log('dashboard written:', generateDashboard());
     process.exit(res.code);

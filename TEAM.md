@@ -15,7 +15,7 @@ Personal day management for every AE — morning queue, replies, post-call kit, 
 | **Today** | What already went out today |
 | Sends / Templates / Scoreboard / DNC | Same as before |
 
-**Nurture (slow drip):** On **My leads**, hit **Move to Nurture** when an opp isn’t ready. That tags `#nurture`, puts them on the ~90-day soft board (check-in → research → why-now), and pauses the active cadence for that lead. CLI: `node textLog.js --nurture-lead <SF link>`.
+**Nurture (slow drip):** On **My leads**, hit **Move to Nurture** when an opp isn’t ready. That tags `#nurture`, puts them on the ~90-day soft board, and sets an **expiration date** (default 90 days). When it expires they leave Nurture and land on the **Re-engage** list (`#reengage`) — Morning + My leads surface them for a fresh push. CLI: `node textLog.js --nurture-lead <SF link> [--expires-days 90]` · force the sweep: `node textLog.js --graduate-nurture`.
 
 Opens are not tracked (no pixels). Replies need a one-time Gmail feed per machine (`node replyPoller.js --setup`).
 

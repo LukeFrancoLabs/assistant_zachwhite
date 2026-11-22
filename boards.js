@@ -56,6 +56,8 @@ function loadPackFile(id) {
     industry: j.industry || null,
     fresh: !!j.fresh,
     autoDays: j.autoDays != null ? Number(j.autoDays) : null,
+    expiresDays: j.expiresDays != null ? Number(j.expiresDays) : null,
+    graduateTo: j.graduateTo || null,
     stages: j.stages.map((s, i) => ({
       outreach: s.outreach != null ? Number(s.outreach) : i + 1,
       afterMin: s.afterMin || 0,

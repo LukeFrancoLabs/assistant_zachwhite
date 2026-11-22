@@ -148,7 +148,7 @@ function morningFromPersonalBoard(now = new Date()) {
     const cfg = cadence.loadConfig();
     const members = cadence.members({ textLog, now }).filter((m) => m.hand);
     const evaluated = cadence.board(members, cfg, now);
-    return evaluated.filter((e) => e.dueNow || e.state === 'due').map((e) => ({
+    const due = evaluated.filter((e) => e.dueNow || e.state === 'due').map((e) => ({
       kind: 'board',
       priority: 3,
       title: e.next ? ('Due: ' + e.next.label) : 'Board due',
@@ -162,6 +162,19 @@ function morningFromPersonalBoard(now = new Date()) {
         ? 'zw --email --from-hand --range 1-1'
         : 'zw --text  (or email --board for the automatic stage)',
     }));
+    const reengage = members.filter((m) => m.onReengage).map((m) => ({
+      kind: 'reengage',
+      priority: 2,
+      title: 'Re-engage list',
+      name: m.name,
+      accountId: m.accountId,
+      url: m.url || sfUrl(m.accountId),
+      at: m.boardAt || m.enrolledAt || null,
+      detail: 'Nurture expired — ready for a fresh push',
+      stage: null,
+      action: 'zw --email --email-template research-reengage  (or day-after-demo / why-now)',
+    }));
+    return due.concat(reengage);
   } catch (_) { return []; }
 }
 
@@ -174,6 +187,13 @@ function myLeadsPayload(now = new Date()) {
     const evaluated = cadence.board(members, cfg, now);
     return evaluated.map((e) => {
       const onNurture = !!(e.lead.onNurture || e.boardId === 'nurture' || (e.lead.own || []).includes('nurture'));
+      const onReengage = !!(e.lead.onReengage || (!onNurture && (e.lead.own || []).includes('reengage')));
+      const expiresAt = e.lead.boardExpiresAt || null;
+      let expiresInDays = null;
+      if (onNurture && expiresAt) {
+        const ms = Date.parse(expiresAt) - now.getTime();
+        expiresInDays = Number.isFinite(ms) ? Math.ceil(ms / 864e5) : null;
+      }
       return {
         name: e.lead.name,
         accountId: e.lead.accountId,
@@ -188,10 +208,13 @@ function myLeadsPayload(now = new Date()) {
         board: e.boardId || e.lead.board || null,
         boardName: e.boardName || null,
         onNurture,
+        onReengage,
+        expiresAt,
+        expiresInDays,
         nurtureCommand: 'node textLog.js --nurture-lead ' + (e.lead.accountId || ''),
         addCommand: null,
       };
-    }).sort((a, b) => (b.dueNow ? 1 : 0) - (a.dueNow ? 1 : 0) || String(a.name).localeCompare(String(b.name)));
+    }).sort((a, b) => (b.onReengage ? 1 : 0) - (a.onReengage ? 1 : 0) || (b.dueNow ? 1 : 0) - (a.dueNow ? 1 : 0) || String(a.name).localeCompare(String(b.name)));
   } catch (_) { return []; }
 }
 
@@ -245,21 +268,27 @@ function todayPayload() {
 
 function howToAddLead() {
   return {
-    hint: 'After you talk to a pro, add them to your personal board so the next touch shows up here. Not ready now? Use Move to Nurture for the slow ~90-day drip.',
+    hint: 'After you talk to a pro, add them to your personal board so the next touch shows up here. Not ready now? Use Move to Nurture for the slow ~90-day drip (expires → Re-engage list).',
     command: 'node textLog.js --add-lead <Salesforce account link> --tag referral --did email,text,call',
     alt: 'Or open the full outreach log (email --sent) → Tools → Follow-up board → ➕ Add a lead.',
-    nurture: 'node textLog.js --nurture-lead <Salesforce account link>',
+    nurture: 'node textLog.js --nurture-lead <Salesforce account link> [--expires-days 90]',
   };
 }
 
-function setLeadBoard(accountId, board) {
+function setLeadBoard(accountId, board, opts = {}) {
   const manualShark = require('./manualShark');
-  const r = manualShark.setLeadBoard({ ref: accountId, board: board || null });
+  const r = manualShark.setLeadBoard({
+    ref: accountId,
+    board: board || null,
+    expiresAt: opts.expiresAt || null,
+    expiresDays: opts.expiresDays != null ? opts.expiresDays : null,
+  });
   if (!r.ok) return { ok: false, error: r.reason };
   return {
     ok: true,
     board: r.board,
     boardAt: r.boardAt,
+    boardExpiresAt: r.boardExpiresAt || null,
     tags: r.tags,
     myLeads: myLeadsPayload(new Date()),
   };

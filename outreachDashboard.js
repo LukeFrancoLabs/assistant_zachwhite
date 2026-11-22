@@ -470,7 +470,10 @@ async function handleApi(req, res, url) {
     const id = j.accountId || j.id || j.ref;
     if (!id) return sendJson(res, 400, { ok: false, error: 'accountId required' });
     try {
-      return sendJson(res, 200, require('./dayDesk').setLeadBoard(id, j.board != null ? j.board : 'nurture'));
+      return sendJson(res, 200, require('./dayDesk').setLeadBoard(id, j.board != null ? j.board : 'nurture', {
+        expiresAt: j.expiresAt || null,
+        expiresDays: j.expiresDays != null ? j.expiresDays : null,
+      }));
     } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }
   if (req.method === 'GET' && url.pathname === '/api/board') {

@@ -368,9 +368,15 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
   try { const hi = require('./holdInbox'); if (!holdRows) holdRows = hi.readAll(); holdOptOut = hi.OPT_OUT; } catch (_) { holdRows = holdRows || new Map(); }
   try { me = require('./threadReader').ME || me; } catch (_) {}
   const isMe = (sender) => !!sender && String(sender).toLowerCase().includes(me);
+  // Expire any nurture leads past their date → #reengage (idempotent; cheap when nobody is due)
+  try { require('./manualShark').graduateExpiredNurture({ now }); } catch (_) { /* ignore */ }
+
   const manual = new Map();
   for (const a of tl.readManualRecords().adds) {
-    const k = k15(a.accountId), cur = manual.get(k), one = { id: a.id, at: a.at, on: a.on, did: a.did || [], board: a.board || null, boardAt: a.boardAt || null };
+    const k = k15(a.accountId), cur = manual.get(k), one = {
+      id: a.id, at: a.at, on: a.on, did: a.did || [],
+      board: a.board || null, boardAt: a.boardAt || null, boardExpiresAt: a.boardExpiresAt || null,
+    };
     if (!cur) manual.set(k, { ...one, tags: [...tl.manualTags(a)] });
     else {
       for (const t of tl.manualTags(a)) if (!cur.tags.includes(t)) cur.tags.push(t);
@@ -379,6 +385,7 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
       if (a.boardAt && (!cur.boardAt || String(a.boardAt) >= String(cur.boardAt))) {
         cur.board = a.board || null;
         cur.boardAt = a.boardAt;
+        cur.boardExpiresAt = a.boardExpiresAt || null;
       }
     }
   }
@@ -405,7 +412,9 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
     if (!kinds.length && !own.length) continue;
     const board = (m && m.board) || (own.includes('nurture') ? 'nurture' : null);
     const boardAt = (m && m.boardAt) || null;
+    const boardExpiresAt = (m && m.boardExpiresAt) || null;
     const onNurture = board === 'nurture' || own.includes('nurture');
+    const onReengage = !onNurture && own.includes('reengage');
     const touches = (a.touches || []).map((t) => ({ ch: t.ch, at: t.at, mode: t.mode || null, title: t.title || null }));
     const ownTouches = touches.filter((t) => t.mode !== BLAST_MODE);      // what the board counts: a --blast email is a manual one-off, it neither starts a lead nor says when its cadence began
     const sn = snaps.get(k15(id));
@@ -433,8 +442,8 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
       repliedAt: Number.isFinite(lr) ? new Date(lr).toISOString() : null, teammateAt: tmAt, optedOut,
       repliedRecent: Number.isFinite(lr) && now.getTime() - lr <= BOARD_ACTIVE_DAYS * 864e5 && !giftAsk.get(k15(id)),      // the lead replied in the last 30 days (a real reply, not a hand note, and not a gift-card complaint): like boardWorked it is never parked as "older", so a pro who answered "why?" and went quiet is still reached (Luke, 2026-11-03: "Yes, include them")
       boardWorked: boardLast.has(k15(id)) && now.getTime() - boardLast.get(k15(id)) <= BOARD_ACTIVE_DAYS * 864e5,      // the board texted or emailed this lead in the last 30 days: it is mid-drip and keeps going past the 7-day window (see board())
-      board, boardAt, onNurture,
-      labelOnly: !kinds.length && !onNurture,       // tagged only with a label (#referral): held. #nurture is a real slow-drip board, not a hold label.
+      board, boardAt, boardExpiresAt, onNurture, onReengage,
+      labelOnly: !kinds.length && !onNurture,       // tagged only with a label (#referral / #reengage): held for a person. #nurture runs the slow drip.
       startable: !!(ownTouches.length || kinds.includes('Shark') || m || startNewLds || onNurture),
     });
   }
