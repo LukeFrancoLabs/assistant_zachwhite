@@ -10,10 +10,13 @@ Personal day management for every AE — morning queue, replies, post-call kit, 
 | **Replies** | Inbound replies this copy knows about |
 | **Quick kit** | Day-after-demo email, book-demo text, soft follow-ups — copy a command |
 | **My leads** | Hand-added follow-ups + next stage |
-| **Board** | Modular boards — Post-demo, **HVAC / Plumbing / Electrical** 2-week drips, cold drip; change **Day** + template per outreach |
+| **Board** | Default **HVAC board** as an n8n-style flow graph. Also **Plumbing**, **Electrical**, **Interior cleaning**, **Pressure washing**, Post-demo, Nurture, cold drip — switch pack, edit Day/template |
+| **Products** | Save pitched plan (**Essentials / Max / Above**) on My leads → tailored proposals + product-filtered blasts (`--product essentials --no-higher` skips Max/Above; DNC always out) |
 | **Content** | Sales Content Finder library — filter by trade / need / competitor, copy link or subject |
 | **Today** | What already went out today |
 | Sends / Templates / Scoreboard / DNC | Same as before |
+
+**Nurture until reconnect:** Pro says “talk in summer” and it’s fall? **Move to Nurture** and pick **summer** (or june / 2026-06-01 / 90 days). Touches stay **quiet** early, **ramp** in the last ~45 days before that date, then they land on **Re-engage** (`#reengage`). CLI: `node textLog.js --nurture-lead <SF link> --until summer` · preview plan: `node nurtureSchedule.js summer` · sweep: `node textLog.js --graduate-nurture`.
 
 Opens are not tracked (no pixels). Replies need a one-time Gmail feed per machine (`node replyPoller.js --setup`).
 
@@ -90,10 +93,20 @@ Per-rep `sender.json` (name, booking link, phone, text overrides) is **never** o
 
 ```text
 zw                  → welcome menu + Pipeline Assistant in the browser
+zwdemo              → director demo — filled Morning / Today / My leads (mock data, port 9341)
 Morning tab         → work the queue
 Quick kit           → after a call/demo, copy a send command
 My leads            → add the account after a good conversation
 ```
+
+### Director walkthrough (`zwdemo`)
+
+```bash
+zwdemo
+# or:  node outreachDashboard.js --demo
+```
+
+Opens **http://127.0.0.1:9341/** with a blue DEMO banner and mock HVAC shops, holds, interested replies, nurture → re-engage, and a full Today / Sends log. Nothing is written to real logs; live `zw` stays on port 9340.
 
 Add a lead from the terminal:
 
@@ -118,3 +131,17 @@ Browse in the **Content** tab, or pull assets into emails via `contentPicker.js`
 ## Your own Pipeline Assistant
 
 Same app — just run `zw`. Shark / report / Claude-off tooling stays on your copy; reps mostly live in Morning → Kit → My leads.
+
+### Mac Mini not updating? (`file://…/outreach-dashboard/index.html`)
+
+That URL is the **old static page** from `main`. Pipeline Assistant needs localhost + the feature branch:
+
+```bash
+cd ~/assistant_zachwhite
+git fetch origin
+git checkout cursor/nurture-slow-drip-bcc4   # or cursor/claude-off-full-list-harvest-ed5f after nurture merges
+git pull
+node outreachDashboard.js --serve           # leave this running, OR just run zw (it starts serve)
+```
+
+You should see **http://127.0.0.1:9340/** with Morning / Board / Content / My leads — not a `file://` path. If serve fails, check `outreach-dashboard/server.log`.

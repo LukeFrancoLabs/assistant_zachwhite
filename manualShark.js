@@ -225,6 +225,213 @@ function tagLead({ ref, tags = null, dryRun = false } = {}) {
   return { ok: true, dryRun: !!dryRun, adds, before, after: pt.tags };
 }
 
+function addDaysIso(isoOrDate, days) {
+  const d = new Date(isoOrDate);
+  d.setUTCDate(d.getUTCDate() + Number(days));
+  return d.toISOString();
+}
+
+function parseExpiresInput(expiresAt, expiresDays, boardAt, pack) {
+  if (expiresAt) {
+    const t = Date.parse(expiresAt);
+    if (!Number.isFinite(t)) return { error: `cannot read expiresAt "${expiresAt}"` };
+    return { expiresAt: new Date(t).toISOString() };
+  }
+  const days = expiresDays != null && expiresDays !== ''
+    ? Number(expiresDays)
+    : (pack && pack.expiresDays != null ? Number(pack.expiresDays) : null);
+  if (days == null || !Number.isFinite(days)) return { expiresAt: null };
+  if (days < 1 || days > 730) return { error: 'expiresDays must be between 1 and 730' };
+  return { expiresAt: addDaysIso(boardAt, days), expiresDays: days };
+}
+
+/**
+ * Put a hand-added lead on a cadence board (e.g. nurture slow drip), or clear it.
+ * Nurture: pass reconnect ("summer", "june", "2026-06-01") so touches stay sparse until
+ * near that date, then ramp and graduate to #reengage.
+ * → { ok, board, boardAt, boardExpiresAt, reconnectAt, reconnectLabel, plan, adds, tags }
+ */
+function setLeadBoard({
+  ref, board = null, dryRun = false, now = new Date(),
+  expiresAt = null, expiresDays = null, reconnect = null, graduateTo = null,
+} = {}) {
+  const p = parseAccountRef(ref); if (p.error) return { ok: false, reason: p.error };
+  let boardId = board == null || board === '' || board === false ? null : String(board).trim().toLowerCase();
+  if (boardId === 'none' || boardId === 'clear' || boardId === 'off') boardId = null;
+  let pack = null;
+  if (boardId) {
+    pack = require('./boards').loadPackFile(boardId);
+    if (!pack) return { ok: false, reason: `unknown board "${boardId}" (try nurture, post-demo, drip-hvac, …)` };
+  }
+  const adds = textLog.readManualRecords().adds.filter((a) => k15(a.accountId) === k15(p.id));
+  if (!adds.length) return { ok: false, reason: 'no lead added by hand matches that account — add them first (My leads / --add-lead), then mark Nurture' };
+  const at = (now instanceof Date ? now : new Date(now)).toISOString();
+
+  let plan = null;
+  let exp = { expiresAt: null };
+  if (boardId === 'nurture') {
+    const sched = require('./nurtureSchedule');
+    const opts = { from: at };
+    if (reconnect) opts.reconnect = reconnect;
+    else if (expiresAt) opts.until = expiresAt;
+    else if (expiresDays != null && expiresDays !== '') opts.reconnect = String(expiresDays) + ' days';
+    else opts.reconnect = String((pack && pack.expiresDays) || 90) + ' days';
+    plan = sched.buildNurturePlan(opts);
+    if (plan.error) return { ok: false, reason: plan.error };
+    exp = { expiresAt: plan.expiresAt };
+  } else if (boardId) {
+    exp = parseExpiresInput(expiresAt, expiresDays, at, pack);
+    if (exp.error) return { ok: false, reason: exp.error };
+  }
+
+  // Keep existing tags, ensure board tag is present when assigning; drop nurture tag when clearing nurture.
+  const beforeTags = [...new Set(adds.flatMap((a) => textLog.manualTags(a)))];
+  let afterTags = beforeTags.slice();
+  if (boardId) {
+    if (!afterTags.includes(boardId)) afterTags.push(boardId);
+    // Leaving re-engage when going back into an active / nurture board
+    afterTags = afterTags.filter((t) => t !== 'reengage');
+  } else {
+    // Clearing board: expire→reengage keeps a destination tag; manual leave / Back to active drops both.
+    afterTags = afterTags.filter((t) => t !== 'nurture');
+    if (graduateTo) {
+      if (!afterTags.includes(graduateTo)) afterTags.push(graduateTo);
+    } else {
+      afterTags = afterTags.filter((t) => t !== 'reengage');
+    }
+    if (!afterTags.length) afterTags = ['referral'];
+  }
+  const out = {
+    ok: true,
+    dryRun: !!dryRun,
+    board: boardId,
+    boardAt: boardId ? at : null,
+    boardExpiresAt: boardId ? exp.expiresAt : null,
+    reconnectAt: plan ? plan.reconnectAt : null,
+    reconnectLabel: plan ? plan.reconnectLabel : null,
+    plan: plan || null,
+    adds,
+    tags: afterTags,
+    beforeTags,
+  };
+  if (dryRun) return out;
+  const lines = [];
+  for (const a of adds) {
+    const row = { type: 'board', id: a.id, at, accountId: a.accountId, accountName: a.accountName, board: boardId };
+    if (exp.expiresAt) row.expiresAt = exp.expiresAt;
+    if (plan) {
+      row.reconnectAt = plan.reconnectAt;
+      row.reconnectLabel = plan.reconnectLabel;
+      row.stages = plan.stages;
+      row.spanDays = plan.spanDays;
+    }
+    if (graduateTo) row.graduatedFrom = 'nurture';
+    lines.push(JSON.stringify(row));
+    if (afterTags.join(',') !== textLog.manualTags(a).join(',')) {
+      lines.push(JSON.stringify({ type: 'tags', id: a.id, at, accountId: a.accountId, accountName: a.accountName, tags: afterTags }));
+    }
+  }
+  fs.appendFileSync(textLog.MANUAL_FILE, lines.join('\n') + '\n', 'utf8');
+  return out;
+}
+
+/** Shortcut: move a hand lead onto nurture until reconnect (summer / date / N days). */
+function nurtureLead({ ref, dryRun = false, now = new Date(), expiresAt = null, expiresDays = null, reconnect = null } = {}) {
+  return setLeadBoard({ ref, board: 'nurture', dryRun, now, expiresAt, expiresDays, reconnect });
+}
+
+/**
+ * Save which HCP product(s) were pitched on this opportunity (Essentials / Max / Above).
+ * Used for tailored proposals and product-filtered email blasts.
+ * → { ok, products, primary, adds }
+ */
+function setLeadProducts({ ref, products = null, primary = null, note = null, dryRun = false, now = new Date() } = {}) {
+  const p = parseAccountRef(ref); if (p.error) return { ok: false, reason: p.error };
+  const catalog = require('./products');
+  const norm = catalog.normalizeIds(products);
+  if (norm.error) return { ok: false, reason: norm.error };
+  let primaryId = primary ? String(primary).toLowerCase().trim() : null;
+  if (primaryId && !norm.ids.includes(primaryId)) {
+    return { ok: false, reason: `primary "${primaryId}" must be one of the pitched products (${norm.ids.join(', ')})` };
+  }
+  if (!primaryId) {
+    const resolved = catalog.resolve(norm.ids);
+    primaryId = resolved.primary ? resolved.primary.id : norm.ids[0];
+  }
+  const adds = textLog.readManualRecords().adds.filter((a) => k15(a.accountId) === k15(p.id));
+  if (!adds.length) return { ok: false, reason: 'no lead added by hand matches that account — add them first (My leads / --add-lead), then set products' };
+  const at = (now instanceof Date ? now : new Date(now)).toISOString();
+  const resolved = catalog.resolve(norm.ids);
+  const out = {
+    ok: true,
+    dryRun: !!dryRun,
+    products: norm.ids,
+    primary: primaryId,
+    catalog: resolved.products,
+    primaryProduct: resolved.products.find((x) => x.id === primaryId) || resolved.primary,
+    adds,
+    proposal: catalog.proposalTokens(resolved.products.find((x) => x.id === primaryId) || resolved.primary),
+  };
+  if (dryRun) return out;
+  const lines = adds.map((a) => JSON.stringify({
+    type: 'product',
+    id: a.id,
+    at,
+    accountId: a.accountId,
+    accountName: a.accountName,
+    products: norm.ids,
+    primary: primaryId,
+    note: note ? String(note).trim() : null,
+  }));
+  fs.appendFileSync(textLog.MANUAL_FILE, lines.join('\n') + '\n', 'utf8');
+  return out;
+}
+
+/**
+ * Nurture leads whose expiration date has passed → off nurture, onto #reengage list.
+ * Safe to call often (dayDesk / members); only writes when someone actually expires.
+ * → { graduated: [{ accountId, name, expiresAt, tags }], skipped }
+ */
+function graduateExpiredNurture({ now = new Date(), dryRun = false } = {}) {
+  const t = now instanceof Date ? now : new Date(now);
+  const pack = require('./boards').loadPackFile('nurture') || {};
+  const defaultDays = Number.isFinite(Number(pack.expiresDays)) ? Number(pack.expiresDays) : 90;
+  const dest = pack.graduateTo || 'reengage';
+  const byAcct = new Map();
+  for (const a of textLog.readManualRecords().adds) {
+    const k = k15(a.accountId);
+    if (!k) continue;
+    const onNur = a.board === 'nurture' || textLog.manualTags(a).includes('nurture');
+    if (!onNur) continue;
+    const cur = byAcct.get(k);
+    if (!cur || String(a.boardAt || a.on || '') >= String(cur.boardAt || '')) {
+      byAcct.set(k, a);
+    }
+  }
+  const graduated = [];
+  for (const a of byAcct.values()) {
+    const start = a.boardAt || a.on;
+    let expMs = a.boardExpiresAt ? Date.parse(a.boardExpiresAt) : NaN;
+    if (!Number.isFinite(expMs) && start) expMs = Date.parse(addDaysIso(start, defaultDays));
+    if (!Number.isFinite(expMs) || expMs > t.getTime()) continue;
+    const r = setLeadBoard({
+      ref: a.accountId,
+      board: null,
+      dryRun,
+      now: t,
+      graduateTo: dest,
+    });
+    if (!r.ok) continue;
+    graduated.push({
+      accountId: a.accountId,
+      name: a.accountName || a.accountId,
+      expiresAt: a.boardExpiresAt || (Number.isFinite(expMs) ? new Date(expMs).toISOString() : null),
+      tags: r.tags,
+    });
+  }
+  return { graduated, dest, dryRun: !!dryRun };
+}
+
 /** Take a lead added by hand back out: its touches are voided (readAll skips them) and it leaves the lists it was tagged into unless a real report has it too. → { ok, removed:[adds] } */
 function removeLead({ ref, dryRun = false } = {}) {
   const p = parseAccountRef(ref); if (p.error) return { ok: false, reason: p.error };
@@ -286,8 +493,8 @@ function emailStanding(leads, { minDays = 3 } = {}) {
 }
 
 // ---- command line ------------------------------------------------------------------------------------------------------------------------------------------------
-const VALUE_FLAGS = new Set(['--did', '--on', '--name', '--note', '--tag']);
-const BOOL_FLAGS = new Set(['--dry-run', '--again']);
+const VALUE_FLAGS = new Set(['--did', '--on', '--name', '--note', '--tag', '--board', '--expires', '--expires-days', '--until', '--reconnect', '--product', '--products', '--primary']);
+const BOOL_FLAGS = new Set(['--dry-run', '--again', '--no-higher']);
 function parseArgs(tokens) {
   const o = { refs: [], flags: {} };
   for (let i = 0; i < tokens.length; i++) {
@@ -330,6 +537,67 @@ function cli(argv, out = console.log) {
     out('');
     return { code: 0, changed: !dry };
   }
+  if (cmd === '--graduate-nurture') {
+    const r = graduateExpiredNurture({ dryRun: dry });
+    out(`\n🌱→📣 Nurture → Re-engage — ${r.graduated.length} expired\n`);
+    for (const g of r.graduated) {
+      out(`  ${g.name}  ${g.accountId}  expired ${String(g.expiresAt || '').slice(0, 10)}  → ${hashTags(g.tags || [r.dest])}`);
+    }
+    if (!r.graduated.length) out('  (nobody past their nurture expiration date)');
+    out('');
+    return { code: 0, changed: !dry && r.graduated.length > 0 };
+  }
+  if (cmd === '--product-lead') {
+    if (a.refs.length !== 1 || !(a.flags['--product'] || a.flags['--products'])) {
+      out('\nUsage:  node textLog.js --product-lead <SF link> --product essentials|max|above[,…] [--primary essentials] [--note "…"] [--dry-run]\n        Save what was pitched so proposals + product blasts stay accurate.\n');
+      return { code: 1, changed: false };
+    }
+    const r = setLeadProducts({
+      ref: a.refs[0],
+      products: a.flags['--product'] || a.flags['--products'],
+      primary: a.flags['--primary'] || null,
+      note: a.flags['--note'] || null,
+      dryRun: dry,
+    });
+    if (!r.ok) { out(`\n❌ ${r.reason}\n`); return { code: 1, changed: false }; }
+    const name = (r.adds[0] && (r.adds[0].accountName || r.adds[0].accountId)) || a.refs[0];
+    const labels = (r.catalog || []).map((p) => p.name + (p.id === r.primary ? ' (primary)' : '')).join(', ');
+    out(`\n${dry ? '(dry run) would save' : '📦 Saved'} products for ${name}: ${labels}`);
+    if (r.proposal && r.proposal.product_price) out(`   Proposal price: ${r.proposal.product_price}${r.proposal.product_promo ? ' · promo ' + r.proposal.product_promo : ''}`);
+    out(`   Essentials-only blast later:  email --email --blast --product essentials --no-higher\n`);
+    return { code: 0, changed: !dry };
+  }
+  if (cmd === '--nurture-lead' || cmd === '--set-board') {
+    if (a.refs.length !== 1) {
+      out(cmd === '--nurture-lead'
+        ? '\nUsage:  node textLog.js --nurture-lead <SF link> [--until summer|june|2026-06-01|90 days] [--dry-run]\n        Quiet nurture until reconnect, then ramp and move to #reengage.\n'
+        : '\nUsage:  node textLog.js --set-board <SF link> --board nurture|none [--until summer] [--dry-run]\n');
+      return { code: 1, changed: false };
+    }
+    const board = cmd === '--nurture-lead' ? 'nurture' : (a.flags['--board'] || null);
+    if (cmd === '--set-board' && board == null) { out('\n❌ --set-board needs --board nurture (or --board none to clear)\n'); return { code: 1, changed: false }; }
+    const r = setLeadBoard({
+      ref: a.refs[0],
+      board,
+      dryRun: dry,
+      expiresAt: a.flags['--expires'] || null,
+      expiresDays: a.flags['--expires-days'] || null,
+      reconnect: a.flags['--until'] || a.flags['--reconnect'] || null,
+    });
+    if (!r.ok) { out(`\n❌ ${r.reason}\n`); return { code: 1, changed: false }; }
+    const name = (r.adds[0] && (r.adds[0].accountName || r.adds[0].accountId)) || a.refs[0];
+    if (r.board) {
+      const when = r.reconnectLabel || (r.boardExpiresAt ? dayName(new Date(r.boardExpiresAt)) : '');
+      const span = r.plan && r.plan.spanDays ? `${r.plan.spanDays}d` : '';
+      out(`\n${dry ? '(dry run) would move' : '🌱 Moved'} ${name} onto nurture until ${when}${span ? ` (${span})` : ''} → then #reengage (${hashTags(r.tags)}).`);
+      if (r.plan && r.plan.stages) {
+        out('   Quiet early, ramp near reconnect:');
+        for (const s of r.plan.stages) out(`     Day ${String(s.day).padStart(3)}  ${s.ch}  ${s.label}`);
+      }
+      out('');
+    } else out(`\n${dry ? '(dry run) would clear' : 'Cleared'} the board assignment for ${name} (${hashTags(r.tags)}).\n`);
+    return { code: 0, changed: !dry };
+  }
   if (cmd === '--tag-lead') {
     if (a.refs.length !== 1 || !a.flags['--tag']) { out('\nUsage:  node textLog.js --tag-lead <Salesforce account link or id> --tag shark|lds|<your own tag>[,…]     (replaces the lead\'s tags)\n'); return { code: 1, changed: false }; }
     const r = tagLead({ ref: a.refs[0], tags: a.flags['--tag'], dryRun: dry });
@@ -369,4 +637,8 @@ function cli(argv, out = console.log) {
   return { code: failed && !added ? 1 : 0, changed: added > 0 && !dry };
 }
 
-module.exports = { parseAccountRef, parseWhen, parseTags, addLead, tagLead, removeLead, listLeads, emailLeads, emailStanding, stage2Day, stage2Lines, cli, STAGE2_DAYS, DIDS, MAX_TAGS };
+module.exports = {
+  parseAccountRef, parseWhen, parseTags, addLead, tagLead, setLeadBoard, nurtureLead,
+  setLeadProducts, graduateExpiredNurture, removeLead, listLeads, emailLeads, emailStanding,
+  stage2Day, stage2Lines, cli, STAGE2_DAYS, DIDS, MAX_TAGS,
+};

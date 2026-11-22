@@ -1,0 +1,86 @@
+{
+  "id": "drip-pressure-washing",
+  "name": "Pressure washing board (2 weeks)",
+  "description": "Our pressure / exterior washing cadence — texts + emails over ~14 days (season, booking, quotes, reviews, soft close). Shown as a flow graph on the Board tab.",
+  "tag": "pressure-washing",
+  "industry": "Pressure washing",
+  "stages": [
+    {
+      "id": "pw1",
+      "outreach": 1,
+      "day": 0,
+      "ch": "text",
+      "n": 1,
+      "label": "Day 0 · Text intro",
+      "template": "pressure-t1",
+      "afterMin": 0,
+      "hint": "First touch — spring / driveways / house wash season angle."
+    },
+    {
+      "id": "pw2",
+      "outreach": 2,
+      "day": 1,
+      "ch": "email",
+      "n": 1,
+      "label": "Day 1 · Email opener",
+      "emailTemplate": "pressure-drip-1",
+      "afterMin": 0,
+      "hint": "Email — booking + dispatch for exterior washing Pros."
+    },
+    {
+      "id": "pw3",
+      "outreach": 3,
+      "day": 3,
+      "ch": "text",
+      "n": 2,
+      "label": "Day 3 · Text booking",
+      "template": "pressure-t2",
+      "afterMin": 0,
+      "hint": "Online booking from Google while you're on a wash."
+    },
+    {
+      "id": "pw4",
+      "outreach": 4,
+      "day": 5,
+      "ch": "email",
+      "n": 2,
+      "label": "Day 5 · Email get paid",
+      "emailTemplate": "pressure-drip-2",
+      "afterMin": 0,
+      "hint": "Invoice + card / ACH before you roll the hose."
+    },
+    {
+      "id": "pw5",
+      "outreach": 5,
+      "day": 8,
+      "ch": "text",
+      "n": 3,
+      "label": "Day 8 · Text pipeline",
+      "template": "pressure-t3",
+      "afterMin": 0,
+      "hint": "Driveway / house quotes going cold — Pipeline nudges."
+    },
+    {
+      "id": "pw6",
+      "outreach": 6,
+      "day": 11,
+      "ch": "email",
+      "n": 3,
+      "label": "Day 11 · Email season + reviews",
+      "emailTemplate": "pressure-drip-3",
+      "afterMin": 0,
+      "hint": "Seasonal campaigns + Google reviews after every wash."
+    },
+    {
+      "id": "pw7",
+      "outreach": 7,
+      "day": 14,
+      "ch": "text",
+      "n": 4,
+      "label": "Day 14 · Text soft close",
+      "template": "pressure-t4",
+      "afterMin": 0,
+      "hint": "Soft close — book a demo or leave it here."
+    }
+  ]
+}

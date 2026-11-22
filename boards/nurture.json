@@ -1,0 +1,78 @@
+{
+  "id": "nurture",
+  "name": "Nurture (slow drip)",
+  "description": "Keep-warm until a reconnect date (e.g. summer). Quiet early, ramp in the last ~45 days, then graduate to #reengage. Set timing with --until summer / Move to Nurture.",
+  "tag": "nurture",
+  "fresh": true,
+  "autoDays": 400,
+  "expiresDays": 90,
+  "graduateTo": "reengage",
+  "stages": [
+    {
+      "id": "nur1",
+      "outreach": 1,
+      "day": 14,
+      "ch": "email",
+      "n": 1,
+      "label": "Day 14 · Soft check-in",
+      "emailTemplate": "nurture-checkin",
+      "afterMin": 0,
+      "hint": "First nurture touch — light value, no hard close."
+    },
+    {
+      "id": "nur2",
+      "outreach": 2,
+      "day": 28,
+      "ch": "text",
+      "n": 1,
+      "label": "Day 28 · Soft text",
+      "template": "nurture-t1",
+      "afterMin": 0,
+      "hint": "Short respectful ping ~2 weeks after the check-in email."
+    },
+    {
+      "id": "nur3",
+      "outreach": 3,
+      "day": 45,
+      "ch": "email",
+      "n": 2,
+      "label": "Day 45 · Research note",
+      "emailTemplate": "nurture-research",
+      "afterMin": 0,
+      "hint": "Share a useful angle (repeat jobs / ops) without pressure."
+    },
+    {
+      "id": "nur4",
+      "outreach": 4,
+      "day": 60,
+      "ch": "text",
+      "n": 2,
+      "label": "Day 60 · Soft text",
+      "template": "nurture-t2",
+      "afterMin": 0,
+      "hint": "Second soft text — booking link only if they want it."
+    },
+    {
+      "id": "nur5",
+      "outreach": 5,
+      "day": 75,
+      "ch": "email",
+      "n": 3,
+      "label": "Day 75 · Why now",
+      "emailTemplate": "nurture-why-now",
+      "afterMin": 0,
+      "hint": "Gentle timing email — still easy to ignore."
+    },
+    {
+      "id": "nur6",
+      "outreach": 6,
+      "day": 90,
+      "ch": "text",
+      "n": 3,
+      "label": "Day 90 · Soft close",
+      "template": "nurture-t3",
+      "afterMin": 0,
+      "hint": "Last nurture touch — leave the door open."
+    }
+  ]
+}

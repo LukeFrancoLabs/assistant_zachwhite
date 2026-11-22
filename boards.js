@@ -54,6 +54,10 @@ function loadPackFile(id) {
     description: j.description || '',
     tag: j.tag || null,
     industry: j.industry || null,
+    fresh: !!j.fresh,
+    autoDays: j.autoDays != null ? Number(j.autoDays) : null,
+    expiresDays: j.expiresDays != null ? Number(j.expiresDays) : null,
+    graduateTo: j.graduateTo || null,
     stages: j.stages.map((s, i) => ({
       outreach: s.outreach != null ? Number(s.outreach) : i + 1,
       afterMin: s.afterMin || 0,
@@ -68,7 +72,16 @@ function loadPackFile(id) {
 }
 
 function listPacks() {
-  const ORDER = ['post-demo', 'drip-hvac', 'drip-plumbing', 'drip-electrical', 'drip'];
+  const ORDER = [
+    'drip-hvac',
+    'drip-plumbing',
+    'drip-electrical',
+    'drip-cleaning',
+    'drip-pressure-washing',
+    'post-demo',
+    'nurture',
+    'drip',
+  ];
   const byId = new Map();
   byId.set('drip', dripPack());
   try {
@@ -104,7 +117,7 @@ function writeLocal(obj) {
 function activeBoardId() {
   const local = readLocal();
   if (local.activeBoard && loadPackFile(local.activeBoard)) return local.activeBoard;
-  return 'post-demo'; // default for Pipeline Assistant reps: post-demo board
+  return 'drip-hvac'; // default for this team: HVAC drip board
 }
 
 function setActiveBoard(id) {
@@ -150,15 +163,18 @@ function mergeStage(base, over) {
   return out;
 }
 
-function loadActive() {
-  const id = activeBoardId();
+function loadPackMerged(id) {
   const pack = loadPackFile(id);
-  if (!pack) return loadPackFile('drip');
+  if (!pack) return null;
   const over = id === 'drip'
     ? { ...legacyDripOverrides(), ...packOverrides('drip') }
     : packOverrides(id);
   const stages = pack.stages.map((s) => mergeStage(s, over[s.id]));
   return { ...pack, stages, overrides: over };
+}
+
+function loadActive() {
+  return loadPackMerged(activeBoardId()) || loadPackMerged('drip');
 }
 
 /**
@@ -247,10 +263,24 @@ function stagesForCadence() {
   return loadActive().stages;
 }
 
+/** Cadence config fragment for a named pack (nurture, post-demo, …). */
+function configForPack(id, base = {}) {
+  const pack = loadPackMerged(id);
+  if (!pack) return null;
+  return {
+    ...base,
+    stages: pack.stages,
+    boardId: pack.id,
+    boardName: pack.name,
+    boardFresh: !!pack.fresh,
+    autoDays: pack.autoDays != null && Number.isFinite(pack.autoDays) ? pack.autoDays : (base.autoDays != null ? base.autoDays : 7),
+  };
+}
+
 module.exports = {
   DIR, LOCAL_FILE,
-  listPacks, loadPackFile, loadActive, activeBoardId, setActiveBoard,
-  saveStage, packOverrides, suggestNextStepsDay, stagesForCadence,
+  listPacks, loadPackFile, loadPackMerged, loadActive, activeBoardId, setActiveBoard,
+  saveStage, packOverrides, suggestNextStepsDay, stagesForCadence, configForPack,
 };
 
 if (require.main === module) {

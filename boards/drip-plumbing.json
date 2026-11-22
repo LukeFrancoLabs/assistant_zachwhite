@@ -1,7 +1,7 @@
 {
   "id": "drip-plumbing",
-  "name": "Plumbing drip (2 weeks)",
-  "description": "Industry drip for plumbing — texts + emails over ~14 days (emergencies, booking, paid invoices, pipeline, soft close). Modular: edit Day or template anytime.",
+  "name": "Plumbing board (2 weeks)",
+  "description": "Our plumbing cadence — texts + emails over ~14 days (emergencies → booking → paid on-site → pipeline → campaigns → soft close). Shown as a flow graph on the Board tab.",
   "tag": "plumbing",
   "industry": "Plumbing",
   "stages": [

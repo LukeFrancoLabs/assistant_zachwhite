@@ -1,7 +1,7 @@
 {
   "id": "drip-electrical",
-  "name": "Electrical drip (2 weeks)",
-  "description": "Industry drip for electrical — texts + emails over ~14 days (panel/service mix, booking, financing, pipeline, soft close). Modular days + templates.",
+  "name": "Electrical board (2 weeks)",
+  "description": "Our electrical cadence — texts + emails over ~14 days (panel/service → booking → financing → pipeline → reviews → soft close). Shown as a flow graph on the Board tab.",
   "tag": "electrical",
   "industry": "Electrical",
   "stages": [

@@ -47,5 +47,49 @@
   "electrical-t4": {
     "name": "Electrical · Day 14 soft close",
     "text": "Last note (<first name> / Housecall Pro) — $26 first month, no contracts. Helps electrical shops book more service work and close panel jobs faster. Grab time or say stop: <booking link> / <call number>"
+  },
+  "cleaning-t1": {
+    "name": "Interior cleaning · Day 0 intro",
+    "text": "Hey, it's <first name> at Housecall Pro. Recurring cleans fall apart when booking and no-shows live in texts. HCP keeps schedule, online booking, and follow-up in one place. Worth a quick look? <booking link>"
+  },
+  "cleaning-t2": {
+    "name": "Interior cleaning · Day 3 booking",
+    "text": "<first name> at Housecall Pro — online booking lets homeowners book a one-time or recurring clean from your site or Google, and you get the alert right away. Fewer phone tags between jobs. See it: <booking link>"
+  },
+  "cleaning-t3": {
+    "name": "Interior cleaning · Day 8 pipeline",
+    "text": "Follow-up from <first name> @ HCP. Move-out and deep-clean quotes go quiet when the calendar fills. Pipeline keeps every lead visible and nudges them for you. 10 mins? <booking link>"
+  },
+  "cleaning-t4": {
+    "name": "Interior cleaning · Day 14 soft close",
+    "text": "Last note from me (<first name> @ HCP) — $26 first month, no contracts. Built for cleaning Pros who want fewer no-shows and steadier recurring work. Book or say stop: <booking link> / <call number>"
+  },
+  "pressure-t1": {
+    "name": "Pressure washing · Day 0 intro",
+    "text": "Hey, it's <first name> at Housecall Pro. Spring house-wash and driveway season fills fast — HCP keeps booking, dispatch, and quote follow-up in one app so leads don't die in your camera roll. Open to a look? <booking link>"
+  },
+  "pressure-t2": {
+    "name": "Pressure washing · Day 3 booking",
+    "text": "<first name> at Housecall Pro — online booking lets homeowners request a wash from Google while you're on a job, and you get the alert immediately. Fuller calendar, less phone tag. See how: <booking link>"
+  },
+  "pressure-t3": {
+    "name": "Pressure washing · Day 8 pipeline",
+    "text": "Quick one from <first name> @ HCP. Driveway and house quotes often go cold after the estimate photo. Pipeline tracks every lead and follows up for you. Want a 10-min walkthrough? <booking link>"
+  },
+  "pressure-t4": {
+    "name": "Pressure washing · Day 14 soft close",
+    "text": "Wrapping up (<first name> / Housecall Pro) — $26 first month, no contracts. Helps pressure-washing Pros book the season and close more washes. Grab time or tell me to stop: <booking link> / <call number>"
+  },
+  "nurture-t1": {
+    "name": "Nurture · Day 28 soft text",
+    "text": "Hey, it's <first name> at Housecall Pro — no rush on our end. Whenever timing's better for a look at scheduling / booking / getting paid in one place, I'm around: <booking link>"
+  },
+  "nurture-t2": {
+    "name": "Nurture · Day 60 soft text",
+    "text": "<first name> at HCP again. Still happy to walk through anything that would help the shop when you're ready — or tell me to pause. <booking link> / <call number>"
+  },
+  "nurture-t3": {
+    "name": "Nurture · Day 90 soft close",
+    "text": "Last soft note from me (<first name> @ Housecall Pro). Door's open if you ever want 15 mins on HCP — otherwise I'll leave you alone. <booking link>"
   }
 }

@@ -26,7 +26,8 @@
  * happened. A blast email still counts as an EMAIL everywhere else: the once-a-day guard, never the same email twice, the daily email cap, the sequence's "last email was N days ago" spacing, and the
  * next blast's "emailed in the last N days".
  *
- *   node emailBlast.js [--days N] [--include-never-emailed] [--list shark|lds|email-report|free-plan]   the audience (no browser, nothing sent)
+ *   node emailBlast.js [--days N] [--include-never-emailed] [--list shark|lds|email-report|free-plan]
+ *                       [--product essentials] [--no-higher]   product-filtered blast (DNC already excluded via the board)
  */
 
 const fs = require('fs');
@@ -61,10 +62,16 @@ function lastEmailOf(lead) {
  * leads = [{ accountId, name, url, lastEmailAt, lastEmailTitle, daysSince, kinds }] in the order the run takes them (never an `email`, `subject`, `body`, `source` or `step`: the email run reads those).
  * stats partitions the pool: pool = labelOnly + wrongList + onList; onList = tooRecent + never + stale; ready = stale (+ never when included) - replied - noAddress.
  */
-function audience(members, { now = new Date(), days = DEFAULT_DAYS, includeNever = false, list = null } = {}) {
+function audience(members, { now = new Date(), days = DEFAULT_DAYS, includeNever = false, list = null, product = null, noHigher = false } = {}) {
   const cutoff = now.getTime() - days * 864e5;
-  const s = { pool: 0, labelOnly: 0, wrongList: 0, onList: 0, tooRecent: 0, never: 0, stale: 0, replied: 0, noAddress: 0, ready: 0, byList: {}, oldest: null, newest: null };
+  const s = {
+    pool: 0, labelOnly: 0, wrongList: 0, onList: 0, wrongProduct: 0, noProduct: 0,
+    tooRecent: 0, never: 0, stale: 0, replied: 0, noAddress: 0, ready: 0,
+    byList: {}, byProduct: {}, oldest: null, newest: null,
+  };
   const emailed = [], never = [];
+  let productsMod = null;
+  try { productsMod = require('./products'); } catch (_) { productsMod = null; }
   for (const l of members || []) {
     if (!l || !l.accountId) continue;
     s.pool++;
@@ -72,6 +79,14 @@ function audience(members, { now = new Date(), days = DEFAULT_DAYS, includeNever
     if (!kinds.length) { s.labelOnly++; continue; }
     if (list && !kinds.includes(list)) { s.wrongList++; continue; }
     s.onList++;
+    if (product) {
+      const ids = l.productIds || [];
+      if (!ids.length && !l.primaryProductId) { s.noProduct++; continue; }
+      const ok = productsMod
+        ? productsMod.matchesLead(l, { productId: product, noHigher: !!noHigher })
+        : ids.map((x) => String(x).toLowerCase()).includes(String(product).toLowerCase());
+      if (!ok) { s.wrongProduct++; continue; }
+    }
     const last = lastEmailOf(l);
     if (!last) s.never++;
     else if (Date.parse(last.at) >= cutoff) { s.tooRecent++; continue; }      // exactly N days is not "over N days"
@@ -79,21 +94,40 @@ function audience(members, { now = new Date(), days = DEFAULT_DAYS, includeNever
     if (!last && !includeNever) continue;
     if (l.optedOut || l.repliedAt) { s.replied++; continue; }
     if (l.noEmail) { s.noAddress++; continue; }
-    const row = { accountId: l.accountId, name: l.name, url: l.url, lastEmailAt: last ? last.at : null, lastEmailTitle: last ? last.title : null, daysSince: last ? (now.getTime() - Date.parse(last.at)) / 864e5 : null, kinds: kinds.slice() };
+    const primary = l.primaryProductId || (idsPrimary(l)) || null;
+    const row = {
+      accountId: l.accountId, name: l.name, url: l.url,
+      lastEmailAt: last ? last.at : null, lastEmailTitle: last ? last.title : null,
+      daysSince: last ? (now.getTime() - Date.parse(last.at)) / 864e5 : null,
+      kinds: kinds.slice(),
+      productIds: (l.productIds || []).slice(),
+      primaryProductId: primary,
+      primaryProduct: l.primaryProduct || null,
+    };
     (last ? emailed : never).push(row);
   }
   emailed.sort((a, b) => Date.parse(a.lastEmailAt) - Date.parse(b.lastEmailAt));      // the lead emailed longest ago first (a stable sort: ties keep the board's order)
   const leads = emailed.concat(never);
   s.ready = leads.length;
-  for (const r of leads) { const k = r.kinds.join('+'); s.byList[k] = (s.byList[k] || 0) + 1; }
+  for (const r of leads) {
+    const k = r.kinds.join('+'); s.byList[k] = (s.byList[k] || 0) + 1;
+    const pk = r.primaryProductId || 'unset'; s.byProduct[pk] = (s.byProduct[pk] || 0) + 1;
+  }
   if (emailed.length) { s.oldest = emailed[0].daysSince; s.newest = emailed[emailed.length - 1].daysSince; }
-  return { leads, stats: s, days, includeNever: !!includeNever, list: list || null };
+  return {
+    leads, stats: s, days, includeNever: !!includeNever, list: list || null,
+    product: product || null, noHigher: !!noHigher,
+  };
+}
+
+function idsPrimary(l) {
+  return (l.productIds && l.productIds[0]) || null;
 }
 
 /** The audience read from the real data: the board's members (cadence.members), then audience(). `textLog` and `cadence` are the modules (a test passes its own). */
-function fromBoard({ textLog, cadence, now = new Date(), days = DEFAULT_DAYS, includeNever = false, list = null } = {}) {
+function fromBoard({ textLog, cadence, now = new Date(), days = DEFAULT_DAYS, includeNever = false, list = null, product = null, noHigher = false } = {}) {
   const members = cadence.members({ textLog, now, startNewLds: false });
-  return audience(members, { now, days, includeNever, list });
+  return audience(members, { now, days, includeNever, list, product, noHigher });
 }
 
 /** Silence buckets of the ready leads that were emailed before (how many days since their last email), in the order the run takes them: the longest silence first. */
@@ -107,10 +141,12 @@ function buckets(res) {
 function describe(res) {
   const s = res.stats, d = res.days, plural = d === 1 ? '' : 's', L = [];
   const row = (c, text, tail = '') => `   ${String(fmt(c)).padStart(7)}  ${text}${tail}`;
-  L.push(`📣 EMAIL BLAST — every lead we have not emailed in over ${d} day${plural}${res.list ? `  (only the ${res.list} list)` : ''}`);
-  L.push(row(s.pool, 'leads on the follow-up board', '   (every lead on a list; banned, closed-won, current customers and opt-outs are not on it)'));
+  L.push(`📣 EMAIL BLAST — every lead we have not emailed in over ${d} day${plural}${res.list ? `  (only the ${res.list} list)` : ''}${res.product ? `  · product ${res.product}${res.noHigher ? ' (no higher tiers)' : ''}` : ''}`);
+  L.push(row(s.pool, 'leads on the follow-up board', '   (every lead on a list; banned / DNC / closed-won / customers are not on it)'));
   if (s.labelOnly) L.push(row(s.labelOnly, 'on no list (only a label of your own)', '   → left out'));
   if (s.wrongList) L.push(row(s.wrongList, `not on the ${res.list} list`, '   → left out (--list)'));
+  if (s.noProduct) L.push(row(s.noProduct, 'no product pitched on file', '   → left out (--product)'));
+  if (s.wrongProduct) L.push(row(s.wrongProduct, res.noHigher ? `pitched a higher tier than ${res.product} (or not ${res.product})` : `not pitched ${res.product}`, '   → left out (--product)'));
   L.push(row(s.tooRecent, `emailed in the last ${d} day${plural}`, '   → not yet'));
   L.push(row(s.never, 'never emailed', res.includeNever ? '   → INCLUDED, after the others (--include-never-emailed)' : '   → not in this blast (add --include-never-emailed to put them last)'));
   L.push(row(s.stale, `emailed more than ${d} day${plural} ago`));
@@ -118,7 +154,8 @@ function describe(res) {
   if (s.noAddress) L.push(row(s.noAddress, 'of the leads above: no email address', '   → left out'));
   L.push(`   ${'-'.repeat(7)}`);
   const byList = Object.entries(s.byList).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${fmt(v)}`).join(' · ');
-  L.push(row(s.ready, 'READY', byList ? `   (${byList})` : ''));
+  const byProd = Object.entries(s.byProduct || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${fmt(v)}`).join(' · ');
+  L.push(row(s.ready, 'READY', [byList, byProd].filter(Boolean).join(' · ') ? `   (${[byList, byProd].filter(Boolean).join(' · ')})` : ''));
   if (s.ready) {
     const nv = res.leads.filter((l) => l.daysSince == null).length;
     L.push(`           ORDER: the lead emailed LONGEST AGO goes first${s.oldest != null ? ` (#1: ${days1(s.oldest)} since our last email), the most recently emailed last (${days1(s.newest)})` : ''}${nv ? `, then the ${fmt(nv)} never emailed` : ''}`);
@@ -317,7 +354,7 @@ function preview({ textLog, cadence, emailPersonalize, args, content, which, now
     out('  ' + '─'.repeat(52));
   } else out('\n  Nobody is due: nothing would be sent.');
   const named = args.typedEmail ? ' --last-typed' : `${args.emailTemplate ? ` --email-template ${args.emailTemplate}` : ''}${args.subject ? ` --subject ${JSON.stringify(args.subject)}` : ''}${args.bodyFile ? ` --body-file ${args.bodyFile}` : ''}`;
-  const same = ` --days ${res.days}${args.includeNeverEmailed ? ' --include-never-emailed' : ''}${res.list ? ` --list ${args.list}` : ''}${named}`;
+  const same = ` --days ${res.days}${args.includeNeverEmailed ? ' --include-never-emailed' : ''}${res.list ? ` --list ${args.list}` : ''}${res.product ? ` --product ${res.product}` : ''}${res.noHigher ? ' --no-higher' : ''}${named}`;
   out(`\n  Try it (fills 5 composers, sends nothing):   email --email --blast${same} --range 1-5 --dry-run`);
   out(`  Send the first 25 (asks to confirm):          email --email --blast${same} --range 1-25`);
   out(`  Keep going (it stops by itself after 300 emails; every send is logged, so the next run leaves those out):\n                                                email --email --blast${same} --range all\n`);
@@ -332,6 +369,15 @@ if (require.main === module) {
   const days = val('--days') != null ? parseInt(val('--days'), 10) : DEFAULT_DAYS;
   const pl = parseList(val('--list'));
   if (!(days >= 1) || !pl.ok) { console.error(!pl.ok ? pl.error : '--days must be a whole number, 1 or more'); process.exit(1); }
-  const res = fromBoard({ textLog: require('./textLog'), cadence: require('./cadence'), days, includeNever: argv.includes('--include-never-emailed'), list: pl.kind });
+  const product = val('--product');
+  const res = fromBoard({
+    textLog: require('./textLog'),
+    cadence: require('./cadence'),
+    days,
+    includeNever: argv.includes('--include-never-emailed'),
+    list: pl.kind,
+    product: product || null,
+    noHigher: argv.includes('--no-higher'),
+  });
   console.log('\n' + describe(res) + '\n');
 }

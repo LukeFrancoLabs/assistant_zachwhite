@@ -1,0 +1,48 @@
+{
+  "_comment": "Plans pitched on opportunities. tier 1 = entry (Essentials); higher tiers must not get Essentials-only promos. Edit prices here — proposals + blast filters read this file.",
+  "products": [
+    {
+      "id": "essentials",
+      "name": "Essentials",
+      "tier": 1,
+      "priceMonthly": 49,
+      "priceLabel": "$49/mo",
+      "promoLabel": "first month $26",
+      "summary": "Scheduling, invoicing, online booking, and getting paid — the core stack for Pros starting on HCP.",
+      "proposalBullets": [
+        "Online booking + job scheduling",
+        "Invoicing and getting paid on-site",
+        "Customer reminders and basic pipeline"
+      ]
+    },
+    {
+      "id": "max",
+      "name": "Max",
+      "tier": 2,
+      "priceMonthly": 149,
+      "priceLabel": "$149/mo",
+      "promoLabel": "promotional $99/mo for 3 months",
+      "summary": "Unlimited users plus the full ops stack — built for shops that outgrew Essentials.",
+      "proposalBullets": [
+        "Everything in Essentials",
+        "Unlimited users",
+        "Advanced Pipeline + campaigns",
+        "Priority onboarding support"
+      ]
+    },
+    {
+      "id": "above",
+      "name": "Above / Key Accounts",
+      "tier": 3,
+      "priceMonthly": null,
+      "priceLabel": "custom",
+      "promoLabel": "custom Key Accounts pricing",
+      "summary": "Higher-touch Key Accounts package — custom pricing, not the standard Essentials/Max promos.",
+      "proposalBullets": [
+        "Dedicated Key Accounts support",
+        "Custom packaging and rollout",
+        "Not eligible for public Essentials/Max flash promos"
+      ]
+    }
+  ]
+}

@@ -434,6 +434,8 @@ function parseArgs(argv) {
     else if (a === '--retry-skipped') args.retrySkipped = true;   // --never-emailed: try again the accounts that had no email address when we last opened them (they are left out for good)
     else if (a === '--blast') { args.blast = true; const di = argv.indexOf('--days'); args.blastDays = di >= 0 ? parseInt(argv[di + 1], 10) : 5; }   // --email --blast: ONE email to every lead we have not emailed in over --days days (default 5); a manual run (emailBlast.js)
     else if (a === '--include-never-emailed') args.includeNeverEmailed = true;   // --blast: the leads we have NEVER emailed join too, after the others
+    else if (a === '--product') args.blastProduct = String(argv[++i] || '').toLowerCase().trim() || null;   // --blast --product essentials: only leads pitched that plan
+    else if (a === '--no-higher') args.blastNoHigher = true;   // with --product: exclude Pros pitched a higher tier (Max/Above miss Essentials promos)
     else if (a === '--list') args.list = String(argv[++i] == null ? '' : argv[i]);   // --blast --list shark|lds|email-report|free-plan: only that list's leads
     else if (a === '--last-typed') args.lastTyped = true;   // --blast: send the email you typed last time (blast-emails.jsonl) instead of typing or picking one
     else if (/^--(never|not[-_]?e?mail|un[-_]?e?mail)/i.test(a)) { console.error(`${a} is not an option: write --never-emailed (a typo here would send the one-off email to every lead on the list, not only the ones we never emailed)`); process.exit(1); }   // never fall through to "everyone" by a typo
@@ -5420,10 +5422,18 @@ async function main() {
       } else if (args.blast) {
         // ONE email to every lead we have not emailed in over --days days (emailBlast.js): the follow-up board's leads, the longest silence first, never a lead that replied.
         const eb = require('./emailBlast');
-        const found = eb.fromBoard({ textLog, cadence: require('./cadence'), days: args.blastDays, includeNever: !!args.includeNeverEmailed, list: eb.parseList(args.list).kind });
+        const found = eb.fromBoard({
+          textLog,
+          cadence: require('./cadence'),
+          days: args.blastDays,
+          includeNever: !!args.includeNeverEmailed,
+          list: eb.parseList(args.list).kind,
+          product: args.blastProduct || null,
+          noHigher: !!args.blastNoHigher,
+        });
         leads = found.leads;
         leads.source = null;      // NOT a list: the emails this run logs carry no source, so a blast never puts a lead on a list it was not on (as --from-hand)
-        commandLog('📣', 'Email blast', eb.oneLine(found));
+        commandLog('📣', 'Email blast', eb.oneLine(found) + (args.blastProduct ? ` · product ${args.blastProduct}${args.blastNoHigher ? ' (no higher)' : ''}` : ''));
         if (!leads.length) { console.log(`\n  📣 Nobody is due an email blast: every lead was emailed in the last ${args.blastDays} day(s), replied, or has no address. (node Assistant.js --cadence --blast shows the numbers)\n`); await ask('\nPress Enter to close the browser... '); return; }
       } else if (args.fromDashboard) {
         const all = textLog.ldsLeads();

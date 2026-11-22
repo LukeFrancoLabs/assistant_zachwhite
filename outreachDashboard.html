@@ -34,6 +34,10 @@ h1{margin:0;font-size:22px;letter-spacing:-.01em}
 .link{color:var(--accent);font-size:13px;text-decoration:none;padding-top:6px}
 .link:hover{text-decoration:underline}
 .banner{margin:14px 0 0;padding:10px 14px;border-radius:10px;background:var(--warn-bg);color:var(--warn-fg);font-size:14px}
+.banner.demo{background:linear-gradient(90deg,#1a3a5c,#2457d6);color:#fff;border:0;font-weight:600}
+.banner.demo code{background:rgba(255,255,255,.15);padding:1px 6px;border-radius:6px}
+.prio.reengage{background:var(--warn-bg);color:var(--warn-fg)}
+.prio.interested{background:#d1fadf;color:#067647}
 .nav{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 0;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
 .nav button{border:0;background:transparent;color:var(--muted);padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;border-radius:8px}
 .nav button[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
@@ -111,6 +115,31 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 .prio.interested{background:#d1fadf;color:#067647}
 .prio.board{background:var(--email-bg);color:var(--email-fg)}
 .kit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:12px}
+.board-graph-wrap{margin:14px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.board-graph-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--line)}
+.board-graph-head h2{margin:0;font-size:14px;letter-spacing:.02em}
+.board-graph-scroll{overflow:auto;max-width:100%;background:
+  radial-gradient(circle at 1px 1px, rgba(127,127,127,.22) 1px, transparent 0) 0 0 / 18px 18px,
+  linear-gradient(180deg, rgba(127,127,127,.04), transparent 40%)}
+.board-graph{position:relative;min-height:220px;padding:28px 24px 36px}
+.board-graph svg.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.board-graph .nodes{position:relative;display:flex;align-items:stretch;gap:0;min-width:max-content}
+.bn-col{display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;z-index:1}
+.bn-gap{width:56px;flex:0 0 56px;display:flex;align-items:center;justify-content:center;position:relative;z-index:0}
+.bn-gap .gap-label{position:absolute;top:42%;transform:translateY(-120%);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:var(--surface);padding:1px 6px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.bn-node{width:168px;min-height:92px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;box-shadow:0 6px 18px rgba(0,0,0,.08);cursor:pointer;text-align:left;transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease}
+.bn-node:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,.12);border-color:var(--accent)}
+.bn-node.start,.bn-node.end{width:120px;min-height:72px;display:flex;flex-direction:column;justify-content:center;background:var(--surface)}
+.bn-node.text{border-left:4px solid var(--text-fg)}
+.bn-node.email{border-left:4px solid var(--email-fg)}
+.bn-node .bn-k{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 4px}
+.bn-node .bn-t{font-size:13px;font-weight:700;line-height:1.25;margin:0}
+.bn-node .bn-s{font-size:11px;color:var(--muted);margin:6px 0 0;line-height:1.3}
+.bn-node .bn-pill{margin-top:8px}
+.board-view-toggle{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.board-view-toggle button{border:0;background:transparent;color:var(--muted);padding:7px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.board-view-toggle button+button{border-left:1px solid var(--line)}
+.board-view-toggle button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
 @media (max-width:680px){
   .wrap{padding:14px 12px 40px}
   .cards,.cards.four{grid-template-columns:1fr 1fr;gap:8px}
@@ -140,6 +169,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     </div>
     <a class="link" id="fullLog" href="/full-log" hidden>Full outreach log &rarr;</a>
   </header>
+  <div class="banner demo" id="demoBanner" hidden>DEMO MODE — mock leads &amp; sends for directors. Nothing is real Salesforce data. Launch with <code>zwdemo</code>.</div>
   <div class="banner" id="banner" hidden>Practice flag in use (--test / --dry-run). This page lists only sends that actually went out, so it stays empty unless one does.</div>
   <div class="banner" id="fileMode" hidden>Opened as a file — Pipeline Assistant needs the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page.</div>
   <div class="banner" id="deskHint" hidden></div>
@@ -149,6 +179,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     <button type="button" role="tab" id="tab-replies" aria-selected="false" data-view="replies">Replies</button>
     <button type="button" role="tab" id="tab-kit" aria-selected="false" data-view="kit">Quick kit</button>
     <button type="button" role="tab" id="tab-myleads" aria-selected="false" data-view="myleads">My leads</button>
+    <button type="button" role="tab" id="tab-products" aria-selected="false" data-view="products">Products</button>
     <button type="button" role="tab" id="tab-board" aria-selected="false" data-view="board">Board</button>
     <button type="button" role="tab" id="tab-content" aria-selected="false" data-view="content">Content</button>
     <button type="button" role="tab" id="tab-today" aria-selected="false" data-view="today">Today</button>
@@ -192,7 +223,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   </section>
 
   <section id="view-myleads" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Your personal follow-up board — leads you added by hand after a call or demo.</p>
+    <p class="sub" style="margin:14px 0 0">Your personal follow-up board. Save the <b>product pitched</b> (Essentials / Max / Above) for accurate proposals. Pro wants summer? <b>Move to Nurture</b> until then.</p>
     <div id="addLeadBox" class="desk-card" style="margin-top:12px">
       <div class="desk-title">Add after a call</div>
       <h3>Put someone on your board</h3>
@@ -206,8 +237,42 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     <div class="empty" id="myLeadsEmpty" hidden>No hand-added leads yet. After a good call, use the command above.</div>
   </section>
 
+  <section id="view-products" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Save what was pitched on an opportunity, then blast only that segment. Example: Essentials end-of-year sale with <b>no higher tiers</b> so Max / Above never see the wrong promo. DNC is always excluded.</p>
+    <div id="productsFlash" class="flash" hidden></div>
+    <div class="controls" style="align-items:flex-end;flex-wrap:wrap">
+      <div>
+        <label for="prodFilter" class="meta" style="display:block;margin:0 0 4px">Product filter</label>
+        <select id="prodFilter" aria-label="Product filter"></select>
+      </div>
+      <label class="meta" style="display:flex;align-items:center;gap:8px;margin:0;padding-bottom:8px">
+        <input type="checkbox" id="prodNoHigher" checked> No higher tiers
+      </label>
+      <button type="button" class="btn primary" id="prodPreview">Preview audience</button>
+    </div>
+    <p class="desk-meta" id="prodTip" style="margin:8px 0 0"></p>
+    <div class="cards" style="grid-template-columns:repeat(3,1fr);margin-top:12px">
+      <div class="card"><div class="k">Ready to blast</div><div class="n" id="prodReady">0</div><div class="s" id="prodReadyS">not on DNC</div></div>
+      <div class="card"><div class="k">No product set</div><div class="n" id="prodUnset">0</div><div class="s">left out of filter</div></div>
+      <div class="card"><div class="k">Wrong / higher tier</div><div class="n" id="prodWrong">0</div><div class="s">excluded on purpose</div></div>
+    </div>
+    <div id="prodCatalog" class="kit-grid"></div>
+    <div class="desk-card" style="margin-top:12px">
+      <div class="desk-title">Blast command</div>
+      <pre class="desk-cmd" id="prodCmd"></pre>
+      <div class="desk-actions"><button type="button" class="btn" id="prodCopyCmd">Copy command</button></div>
+    </div>
+    <div class="tablewrap" style="margin-top:12px">
+      <table>
+        <thead><tr><th>Who</th><th>Pitched</th><th>Last email</th></tr></thead>
+        <tbody id="prodRows"></tbody>
+      </table>
+      <div class="empty" id="prodEmpty" hidden>Preview a product filter to see who would get the blast.</div>
+    </div>
+  </section>
+
   <section id="view-board" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Modular boards — Post-demo, HVAC / Plumbing / Electrical 2-week drips (text + email), or the 60-day cold drip. Change Day or template on any outreach.</p>
+    <p class="sub" style="margin:14px 0 0">Industry boards as a flow — <b>HVAC</b>, <b>Plumbing</b>, <b>Electrical</b>, <b>Interior cleaning</b>, <b>Pressure washing</b> (plus Post-demo / Nurture). Switch packs below; the graph updates live.</p>
     <div id="boardFlash" class="flash" hidden></div>
     <div class="controls" style="align-items:flex-end">
       <div style="flex:1;min-width:200px">
@@ -215,10 +280,23 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
         <select id="boardPack" aria-label="Active board" style="width:100%"></select>
       </div>
       <span class="sub" id="boardPackDesc" style="flex:2"></span>
+      <div class="board-view-toggle" role="group" aria-label="Board view">
+        <button type="button" id="boardViewGraph" aria-pressed="true">Flow</button>
+        <button type="button" id="boardViewList" aria-pressed="false">Edit list</button>
+      </div>
     </div>
     <p class="desk-meta" id="boardTip" style="margin:8px 0 0"></p>
-    <div id="boardList" class="desk-list"></div>
-    <p class="foot" id="boardFoot">Change <b>Day</b> to move an outreach (e.g. Outreach 3 on day 5 instead of day 1). Templates come from the Templates tab. Saves to <code>boards-local.json</code>.</p>
+    <div class="board-graph-wrap" id="boardGraphWrap">
+      <div class="board-graph-head">
+        <h2 id="boardGraphTitle">Board flow</h2>
+        <span class="sub" id="boardGraphMeta"></span>
+      </div>
+      <div class="board-graph-scroll">
+        <div class="board-graph" id="boardGraph" aria-label="Board flow graph"></div>
+      </div>
+    </div>
+    <div id="boardList" class="desk-list" hidden></div>
+    <p class="foot" id="boardFoot">n8n-style flow of this cadence. Click a node to jump to its editor. Change <b>Day</b> or template, then Save — applies on the next board run.</p>
   </section>
 
   <section id="view-content" role="tabpanel" hidden>
@@ -356,14 +434,17 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   'use strict';
   var POLL_MS = 3000, MAX_DRAWN = 500, LS = 'outreach-dashboard:';
   var LIVE = location.protocol === 'http:' || location.protocol === 'https:';
-  var DESK_VIEWS = ['morning', 'replies', 'kit', 'myleads', 'board', 'content', 'today', 'sends', 'templates', 'analytics', 'dnc'];
+  var DESK_VIEWS = ['morning', 'replies', 'kit', 'myleads', 'products', 'board', 'content', 'today', 'sends', 'templates', 'analytics', 'dnc'];
   var state = {
     view: 'morning', channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0,
     tk: 'text', tq: '', templates: null, editing: null,
     analytics: null,
     dnc: null, dncQ: '',
     desk: null, rq: '',
-    board: null
+    board: null,
+    boardMode: 'graph',
+    products: null,
+    productCatalog: []
   };
 
   function $(id) { return document.getElementById(id); }
@@ -377,6 +458,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   var c0 = lsGet('channel'); if (c0 === 'text' || c0 === 'email') state.channel = c0;
   var r0 = lsGet('range'); if (r0 === 'run' || r0 === 'today' || r0 === 'week' || r0 === 'all') state.range = r0;
   var v0 = lsGet('view'); if (DESK_VIEWS.indexOf(v0) >= 0) state.view = v0;
+  var bm0 = lsGet('boardMode'); if (bm0 === 'graph' || bm0 === 'list' || bm0 === 'both') state.boardMode = bm0;
 
   var fTime = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' });
   var fTimeSec = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
@@ -427,6 +509,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     if (view === 'board') loadBoard();
     if (view === 'content') loadContent();
     if (view === 'morning' || view === 'replies' || view === 'kit' || view === 'myleads' || view === 'today') loadDayDesk();
+    if (view === 'products') loadProducts();
   }
 
   function flashBoard(msg, ok) {
@@ -707,12 +790,167 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
           });
           actions.appendChild(reset);
         }
+        card.id = 'board-card-' + s.id;
         card.appendChild(actions);
         box.appendChild(card);
       })(stages[i]);
     }
     if (!stages.length) {
       box.appendChild(make('div', 'empty', 'No board stages found.'));
+    }
+    renderBoardGraph(stages, j);
+    applyBoardMode();
+  }
+
+  function applyBoardMode() {
+    var mode = state.boardMode || 'graph';
+    var graph = $('boardGraphWrap');
+    var list = $('boardList');
+    var gBtn = $('boardViewGraph');
+    var lBtn = $('boardViewList');
+    if (gBtn) gBtn.setAttribute('aria-pressed', mode === 'graph' || mode === 'both' ? 'true' : 'false');
+    if (lBtn) lBtn.setAttribute('aria-pressed', mode === 'list' || mode === 'both' ? 'true' : 'false');
+    if (mode === 'graph') {
+      if (graph) graph.hidden = false;
+      if (list) list.hidden = true;
+    } else if (mode === 'list') {
+      if (graph) graph.hidden = true;
+      if (list) list.hidden = false;
+    } else {
+      if (graph) graph.hidden = false;
+      if (list) list.hidden = false;
+    }
+  }
+
+  function setBoardMode(mode) {
+    state.boardMode = mode;
+    lsSet('boardMode', mode);
+    applyBoardMode();
+  }
+
+  function jumpToBoardCard(id) {
+    setBoardMode('both');
+    var el = $('board-card-' + id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('due');
+    setTimeout(function () { el.classList.remove('due'); }, 1600);
+  }
+
+  function renderBoardGraph(stages, j) {
+    var root = $('boardGraph');
+    if (!root) return;
+    root.innerHTML = '';
+    $('boardGraphTitle').textContent = (j.boardName || j.activeBoard || 'Board') + ' · flow';
+    var lastDay = stages.length ? (stages[stages.length - 1].day != null ? stages[stages.length - 1].day : 0) : 0;
+    $('boardGraphMeta').textContent = stages.length
+      ? (stages.length + ' nodes · ~' + lastDay + ' days · ' + (j.industry || j.tag || 'cadence'))
+      : 'No stages';
+
+    if (!stages.length) {
+      root.appendChild(make('div', 'empty', 'No stages on this board.'));
+      return;
+    }
+
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'edges');
+    svg.setAttribute('aria-hidden', 'true');
+    root.appendChild(svg);
+
+    var row = make('div', 'nodes');
+    root.appendChild(row);
+
+    function addNode(cls, k, t, s, pill, onClick) {
+      var col = make('div', 'bn-col');
+      var n = make('button', 'bn-node ' + cls);
+      n.type = 'button';
+      if (k) n.appendChild(make('div', 'bn-k', k));
+      n.appendChild(make('div', 'bn-t', t));
+      if (s) n.appendChild(make('div', 'bn-s', s));
+      if (pill) {
+        var p = make('span', 'pill ' + pill.cls + ' bn-pill', pill.text);
+        n.appendChild(p);
+      }
+      if (onClick) n.addEventListener('click', onClick);
+      col.appendChild(n);
+      row.appendChild(col);
+      return n;
+    }
+
+    function addGap(label) {
+      var g = make('div', 'bn-gap');
+      if (label) g.appendChild(make('span', 'gap-label', label));
+      row.appendChild(g);
+      return g;
+    }
+
+    addNode('start', 'Trigger', 'Lead tagged', (j.industry || j.tag || 'board') + ' start', null, null);
+    var prevDay = null;
+    for (var i = 0; i < stages.length; i++) {
+      (function (s, idx) {
+        var day = s.day != null ? s.day : 0;
+        var gapTxt = idx === 0
+          ? ('Day ' + day)
+          : (day === prevDay ? 'same day' : ('+' + Math.max(0, day - prevDay) + 'd'));
+        addGap(gapTxt);
+        var ch = s.ch === 'email' ? 'email' : 'text';
+        var tpl = ch === 'email' ? (s.emailTemplate || ('email #' + s.n)) : (s.template || ('text #' + s.n));
+        addNode(
+          ch,
+          'Day ' + day + ' · ' + (ch === 'email' ? 'Email' : 'Text'),
+          s.label || s.id,
+          (s.copyName || tpl) + (s.hint ? ' — ' + s.hint : ''),
+          { cls: ch, text: ch === 'email' ? 'Email' : 'Text' },
+          function () { jumpToBoardCard(s.id); }
+        );
+        prevDay = day;
+      })(stages[i], i);
+    }
+    addGap('done');
+    addNode('end', 'Exit', 'Soft close', 'Cadence complete', { cls: 'ok', text: 'Done' }, null);
+
+    requestAnimationFrame(function () {
+      drawBoardEdges(root, svg, row);
+    });
+  }
+
+  function drawBoardEdges(root, svg, row) {
+    var nodes = row.querySelectorAll('.bn-node');
+    if (nodes.length < 2) return;
+    var rootRect = root.getBoundingClientRect();
+    var w = root.scrollWidth || rootRect.width;
+    var h = root.scrollHeight || rootRect.height;
+    svg.setAttribute('width', String(w));
+    svg.setAttribute('height', String(h));
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    var accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#2457d6';
+    var muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#5b6578';
+
+    for (var i = 0; i < nodes.length - 1; i++) {
+      var a = nodes[i].getBoundingClientRect();
+      var b = nodes[i + 1].getBoundingClientRect();
+      var x1 = a.right - rootRect.left + root.scrollLeft;
+      var y1 = a.top + a.height / 2 - rootRect.top + root.scrollTop;
+      var x2 = b.left - rootRect.left + root.scrollLeft;
+      var y2 = b.top + b.height / 2 - rootRect.top + root.scrollTop;
+      var mid = (x1 + x2) / 2;
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', 'M ' + x1 + ' ' + y1 + ' C ' + mid + ' ' + y1 + ', ' + mid + ' ' + y2 + ', ' + x2 + ' ' + y2);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', i === 0 || i === nodes.length - 2 ? muted : accent);
+      path.setAttribute('stroke-width', '2.5');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('opacity', '0.85');
+      svg.appendChild(path);
+
+      var tip = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      var size = 5;
+      tip.setAttribute('points', (x2 - 1) + ',' + y2 + ' ' + (x2 - 10) + ',' + (y2 - size) + ' ' + (x2 - 10) + ',' + (y2 + size));
+      tip.setAttribute('fill', i === 0 || i === nodes.length - 2 ? muted : accent);
+      tip.setAttribute('opacity', '0.9');
+      svg.appendChild(tip);
     }
   }
 
@@ -750,7 +988,11 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
       var m = list[i];
       var card = make('div', 'desk-card' + (m.kind === 'hold' || m.kind === 'interested' ? ' due' : ''));
       var title = make('div', 'desk-title');
-      title.appendChild(make('span', 'prio ' + (m.kind || ''), m.kind === 'hold' ? 'Hold' : m.kind === 'interested' ? 'Interested' : 'Board'));
+      title.appendChild(make('span', 'prio ' + (m.kind || ''),
+        m.kind === 'hold' ? 'Hold'
+          : m.kind === 'interested' ? 'Interested'
+            : m.kind === 'reengage' ? 'Re-engage'
+              : 'Board'));
       title.appendChild(document.createTextNode(m.title || ''));
       card.appendChild(title);
       var h = make('h3'); h.appendChild(personLink(m.name, m.url)); card.appendChild(h);
@@ -830,6 +1072,63 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     }
   }
 
+  function flashMyLeads(msg, ok) {
+    var el = $('deskHint');
+    if (!el) return;
+    el.hidden = false;
+    el.textContent = msg;
+    el.className = 'banner' + (ok ? '' : '');
+  }
+
+  function saveLeadProducts(accountId, product) {
+    if (!LIVE) return Promise.resolve(false);
+    return fetch('/api/leads/products', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: accountId, products: [product], primary: product })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.ok) { flashMyLeads((j && j.error) || 'Could not save product', false); return false; }
+      if (j.myLeads && state.desk) state.desk.myLeads = j.myLeads;
+      else loadDayDesk();
+      renderMyLeads();
+      flashMyLeads('Saved product' + (j.primaryProduct ? ': ' + j.primaryProduct.name : ''), true);
+      return true;
+    }).catch(function () { flashMyLeads('Could not save product', false); return false; });
+  }
+
+  function setLeadBoard(accountId, board, extra) {
+    if (!LIVE || !accountId) return Promise.resolve(false);
+    var body = { accountId: accountId, board: board };
+    if (extra && extra.expiresDays != null) body.expiresDays = extra.expiresDays;
+    if (extra && extra.expiresAt) body.expiresAt = extra.expiresAt;
+    if (extra && extra.reconnect) body.reconnect = extra.reconnect;
+    return fetch('/api/leads/board', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.ok) {
+        alert((j && j.error) || 'Could not update board');
+        return false;
+      }
+      if (state.desk) state.desk.myLeads = j.myLeads || state.desk.myLeads;
+      renderMyLeads();
+      return true;
+    }).catch(function () { alert('Could not update board'); return false; });
+  }
+
+  function askReconnectWhen(name) {
+    var ans = window.prompt(
+      'When should we reconnect with ' + (name || 'this pro') + '?\n\n' +
+      'Examples: summer · spring · june · 2026-06-01 · 90 days\n\n' +
+      'Quiet now, ramp near that date, then Re-engage list.',
+      'summer'
+    );
+    if (ans == null) return null;
+    ans = String(ans).trim();
+    return ans || '90 days';
+  }
+
   function renderMyLeads() {
     var j = state.desk || {};
     var add = j.addLead || {};
@@ -838,16 +1137,117 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     var list = j.myLeads || [];
     var box = $('myLeadsList'); box.innerHTML = '';
     for (var i = 0; i < list.length; i++) {
-      var m = list[i];
-      var card = make('div', 'desk-card' + (m.dueNow ? ' due' : ''));
-      card.appendChild(make('div', 'desk-title', m.dueNow ? 'Due now' : (m.state || 'On board')));
-      var h = make('h3'); h.appendChild(personLink(m.name, m.url)); card.appendChild(h);
-      var bits = [];
-      if (m.next) bits.push('Next: ' + m.next);
-      if (m.tags && m.tags.length) bits.push('#' + m.tags.join(' #'));
-      if (m.hold) bits.push(m.hold);
-      if (bits.length) card.appendChild(make('div', 'desk-meta', bits.join(' · ')));
-      box.appendChild(card);
+      (function (m) {
+        var card = make('div', 'desk-card' + (m.dueNow ? ' due' : '') + (m.onNurture ? ' nurture' : '') + (m.onReengage ? ' due' : ''));
+        var title = make('div', 'desk-title');
+        if (m.onReengage) title.appendChild(make('span', 'pill warn', 'Re-engage'));
+        else if (m.onNurture && m.inRamp) title.appendChild(make('span', 'pill warn', 'Nurture · ramp'));
+        else if (m.onNurture) title.appendChild(make('span', 'pill ok', 'Nurture · quiet'));
+        title.appendChild(document.createTextNode(m.dueNow ? 'Due now' : (m.onReengage ? 'Ready for a fresh push' : (m.state || 'On board'))));
+        card.appendChild(title);
+        var h = make('h3'); h.appendChild(personLink(m.name, m.url)); card.appendChild(h);
+        var bits = [];
+        if (m.reconnectLabel) bits.push('Reconnect: ' + m.reconnectLabel);
+        else if (m.boardName) bits.push(m.boardName);
+        if (m.onNurture && m.expiresInDays != null) {
+          bits.push(m.expiresInDays <= 0
+            ? 'reconnect today → Re-engage'
+            : (m.expiresInDays + 'd until reconnect → Re-engage'));
+        }
+        if (m.onNurture && m.inRamp) bits.push('ramping up');
+        else if (m.onNurture) bits.push('quiet period');
+        if (m.next && !m.onReengage) bits.push('Next: ' + m.next);
+        if (m.primaryProduct) bits.push('Pitched: ' + m.primaryProduct.name + (m.primaryProduct.priceLabel ? ' · ' + m.primaryProduct.priceLabel : ''));
+        else if (m.primaryProductId) bits.push('Pitched: ' + m.primaryProductId);
+        if (m.tags && m.tags.length) bits.push('#' + m.tags.join(' #'));
+        if (m.hold) bits.push(m.hold);
+        if (bits.length) card.appendChild(make('div', 'desk-meta', bits.join(' · ')));
+
+        var prodRow = document.createElement('div');
+        prodRow.className = 'controls';
+        prodRow.style.margin = '10px 0 0';
+        var prodLab = make('label', 'meta');
+        prodLab.setAttribute('for', 'prod-' + m.accountId);
+        prodLab.textContent = 'Product pitched';
+        prodRow.appendChild(prodLab);
+        var prodSel = document.createElement('select');
+        prodSel.id = 'prod-' + m.accountId;
+        prodSel.style.width = '100%';
+        prodSel.style.marginTop = '4px';
+        var blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = '— pick Essentials / Max / Above —';
+        prodSel.appendChild(blank);
+        var cats = state.productCatalog.length ? state.productCatalog : [
+          { id: 'essentials', name: 'Essentials' },
+          { id: 'max', name: 'Max' },
+          { id: 'above', name: 'Above / Key Accounts' }
+        ];
+        for (var ci = 0; ci < cats.length; ci++) {
+          var co = document.createElement('option');
+          co.value = cats[ci].id;
+          co.textContent = cats[ci].name + (cats[ci].priceLabel ? ' · ' + cats[ci].priceLabel : '');
+          if (String(m.primaryProductId || '') === String(cats[ci].id)) co.selected = true;
+          prodSel.appendChild(co);
+        }
+        prodRow.appendChild(prodSel);
+        card.appendChild(prodRow);
+        if (m.proposal && m.proposal.product_summary) {
+          card.appendChild(make('div', 'desk-detail', m.proposal.product_summary + (m.proposal.product_price ? ' · ' + m.proposal.product_price : '')));
+        }
+
+        var actions = make('div', 'desk-actions');
+        var saveProd = make('button', 'btn primary', 'Save product');
+        saveProd.type = 'button';
+        saveProd.addEventListener('click', function () {
+          if (!prodSel.value) { flashMyLeads('Pick a product first', false); return; }
+          saveProd.disabled = true;
+          saveLeadProducts(m.accountId, prodSel.value).then(function (ok) { if (!ok) saveProd.disabled = false; });
+        });
+        actions.appendChild(saveProd);
+        if (m.onReengage) {
+          var tip = make('div', 'desk-meta', 'Reconnect window hit. Use Quick kit / email — research-reengage, why-now, or day-after-demo.');
+          card.appendChild(tip);
+          var backActive = make('button', 'btn', 'Back to active');
+          backActive.type = 'button';
+          backActive.addEventListener('click', function () {
+            backActive.disabled = true;
+            setLeadBoard(m.accountId, 'none').then(function (ok) { if (!ok) backActive.disabled = false; });
+          });
+          actions.appendChild(backActive);
+          var nurAgain = make('button', 'btn', 'Nurture again');
+          nurAgain.type = 'button';
+          nurAgain.addEventListener('click', function () {
+            var when = askReconnectWhen(m.name);
+            if (!when) return;
+            nurAgain.disabled = true;
+            setLeadBoard(m.accountId, 'nurture', { reconnect: when }).then(function (ok) { if (!ok) nurAgain.disabled = false; });
+          });
+          actions.appendChild(nurAgain);
+        } else if (!m.onNurture) {
+          var nur = make('button', 'btn', 'Move to Nurture');
+          nur.type = 'button';
+          nur.title = 'Quiet until reconnect (e.g. summer), then ramp and Re-engage';
+          nur.addEventListener('click', function () {
+            var when = askReconnectWhen(m.name);
+            if (!when) return;
+            nur.disabled = true;
+            setLeadBoard(m.accountId, 'nurture', { reconnect: when }).then(function (ok) { if (!ok) nur.disabled = false; });
+          });
+          actions.appendChild(nur);
+        } else {
+          var back = make('button', 'btn', 'Leave Nurture');
+          back.type = 'button';
+          back.addEventListener('click', function () {
+            if (!confirm('Take ' + (m.name || 'this lead') + ' off Nurture now? (No Re-engage unless you wait for reconnect.)')) return;
+            back.disabled = true;
+            setLeadBoard(m.accountId, 'none').then(function (ok) { if (!ok) back.disabled = false; });
+          });
+          actions.appendChild(back);
+        }
+        card.appendChild(actions);
+        box.appendChild(card);
+      })(list[i]);
     }
     $('myLeadsEmpty').hidden = list.length > 0;
   }
@@ -888,13 +1288,109 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     renderTodayDesk();
   }
 
+  function showDemoBanner(on) {
+    var b = $('demoBanner');
+    if (!b) return;
+    b.hidden = !on;
+    if (on) {
+      document.title = 'Pipeline Assistant · DEMO';
+      try {
+        var h = document.querySelector('h1');
+        if (h && h.textContent.indexOf('DEMO') < 0) h.textContent = 'Pipeline Assistant · DEMO';
+      } catch (e) {}
+    }
+  }
+
+  function detectDemo() {
+    if (!LIVE) return;
+    fetch('/api/health').then(function (r) { return r.json(); }).then(function (j) {
+      if (j && j.demo) showDemoBanner(true);
+    }).catch(function () {});
+  }
+
   function loadDayDesk() {
     if (!LIVE) return;
     fetch('/api/daydesk').then(function (r) { return r.json(); }).then(function (j) {
       if (!j || j.ok === false) return;
       state.desk = j;
+      if (j.demo || (j.meta && j.meta.demo)) showDemoBanner(true);
       renderDayDesk();
     }).catch(function () {});
+    if (!state.productCatalog.length) {
+      fetch('/api/products').then(function (r) { return r.json(); }).then(function (j) {
+        if (j && j.catalog) {
+          state.productCatalog = j.catalog;
+          if (state.view === 'myleads') renderMyLeads();
+        }
+      }).catch(function () {});
+    }
+  }
+
+  function loadProducts() {
+    if (!LIVE) return;
+    var product = ($('prodFilter') && $('prodFilter').value) || '';
+    var noHigher = $('prodNoHigher') ? $('prodNoHigher').checked : true;
+    var qs = [];
+    if (product) qs.push('product=' + encodeURIComponent(product));
+    if (noHigher) qs.push('noHigher=1');
+    qs.push('days=5');
+    fetch('/api/products?' + qs.join('&')).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || j.ok === false) return;
+      state.products = j;
+      if (j.catalog) state.productCatalog = j.catalog;
+      renderProducts();
+    }).catch(function () {});
+  }
+
+  function renderProducts() {
+    var j = state.products || {};
+    var cat = j.catalog || state.productCatalog || [];
+    var sel = $('prodFilter');
+    if (sel && !sel.options.length) {
+      var o0 = document.createElement('option');
+      o0.value = '';
+      o0.textContent = 'All with any product';
+      sel.appendChild(o0);
+      for (var i = 0; i < cat.length; i++) {
+        var o = document.createElement('option');
+        o.value = cat[i].id;
+        o.textContent = cat[i].name + ' (tier ' + cat[i].tier + ')';
+        sel.appendChild(o);
+      }
+    }
+    var box = $('prodCatalog');
+    if (box) {
+      box.innerHTML = '';
+      for (var c = 0; c < cat.length; c++) {
+        var p = cat[c];
+        var card = make('div', 'desk-card');
+        card.appendChild(make('div', 'desk-title', 'Tier ' + p.tier));
+        card.appendChild(make('h3', null, p.name));
+        card.appendChild(make('div', 'desk-meta', (p.priceLabel || '') + (p.promoLabel ? ' · ' + p.promoLabel : '')));
+        if (p.summary) card.appendChild(make('div', 'desk-detail', p.summary));
+        box.appendChild(card);
+      }
+    }
+    var aud = j.audience || {};
+    $('prodReady').textContent = fNum.format(aud.ready || 0);
+    $('prodUnset').textContent = fNum.format(aud.noProduct || 0);
+    $('prodWrong').textContent = fNum.format(aud.wrongProduct || 0);
+    $('prodReadyS').textContent = (j.filter && j.filter.product)
+      ? (j.filter.product + (j.filter.noHigher ? ' · no higher' : ''))
+      : 'pick a product filter';
+    $('prodTip').textContent = j.tip || '';
+    $('prodCmd').textContent = j.blastCommand || '';
+    var body = $('prodRows'); body.innerHTML = '';
+    var leads = aud.leads || [];
+    for (var r = 0; r < leads.length; r++) {
+      var L = leads[r];
+      var tr = make('tr', 'row');
+      var td = make('td', 'who'); td.appendChild(personLink(L.name, L.url)); tr.appendChild(td);
+      td = make('td'); td.textContent = (L.productIds || []).join(', ') || (L.primaryProductId || '—'); tr.appendChild(td);
+      td = make('td'); td.textContent = L.daysSince == null ? 'never' : (Math.floor(L.daysSince) + 'd ago'); tr.appendChild(td);
+      body.appendChild(tr);
+    }
+    $('prodEmpty').hidden = leads.length > 0;
   }
 
   function ingest(d) {
@@ -1457,6 +1953,26 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
         flashBoard('Switched to ' + ((j.board && j.board.boardName) || id), true);
       }).catch(function () { flashBoard('Could not switch board', false); });
     });
+    $('boardViewGraph').addEventListener('click', function () { setBoardMode('graph'); });
+    $('boardViewList').addEventListener('click', function () { setBoardMode('list'); });
+    if ($('prodPreview')) $('prodPreview').addEventListener('click', function () { loadProducts(); });
+    if ($('prodFilter')) $('prodFilter').addEventListener('change', function () { loadProducts(); });
+    if ($('prodNoHigher')) $('prodNoHigher').addEventListener('change', function () { loadProducts(); });
+    if ($('prodCopyCmd')) $('prodCopyCmd').addEventListener('click', function () {
+      var cmd = $('prodCmd').textContent || '';
+      if (!cmd) return;
+      copyText(cmd).then(function () {
+        $('prodCopyCmd').textContent = 'Copied';
+        setTimeout(function () { $('prodCopyCmd').textContent = 'Copy command'; }, 1200);
+      }).catch(function () {});
+    });
+    window.addEventListener('resize', function () {
+      if (state.view !== 'board') return;
+      var root = $('boardGraph');
+      var svg = root && root.querySelector('svg.edges');
+      var row = root && root.querySelector('.nodes');
+      if (root && svg && row) drawBoardEdges(root, svg, row);
+    });
 
     function bindContentFind() {
       if ($('cGo')) $('cGo').addEventListener('click', function () { loadContent(); });
@@ -1508,6 +2024,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
 
   syncControls();
+  detectDemo();
   setView(state.view);
   try { onData(); } catch (e) {}
   setTimeout(poll, POLL_MS);

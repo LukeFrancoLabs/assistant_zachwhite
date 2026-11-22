@@ -198,6 +198,48 @@
       ""
     ]
   },
+  "nurture-checkin": {
+    "name": "Nurture · soft check-in",
+    "subject": "No rush — checking in from Housecall Pro",
+    "body": [
+      "{{greeting}}",
+      "",
+      "No pressure on our end — I know timing has to be right.",
+      "",
+      "Whenever {{business|your shop}} wants a quieter look at putting scheduling, booking, and getting paid in one place, I'm happy to walk through it at your pace.",
+      "",
+      "Reply here if useful, or grab a time with the link below when you're ready. If now still isn't it, no worries.",
+      ""
+    ]
+  },
+  "nurture-research": {
+    "name": "Nurture · research note",
+    "subject": "A quick note for when timing is better",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Sharing something Pros often find useful between busy seasons: past customers and reviews are usually the first things that slip when the board is full.",
+      "",
+      "Housecall Pro can run thank-you texts, review asks, and light campaigns in the background so that work still happens while you're on jobs.",
+      "",
+      "No ask today — just parking this for when timing is better. Reply anytime, or use the link below if you want a short walkthrough.",
+      ""
+    ]
+  },
+  "nurture-why-now": {
+    "name": "Nurture · gentle why-now",
+    "subject": "Still here when {{business|you}} are ready",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Circling back gently — still happy to help {{business|your team}} see Housecall Pro whenever it makes sense.",
+      "",
+      "Short version: online booking + Pipeline for new work, campaigns for past customers, and getting paid on the spot. First month is $26 with no contracts if you ever want to try it.",
+      "",
+      "If now isn't the time, tell me and I'll ease off. Otherwise reply here or grab a slot with the link below.",
+      ""
+    ]
+  },
   "hvac-drip-1": {
     "name": "HVAC drip · opener",
     "subject": "Keeping {{business|your HVAC shop}} booked when the heat hits",
@@ -329,6 +371,130 @@
       "Homeowners hire electricians they trust — and Google reviews do a lot of that work. Campaigns in Housecall Pro can ask for a review after every job and stay in touch with past customers for the next service call.",
       "",
       "Set it up once; it runs while you're on a panel.",
+      "",
+      "Open to a walkthrough for {{business|your shop}}? Reply here, or grab a time below.",
+      ""
+    ]
+  },
+  "cleaning-drip-1": {
+    "name": "Interior cleaning drip · opener",
+    "subject": "Fewer no-shows for {{business|your cleaning business}}",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Recurring cleans only work when the calendar and reminders stay tight. Housecall Pro helps interior cleaning Pros keep booking, team schedules, and follow-up in one place.",
+      "",
+      "• Online booking for one-time and recurring cleans",
+      "• Instant alerts when a homeowner requests a slot",
+      "• Pipeline so move-out / deep-clean quotes don't go quiet",
+      "",
+      "Want to see it for {{business|your team}}? Reply here, or grab a time with the link below.",
+      ""
+    ]
+  },
+  "cleaning-drip-2": {
+    "name": "Interior cleaning drip · get paid",
+    "subject": "Get paid before you pack up the supplies",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Chasing invoices after a clean eats the margin. With Housecall Pro you can take card, ACH, or keep a card on file for recurring clients — right from your phone.",
+      "",
+      "Cleaning Pros use that to leave every job paid and to cut the awkward \"I'll Venmo you later\" conversations.",
+      "",
+      "Open to a 10-minute look? Reply here or book with the link below.",
+      ""
+    ]
+  },
+  "cleaning-drip-3": {
+    "name": "Interior cleaning drip · reviews + recurring",
+    "subject": "Reviews and rebooks on autopilot for {{business|your cleaning business}}",
+    "body": [
+      "{{greeting}}",
+      "",
+      "The next clean is often a past client — if something reminds them. Campaigns in Housecall Pro can:",
+      "",
+      "• Ask for a Google review after every completed clean",
+      "• Bring past clients back on a recurring cadence",
+      "• Run without another spreadsheet of who to text",
+      "",
+      "Curious for {{business|your shop}}? Reply here, or grab a time below.",
+      ""
+    ]
+  },
+  "pressure-drip-1": {
+    "name": "Pressure washing drip · opener",
+    "subject": "Keeping {{business|your pressure washing business}} booked this season",
+    "body": [
+      "{{greeting}}",
+      "",
+      "House washes and driveways stack up fast once the weather breaks. Housecall Pro helps pressure-washing Pros keep online booking, dispatch, and quote follow-up in one place.",
+      "",
+      "• Online booking from your site or Google",
+      "• Instant alerts when a homeowner requests a wash",
+      "• Pipeline so every estimate photo gets a follow-up",
+      "",
+      "Want a quick look for {{business|your team}}? Reply here, or grab a time with the link below.",
+      ""
+    ]
+  },
+  "pressure-drip-2": {
+    "name": "Pressure washing drip · get paid",
+    "subject": "Invoice and get paid before you roll the hose",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Bigger house washes stall when payment is awkward at the curb. Housecall Pro lets you invoice and collect by card or ACH from the job — before you pack up.",
+      "",
+      "Pressure-washing Pros use that to close the job on site and skip a week of \"did you get my Venmo?\"",
+      "",
+      "10 minutes to see how it looks? Reply here or use the booking link below.",
+      ""
+    ]
+  },
+  "proposal-product": {
+    "name": "Product proposal (pitched plan)",
+    "subject": "{{product_name}} pricing for {{business|your shop}}",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Following up on what we walked through — here's the {{product_name}} package we discussed for {{business|your team}}.",
+      "",
+      "{{product_summary}}",
+      "",
+      "{{product_bullets}}",
+      "",
+      "Pricing we talked about: {{product_price}} ({{product_promo|standard pricing}}).",
+      "",
+      "If that still lines up, reply here or grab a time with the link below and we can lock next steps.",
+      ""
+    ]
+  },
+  "promo-essentials-eoy": {
+    "name": "Essentials end-of-year promo",
+    "subject": "End-of-year Essentials offer for {{business|your shop}}",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Quick note for Pros we walked through Essentials with — we have an end-of-year offer on that plan (first month $26, no contracts).",
+      "",
+      "This note is only going to shops pitched Essentials, so the pricing matches what you already saw.",
+      "",
+      "Want the details or a quick rebook? Reply here or use the link below.",
+      ""
+    ]
+  },
+  "pressure-drip-3": {
+    "name": "Pressure washing drip · season + reviews",
+    "subject": "Seasonal washes and reviews that refill the board",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Last year's driveway customers are this year's easiest jobs — if you stay in touch. Campaigns in Housecall Pro can:",
+      "",
+      "• Nudge past customers when wash season starts",
+      "• Ask for a Google review after every completed job",
+      "• Keep your name in front of homeowners who already hired you",
       "",
       "Open to a walkthrough for {{business|your shop}}? Reply here, or grab a time below.",
       ""
