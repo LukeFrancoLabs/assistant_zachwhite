@@ -192,7 +192,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   </section>
 
   <section id="view-myleads" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Your personal follow-up board — leads you added by hand after a call or demo. Not ready to push? <b>Move to Nurture</b> puts them on the slow ~90-day drip (expires → <b>Re-engage</b> list).</p>
+    <p class="sub" style="margin:14px 0 0">Your personal follow-up board. Pro wants to reconnect in summer? <b>Move to Nurture</b> until then — quiet touches now, ramp near that date, then <b>Re-engage</b>.</p>
     <div id="addLeadBox" class="desk-card" style="margin-top:12px">
       <div class="desk-title">Add after a call</div>
       <h3>Put someone on your board</h3>
@@ -835,6 +835,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     var body = { accountId: accountId, board: board };
     if (extra && extra.expiresDays != null) body.expiresDays = extra.expiresDays;
     if (extra && extra.expiresAt) body.expiresAt = extra.expiresAt;
+    if (extra && extra.reconnect) body.reconnect = extra.reconnect;
     return fetch('/api/leads/board', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -850,6 +851,18 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     }).catch(function () { alert('Could not update board'); return false; });
   }
 
+  function askReconnectWhen(name) {
+    var ans = window.prompt(
+      'When should we reconnect with ' + (name || 'this pro') + '?\n\n' +
+      'Examples: summer · spring · june · 2026-06-01 · 90 days\n\n' +
+      'Quiet now, ramp near that date, then Re-engage list.',
+      'summer'
+    );
+    if (ans == null) return null;
+    ans = String(ans).trim();
+    return ans || '90 days';
+  }
+
   function renderMyLeads() {
     var j = state.desk || {};
     var add = j.addLead || {};
@@ -862,29 +875,31 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
         var card = make('div', 'desk-card' + (m.dueNow ? ' due' : '') + (m.onNurture ? ' nurture' : '') + (m.onReengage ? ' due' : ''));
         var title = make('div', 'desk-title');
         if (m.onReengage) title.appendChild(make('span', 'pill warn', 'Re-engage'));
-        else if (m.onNurture) title.appendChild(make('span', 'pill ok', 'Nurture'));
+        else if (m.onNurture && m.inRamp) title.appendChild(make('span', 'pill warn', 'Nurture · ramp'));
+        else if (m.onNurture) title.appendChild(make('span', 'pill ok', 'Nurture · quiet'));
         title.appendChild(document.createTextNode(m.dueNow ? 'Due now' : (m.onReengage ? 'Ready for a fresh push' : (m.state || 'On board'))));
         card.appendChild(title);
         var h = make('h3'); h.appendChild(personLink(m.name, m.url)); card.appendChild(h);
         var bits = [];
-        if (m.boardName) bits.push(m.boardName);
-        if (m.onNurture && m.expiresAt) {
-          var expLabel = m.expiresInDays != null
-            ? (m.expiresInDays <= 0 ? 'expires today → Re-engage' : ('expires in ' + m.expiresInDays + 'd → Re-engage'))
-            : ('expires ' + String(m.expiresAt).slice(0, 10));
-          bits.push(expLabel);
+        if (m.reconnectLabel) bits.push('Reconnect: ' + m.reconnectLabel);
+        else if (m.boardName) bits.push(m.boardName);
+        if (m.onNurture && m.expiresInDays != null) {
+          bits.push(m.expiresInDays <= 0
+            ? 'reconnect today → Re-engage'
+            : (m.expiresInDays + 'd until reconnect → Re-engage'));
         }
+        if (m.onNurture && m.inRamp) bits.push('ramping up');
+        else if (m.onNurture) bits.push('quiet period');
         if (m.next && !m.onReengage) bits.push('Next: ' + m.next);
         if (m.tags && m.tags.length) bits.push('#' + m.tags.join(' #'));
         if (m.hold) bits.push(m.hold);
         if (bits.length) card.appendChild(make('div', 'desk-meta', bits.join(' · ')));
         var actions = make('div', 'desk-actions');
         if (m.onReengage) {
-          var tip = make('div', 'desk-meta', 'Nurture expired. Use Quick kit / email — research-reengage, why-now, or day-after-demo.');
+          var tip = make('div', 'desk-meta', 'Reconnect window hit. Use Quick kit / email — research-reengage, why-now, or day-after-demo.');
           card.appendChild(tip);
           var backActive = make('button', 'btn', 'Back to active');
           backActive.type = 'button';
-          backActive.title = 'Clear re-engage tag and leave them on My leads as a normal hand lead';
           backActive.addEventListener('click', function () {
             backActive.disabled = true;
             setLeadBoard(m.accountId, 'none').then(function (ok) { if (!ok) backActive.disabled = false; });
@@ -893,27 +908,28 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
           var nurAgain = make('button', 'btn', 'Nurture again');
           nurAgain.type = 'button';
           nurAgain.addEventListener('click', function () {
-            if (!confirm('Put ' + (m.name || 'this lead') + ' back on Nurture for another 90 days?')) return;
+            var when = askReconnectWhen(m.name);
+            if (!when) return;
             nurAgain.disabled = true;
-            setLeadBoard(m.accountId, 'nurture').then(function (ok) { if (!ok) nurAgain.disabled = false; });
+            setLeadBoard(m.accountId, 'nurture', { reconnect: when }).then(function (ok) { if (!ok) nurAgain.disabled = false; });
           });
           actions.appendChild(nurAgain);
         } else if (!m.onNurture) {
           var nur = make('button', 'btn', 'Move to Nurture');
           nur.type = 'button';
-          nur.title = 'Slow ~90-day drip — then automatically moves to the Re-engage list';
+          nur.title = 'Quiet until reconnect (e.g. summer), then ramp and Re-engage';
           nur.addEventListener('click', function () {
-            if (!confirm('Move ' + (m.name || 'this lead') + ' to Nurture?\n\nSoft touches for ~90 days, then they land on your Re-engage list.')) return;
+            var when = askReconnectWhen(m.name);
+            if (!when) return;
             nur.disabled = true;
-            setLeadBoard(m.accountId, 'nurture').then(function (ok) { if (!ok) nur.disabled = false; });
+            setLeadBoard(m.accountId, 'nurture', { reconnect: when }).then(function (ok) { if (!ok) nur.disabled = false; });
           });
           actions.appendChild(nur);
         } else {
           var back = make('button', 'btn', 'Leave Nurture');
           back.type = 'button';
-          back.title = 'Clear nurture now (does not add to Re-engage — wait for expiration for that)';
           back.addEventListener('click', function () {
-            if (!confirm('Take ' + (m.name || 'this lead') + ' off Nurture now? (They will not be added to Re-engage unless you wait for the expiration date.)')) return;
+            if (!confirm('Take ' + (m.name || 'this lead') + ' off Nurture now? (No Re-engage unless you wait for reconnect.)')) return;
             back.disabled = true;
             setLeadBoard(m.accountId, 'none').then(function (ok) { if (!ok) back.disabled = false; });
           });

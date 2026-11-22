@@ -1,10 +1,10 @@
 {
   "id": "nurture",
   "name": "Nurture (slow drip)",
-  "description": "Long-cycle keep-warm for opps that are not ready now — soft texts + emails over ~90 days. When the expiration date hits, the lead leaves Nurture and lands on the Re-engage list (#reengage).",
+  "description": "Keep-warm until a reconnect date (e.g. summer). Quiet early, ramp in the last ~45 days, then graduate to #reengage. Set timing with --until summer / Move to Nurture.",
   "tag": "nurture",
   "fresh": true,
-  "autoDays": 180,
+  "autoDays": 400,
   "expiresDays": 90,
   "graduateTo": "reengage",
   "stages": [

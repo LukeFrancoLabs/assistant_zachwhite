@@ -188,12 +188,16 @@ function myLeadsPayload(now = new Date()) {
     return evaluated.map((e) => {
       const onNurture = !!(e.lead.onNurture || e.boardId === 'nurture' || (e.lead.own || []).includes('nurture'));
       const onReengage = !!(e.lead.onReengage || (!onNurture && (e.lead.own || []).includes('reengage')));
-      const expiresAt = e.lead.boardExpiresAt || null;
+      const expiresAt = e.lead.boardExpiresAt || e.lead.reconnectAt || null;
+      const reconnectAt = e.lead.reconnectAt || expiresAt;
+      const reconnectLabel = e.lead.reconnectLabel || null;
       let expiresInDays = null;
       if (onNurture && expiresAt) {
         const ms = Date.parse(expiresAt) - now.getTime();
         expiresInDays = Number.isFinite(ms) ? Math.ceil(ms / 864e5) : null;
       }
+      const spanDays = e.lead.spanDays != null ? e.lead.spanDays : null;
+      const inRamp = onNurture && expiresInDays != null && expiresInDays <= 45;
       return {
         name: e.lead.name,
         accountId: e.lead.accountId,
@@ -211,7 +215,11 @@ function myLeadsPayload(now = new Date()) {
         onReengage,
         expiresAt,
         expiresInDays,
-        nurtureCommand: 'node textLog.js --nurture-lead ' + (e.lead.accountId || ''),
+        reconnectAt,
+        reconnectLabel,
+        spanDays,
+        inRamp,
+        nurtureCommand: 'node textLog.js --nurture-lead ' + (e.lead.accountId || '') + ' --until summer',
         addCommand: null,
       };
     }).sort((a, b) => (b.onReengage ? 1 : 0) - (a.onReengage ? 1 : 0) || (b.dueNow ? 1 : 0) - (a.dueNow ? 1 : 0) || String(a.name).localeCompare(String(b.name)));
@@ -268,10 +276,10 @@ function todayPayload() {
 
 function howToAddLead() {
   return {
-    hint: 'After you talk to a pro, add them to your personal board so the next touch shows up here. Not ready now? Use Move to Nurture for the slow ~90-day drip (expires → Re-engage list).',
+    hint: 'After you talk to a pro, add them here. Not ready until summer? Move to Nurture until then — quiet now, ramp near reconnect, then Re-engage.',
     command: 'node textLog.js --add-lead <Salesforce account link> --tag referral --did email,text,call',
     alt: 'Or open the full outreach log (email --sent) → Tools → Follow-up board → ➕ Add a lead.',
-    nurture: 'node textLog.js --nurture-lead <Salesforce account link> [--expires-days 90]',
+    nurture: 'node textLog.js --nurture-lead <Salesforce account link> --until summer',
   };
 }
 
@@ -282,6 +290,7 @@ function setLeadBoard(accountId, board, opts = {}) {
     board: board || null,
     expiresAt: opts.expiresAt || null,
     expiresDays: opts.expiresDays != null ? opts.expiresDays : null,
+    reconnect: opts.reconnect || opts.until || null,
   });
   if (!r.ok) return { ok: false, error: r.reason };
   return {
@@ -289,6 +298,9 @@ function setLeadBoard(accountId, board, opts = {}) {
     board: r.board,
     boardAt: r.boardAt,
     boardExpiresAt: r.boardExpiresAt || null,
+    reconnectAt: r.reconnectAt || null,
+    reconnectLabel: r.reconnectLabel || null,
+    plan: r.plan || null,
     tags: r.tags,
     myLeads: myLeadsPayload(new Date()),
   };

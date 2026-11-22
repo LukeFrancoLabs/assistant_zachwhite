@@ -162,7 +162,20 @@ function resolveConfig(lead, baseCfg) {
   if (!boardId || boardId === 'drip') return base;
   try {
     const packCfg = require('./boards').configForPack(boardId, base);
-    if (packCfg) return packCfg;
+    if (!packCfg) return base;
+    // Per-lead nurture plan (stretched to reconnect-by date: quiet early, ramp near summer)
+    if (boardId === 'nurture' && Array.isArray(lead.nurtureStages) && lead.nurtureStages.length) {
+      const span = Number(lead.spanDays) || 0;
+      const autoDays = Math.max(packCfg.autoDays || 180, span + 30, 180);
+      return {
+        ...packCfg,
+        stages: lead.nurtureStages,
+        autoDays,
+        reconnectAt: lead.reconnectAt || null,
+        reconnectLabel: lead.reconnectLabel || null,
+      };
+    }
+    return packCfg;
   } catch (_) { /* boards missing — fall through */ }
   return base;
 }
@@ -376,6 +389,8 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
     const k = k15(a.accountId), cur = manual.get(k), one = {
       id: a.id, at: a.at, on: a.on, did: a.did || [],
       board: a.board || null, boardAt: a.boardAt || null, boardExpiresAt: a.boardExpiresAt || null,
+      reconnectAt: a.reconnectAt || null, reconnectLabel: a.reconnectLabel || null,
+      nurtureStages: a.nurtureStages || null, spanDays: a.spanDays != null ? a.spanDays : null,
     };
     if (!cur) manual.set(k, { ...one, tags: [...tl.manualTags(a)] });
     else {
@@ -383,9 +398,15 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
       if (String(a.on) >= String(cur.on)) Object.assign(cur, one);
       // Newest board assignment wins across adds of the same account
       if (a.boardAt && (!cur.boardAt || String(a.boardAt) >= String(cur.boardAt))) {
-        cur.board = a.board || null;
-        cur.boardAt = a.boardAt;
-        cur.boardExpiresAt = a.boardExpiresAt || null;
+        Object.assign(cur, {
+          board: a.board || null,
+          boardAt: a.boardAt,
+          boardExpiresAt: a.boardExpiresAt || null,
+          reconnectAt: a.reconnectAt || null,
+          reconnectLabel: a.reconnectLabel || null,
+          nurtureStages: a.nurtureStages || null,
+          spanDays: a.spanDays != null ? a.spanDays : null,
+        });
       }
     }
   }
@@ -413,6 +434,10 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
     const board = (m && m.board) || (own.includes('nurture') ? 'nurture' : null);
     const boardAt = (m && m.boardAt) || null;
     const boardExpiresAt = (m && m.boardExpiresAt) || null;
+    const reconnectAt = (m && m.reconnectAt) || null;
+    const reconnectLabel = (m && m.reconnectLabel) || null;
+    const nurtureStages = (m && m.nurtureStages) || null;
+    const spanDays = (m && m.spanDays != null) ? m.spanDays : null;
     const onNurture = board === 'nurture' || own.includes('nurture');
     const onReengage = !onNurture && own.includes('reengage');
     const touches = (a.touches || []).map((t) => ({ ch: t.ch, at: t.at, mode: t.mode || null, title: t.title || null }));
@@ -442,7 +467,7 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
       repliedAt: Number.isFinite(lr) ? new Date(lr).toISOString() : null, teammateAt: tmAt, optedOut,
       repliedRecent: Number.isFinite(lr) && now.getTime() - lr <= BOARD_ACTIVE_DAYS * 864e5 && !giftAsk.get(k15(id)),      // the lead replied in the last 30 days (a real reply, not a hand note, and not a gift-card complaint): like boardWorked it is never parked as "older", so a pro who answered "why?" and went quiet is still reached (Luke, 2026-11-03: "Yes, include them")
       boardWorked: boardLast.has(k15(id)) && now.getTime() - boardLast.get(k15(id)) <= BOARD_ACTIVE_DAYS * 864e5,      // the board texted or emailed this lead in the last 30 days: it is mid-drip and keeps going past the 7-day window (see board())
-      board, boardAt, boardExpiresAt, onNurture, onReengage,
+      board, boardAt, boardExpiresAt, reconnectAt, reconnectLabel, nurtureStages, spanDays, onNurture, onReengage,
       labelOnly: !kinds.length && !onNurture,       // tagged only with a label (#referral / #reengage): held for a person. #nurture runs the slow drip.
       startable: !!(ownTouches.length || kinds.includes('Shark') || m || startNewLds || onNurture),
     });

@@ -113,6 +113,10 @@ function readManualRecords() {
         board: r.board || null,
         boardAt: r.at || null,
         boardExpiresAt: r.expiresAt || r.boardExpiresAt || null,
+        reconnectAt: r.reconnectAt || null,
+        reconnectLabel: r.reconnectLabel || null,
+        nurtureStages: Array.isArray(r.stages) ? r.stages : null,
+        spanDays: r.spanDays != null ? Number(r.spanDays) : null,
         graduatedFrom: r.graduatedFrom || null,
       });
     }
@@ -129,6 +133,10 @@ function readManualRecords() {
           board: b ? b.board : (a.board || null),
           boardAt: b ? b.boardAt : (a.boardAt || null),
           boardExpiresAt: b ? b.boardExpiresAt : (a.boardExpiresAt || a.expiresAt || null),
+          reconnectAt: b ? b.reconnectAt : (a.reconnectAt || null),
+          reconnectLabel: b ? b.reconnectLabel : (a.reconnectLabel || null),
+          nurtureStages: b ? b.nurtureStages : (a.nurtureStages || a.stages || null),
+          spanDays: b ? b.spanDays : (a.spanDays != null ? a.spanDays : null),
           graduatedFrom: b ? b.graduatedFrom : (a.graduatedFrom || null),
         };
       }),
