@@ -452,6 +452,41 @@ function saveBoardStage(id, payload) {
   return { ok: true, board: boardPayload() };
 }
 
+function deskAfter(result) {
+  if (!result || !result.ok) return result;
+  try { result.desk = require('./dayDesk').build(); } catch (_) { /* the page can reload the desk */ }
+  return result;
+}
+
+/** Put a lead on the personal board. Writes the same records as textLog.js --add-lead. Nothing is sent. */
+function addHandLead(body) {
+  const manual = require('./manualShark');
+  const r = manual.addLead({
+    ref: body && (body.ref || body.accountId || body.url),
+    name: body && body.name ? body.name : null,
+    tags: body && body.tags,
+    did: body && body.did,
+    note: body && body.note ? body.note : null,
+    on: body && body.on ? body.on : null,
+  });
+  if (!r.ok) return { ok: false, error: r.reason };
+  return deskAfter({
+    ok: true,
+    account: r.account,
+    tags: r.tags,
+    did: r.did,
+    warnings: r.warnings || [],
+  });
+}
+
+/** Take a hand-added lead back off the board. */
+function removeHandLead(body) {
+  const manual = require('./manualShark');
+  const r = manual.removeLead({ ref: body && (body.ref || body.accountId) });
+  if (!r.ok) return { ok: false, error: r.reason };
+  return deskAfter({ ok: true, removed: (r.removed || []).length });
+}
+
 function setActiveBoard(id) {
   const r = require('./boards').setActiveBoard(id);
   if (!r.ok) return r;
@@ -507,6 +542,16 @@ async function handleApi(req, res, url) {
   }
   if (req.method === 'GET' && url.pathname === '/api/dnc') {
     try { return sendJson(res, 200, dncPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/leads') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, addHandLead(j));
+  }
+  if (req.method === 'POST' && url.pathname === '/api/leads/remove') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, removeHandLead(j));
   }
   if (req.method === 'POST' && url.pathname === '/api/dnc') {
     const raw = await readBody(req);
