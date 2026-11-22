@@ -247,6 +247,23 @@ function flush(kind, flags) {
 
 // ---- Templates + analytics (localhost APIs) ----------------------------------------------------------------
 
+function industryDripTexts(values, setup) {
+  let all = {};
+  try { all = JSON.parse(fs.readFileSync(path.join(__dirname, 'industry-drip-texts.json'), 'utf8')) || {}; } catch (_) { return []; }
+  return Object.keys(all).filter((k) => !k.startsWith('_') && all[k] && typeof all[k] === 'object').map((id) => {
+    const t = all[id];
+    const text = String(t.text || '');
+    return {
+      id,
+      name: t.name || id,
+      text,
+      kind: 'industry',
+      channel: 'text',
+      preview: setup ? setup.expandTokens(text, values || {}) : text,
+    };
+  });
+}
+
 function templatesPayload() {
   const setup = require('./senderSetup');
   let values = {};
@@ -259,7 +276,7 @@ function templatesPayload() {
     kind: item.kind,
     channel: 'text',
     preview: setup.expandTokens(item.text, values),
-  }));
+  })).concat(industryDripTexts(values, setup));
   let emails = [];
   try {
     const all = JSON.parse(fs.readFileSync(EMAIL_TEMPLATES, 'utf8')) || {};

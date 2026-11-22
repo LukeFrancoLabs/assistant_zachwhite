@@ -53,6 +53,7 @@ function loadPackFile(id) {
     name: j.name || id,
     description: j.description || '',
     tag: j.tag || null,
+    industry: j.industry || null,
     stages: j.stages.map((s, i) => ({
       outreach: s.outreach != null ? Number(s.outreach) : i + 1,
       afterMin: s.afterMin || 0,
@@ -67,22 +68,29 @@ function loadPackFile(id) {
 }
 
 function listPacks() {
-  const packs = [dripPack()];
+  const ORDER = ['post-demo', 'drip-hvac', 'drip-plumbing', 'drip-electrical', 'drip'];
+  const byId = new Map();
+  byId.set('drip', dripPack());
   try {
     for (const name of fs.readdirSync(DIR)) {
       if (!name.endsWith('.json')) continue;
       const id = name.replace(/\.json$/, '');
       if (id === 'drip') continue;
       const p = loadPackFile(id);
-      if (p) packs.push({ id: p.id, name: p.name, description: p.description, stageCount: p.stages.length });
+      if (p) byId.set(p.id, p);
     }
   } catch (_) { /* no boards dir yet */ }
-  // Full objects for drip already; normalize list entries
-  return packs.map((p) => (
-    p.stages
-      ? { id: p.id, name: p.name, description: p.description, stageCount: p.stages.length }
-      : p
-  ));
+  const ordered = [];
+  for (const id of ORDER) {
+    if (!byId.has(id)) continue;
+    const p = byId.get(id);
+    ordered.push({ id: p.id, name: p.name, description: p.description || '', stageCount: p.stages.length, industry: p.industry || null });
+    byId.delete(id);
+  }
+  for (const p of byId.values()) {
+    ordered.push({ id: p.id, name: p.name, description: p.description || '', stageCount: (p.stages || []).length, industry: p.industry || null });
+  }
+  return ordered;
 }
 
 function readLocal() {

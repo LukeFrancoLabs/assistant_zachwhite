@@ -1,0 +1,86 @@
+{
+  "id": "drip-plumbing",
+  "name": "Plumbing drip (2 weeks)",
+  "description": "Industry drip for plumbing — texts + emails over ~14 days (emergencies, booking, paid invoices, pipeline, soft close). Modular: edit Day or template anytime.",
+  "tag": "plumbing",
+  "industry": "Plumbing",
+  "stages": [
+    {
+      "id": "plumb1",
+      "outreach": 1,
+      "day": 0,
+      "ch": "text",
+      "n": 1,
+      "label": "Day 0 · Text intro",
+      "template": "plumbing-t1",
+      "afterMin": 0,
+      "hint": "First touch — after-hours drain / water-heater angle."
+    },
+    {
+      "id": "plumb2",
+      "outreach": 2,
+      "day": 1,
+      "ch": "email",
+      "n": 1,
+      "label": "Day 1 · Email opener",
+      "emailTemplate": "plumbing-drip-1",
+      "afterMin": 0,
+      "hint": "Email — booking + dispatch for plumbing shops."
+    },
+    {
+      "id": "plumb3",
+      "outreach": 3,
+      "day": 3,
+      "ch": "text",
+      "n": 2,
+      "label": "Day 3 · Text booking",
+      "template": "plumbing-t2",
+      "afterMin": 0,
+      "hint": "Online booking while you're on a job."
+    },
+    {
+      "id": "plumb4",
+      "outreach": 4,
+      "day": 5,
+      "ch": "email",
+      "n": 2,
+      "label": "Day 5 · Email paid on-site",
+      "emailTemplate": "plumbing-drip-2",
+      "afterMin": 0,
+      "hint": "Get paid on the spot — card / ACH / financing."
+    },
+    {
+      "id": "plumb5",
+      "outreach": 5,
+      "day": 8,
+      "ch": "text",
+      "n": 3,
+      "label": "Day 8 · Text pipeline",
+      "template": "plumbing-t3",
+      "afterMin": 0,
+      "hint": "Estimates going quiet during service-call weeks."
+    },
+    {
+      "id": "plumb6",
+      "outreach": 6,
+      "day": 11,
+      "ch": "email",
+      "n": 3,
+      "label": "Day 11 · Email campaigns",
+      "emailTemplate": "plumbing-drip-3",
+      "afterMin": 0,
+      "hint": "Past customers + review asks after every job."
+    },
+    {
+      "id": "plumb7",
+      "outreach": 7,
+      "day": 14,
+      "ch": "text",
+      "n": 4,
+      "label": "Day 14 · Text soft close",
+      "template": "plumbing-t4",
+      "afterMin": 0,
+      "hint": "Soft close — book or opt out."
+    }
+  ]
+}

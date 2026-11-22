@@ -1,0 +1,86 @@
+{
+  "id": "drip-electrical",
+  "name": "Electrical drip (2 weeks)",
+  "description": "Industry drip for electrical — texts + emails over ~14 days (panel/service mix, booking, financing, pipeline, soft close). Modular days + templates.",
+  "tag": "electrical",
+  "industry": "Electrical",
+  "stages": [
+    {
+      "id": "elec1",
+      "outreach": 1,
+      "day": 0,
+      "ch": "text",
+      "n": 1,
+      "label": "Day 0 · Text intro",
+      "template": "electrical-t1",
+      "afterMin": 0,
+      "hint": "First touch — panel upgrades + service-call load."
+    },
+    {
+      "id": "elec2",
+      "outreach": 2,
+      "day": 1,
+      "ch": "email",
+      "n": 1,
+      "label": "Day 1 · Email opener",
+      "emailTemplate": "electrical-drip-1",
+      "afterMin": 0,
+      "hint": "Email — scheduling + Pipeline for electrical shops."
+    },
+    {
+      "id": "elec3",
+      "outreach": 3,
+      "day": 3,
+      "ch": "text",
+      "n": 2,
+      "label": "Day 3 · Text booking",
+      "template": "electrical-t2",
+      "afterMin": 0,
+      "hint": "Online booking from Google / site."
+    },
+    {
+      "id": "elec4",
+      "outreach": 4,
+      "day": 5,
+      "ch": "email",
+      "n": 2,
+      "label": "Day 5 · Email financing",
+      "emailTemplate": "electrical-drip-2",
+      "afterMin": 0,
+      "hint": "Bigger panel / whole-home jobs — get paid + financing."
+    },
+    {
+      "id": "elec5",
+      "outreach": 5,
+      "day": 8,
+      "ch": "text",
+      "n": 3,
+      "label": "Day 8 · Text pipeline",
+      "template": "electrical-t3",
+      "afterMin": 0,
+      "hint": "Quotes waiting on the homeowner — Pipeline nudges."
+    },
+    {
+      "id": "elec6",
+      "outreach": 6,
+      "day": 11,
+      "ch": "email",
+      "n": 3,
+      "label": "Day 11 · Email reputation",
+      "emailTemplate": "electrical-drip-3",
+      "afterMin": 0,
+      "hint": "Reviews + past-customer campaigns for electrical Pros."
+    },
+    {
+      "id": "elec7",
+      "outreach": 7,
+      "day": 14,
+      "ch": "text",
+      "n": 4,
+      "label": "Day 14 · Text soft close",
+      "template": "electrical-t4",
+      "afterMin": 0,
+      "hint": "Soft close — book or stop."
+    }
+  ]
+}
