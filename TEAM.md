@@ -120,3 +120,17 @@ Browse in the **Content** tab, or pull assets into emails via `contentPicker.js`
 ## Your own Pipeline Assistant
 
 Same app — just run `zw`. Shark / report / Claude-off tooling stays on your copy; reps mostly live in Morning → Kit → My leads.
+
+### Mac Mini not updating? (`file://…/outreach-dashboard/index.html`)
+
+That URL is the **old static page** from `main`. Pipeline Assistant needs localhost + the feature branch:
+
+```bash
+cd ~/assistant_zachwhite
+git fetch origin
+git checkout cursor/nurture-slow-drip-bcc4   # or cursor/claude-off-full-list-harvest-ed5f after nurture merges
+git pull
+node outreachDashboard.js --serve           # leave this running, OR just run zw (it starts serve)
+```
+
+You should see **http://127.0.0.1:9340/** with Morning / Board / Content / My leads — not a `file://` path. If serve fails, check `outreach-dashboard/server.log`.

@@ -619,12 +619,12 @@ async function ensureServing() {
     serveLog('spawn failed: ' + (e && e.message));
     return false;
   }
-  // Wait up to ~5s — Mac cold start + antivirus can be slow; never open the browser until health passes.
-  for (let i = 0; i < 50; i++) {
+  // Wait up to ~12s — Mac cold start + antivirus can be slow; never open the browser until health passes.
+  for (let i = 0; i < 120; i++) {
     await new Promise((r) => setTimeout(r, 100));
     if (await healthOk()) { serveLog('healthy'); return true; }
   }
-  serveLog('health check failed after spawn');
+  serveLog('health check failed after spawn (see lines above for EADDRINUSE / crash)');
   return false;
 }
 
@@ -694,13 +694,16 @@ async function launch(flags = []) {
     try { console.log('Pipeline Assistant: ' + dashUrl()); } catch (_) {}
     return dashUrl();
   }
-  // Last resort: open the static file (Sends only). Prefer telling the user how to start the live server.
+  // Do NOT open file:// — that static copy looks like "the app" but has no Morning/Board/Content APIs and goes stale.
   try {
-    console.error('Pipeline Assistant server did not start on port ' + PORT + '. Run: node outreachDashboard.js --serve');
-    console.error('(details: ' + SERVE_LOG + ')');
+    console.error('Pipeline Assistant did not start on http://127.0.0.1:' + PORT + '/');
+    console.error('  Fix:  cd "' + __dirname + '" && node outreachDashboard.js --serve');
+    console.error('  Then open:  ' + dashUrl());
+    console.error('  Log:  ' + SERVE_LOG);
+    console.error('  Tip:  Mac Mini must be on the Pipeline Assistant branch (not main).');
+    console.error('        git fetch && git checkout cursor/nurture-slow-drip-bcc4 && git pull');
   } catch (_) {}
-  openPage(file);
-  return file;
+  return 'failed';
 }
 
 
@@ -729,9 +732,15 @@ if (require.main === module) {
     if (!f) { console.log('The outreach dashboard could not be written (or ASSISTANT_NO_DASHBOARD is set).'); process.exitCode = 1; }
     else {
       ensureServing().then((live) => {
-        const target = live ? dashUrl() : f;
-        console.log('\n  📬 Outreach dashboard: ' + target + (live ? '' : '\n     file://' + f) + '\n');
-        openPage(live ? dashUrl() : f);
+        if (live) {
+          console.log('\n  📬 Pipeline Assistant: ' + dashUrl() + '\n');
+          openPage(dashUrl());
+        } else {
+          console.log('\n  ⚠️  Pipeline Assistant server did not start.');
+          console.log('     Run:  node outreachDashboard.js --serve');
+          console.log('     Then open:  ' + dashUrl());
+          console.log('     (Do not use file://outreach-dashboard/index.html — that copy is stale.)\n');
+        }
       });
     }
   }
