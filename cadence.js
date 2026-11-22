@@ -391,6 +391,10 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
       board: a.board || null, boardAt: a.boardAt || null, boardExpiresAt: a.boardExpiresAt || null,
       reconnectAt: a.reconnectAt || null, reconnectLabel: a.reconnectLabel || null,
       nurtureStages: a.nurtureStages || null, spanDays: a.spanDays != null ? a.spanDays : null,
+      productIds: Array.isArray(a.productIds) ? a.productIds.slice() : [],
+      primaryProductId: a.primaryProductId || null,
+      productsAt: a.productsAt || null,
+      productsNote: a.productsNote || null,
     };
     if (!cur) manual.set(k, { ...one, tags: [...tl.manualTags(a)] });
     else {
@@ -406,6 +410,14 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
           reconnectLabel: a.reconnectLabel || null,
           nurtureStages: a.nurtureStages || null,
           spanDays: a.spanDays != null ? a.spanDays : null,
+        });
+      }
+      if (a.productsAt && (!cur.productsAt || String(a.productsAt) >= String(cur.productsAt))) {
+        Object.assign(cur, {
+          productIds: Array.isArray(a.productIds) ? a.productIds.slice() : [],
+          primaryProductId: a.primaryProductId || null,
+          productsAt: a.productsAt || null,
+          productsNote: a.productsNote || null,
         });
       }
     }
@@ -440,6 +452,15 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
     const spanDays = (m && m.spanDays != null) ? m.spanDays : null;
     const onNurture = board === 'nurture' || own.includes('nurture');
     const onReengage = !onNurture && own.includes('reengage');
+    const productIds = (m && Array.isArray(m.productIds)) ? m.productIds.slice() : [];
+    const primaryProductId = (m && m.primaryProductId) || (productIds[0] || null);
+    let primaryProduct = null, products = [];
+    try {
+      const catalog = require('./products');
+      const resolved = catalog.resolve(productIds.length ? productIds : (primaryProductId ? [primaryProductId] : []));
+      products = resolved.products;
+      primaryProduct = products.find((x) => x.id === primaryProductId) || resolved.primary;
+    } catch (_) { /* catalog optional */ }
     const touches = (a.touches || []).map((t) => ({ ch: t.ch, at: t.at, mode: t.mode || null, title: t.title || null }));
     const ownTouches = touches.filter((t) => t.mode !== BLAST_MODE);      // what the board counts: a --blast email is a manual one-off, it neither starts a lead nor says when its cadence began
     const sn = snaps.get(k15(id));
@@ -468,6 +489,7 @@ function members({ textLog, now = new Date(), startNewLds = false, holds } = {})
       repliedRecent: Number.isFinite(lr) && now.getTime() - lr <= BOARD_ACTIVE_DAYS * 864e5 && !giftAsk.get(k15(id)),      // the lead replied in the last 30 days (a real reply, not a hand note, and not a gift-card complaint): like boardWorked it is never parked as "older", so a pro who answered "why?" and went quiet is still reached (Luke, 2026-11-03: "Yes, include them")
       boardWorked: boardLast.has(k15(id)) && now.getTime() - boardLast.get(k15(id)) <= BOARD_ACTIVE_DAYS * 864e5,      // the board texted or emailed this lead in the last 30 days: it is mid-drip and keeps going past the 7-day window (see board())
       board, boardAt, boardExpiresAt, reconnectAt, reconnectLabel, nurtureStages, spanDays, onNurture, onReengage,
+      productIds, primaryProductId, products, primaryProduct,
       labelOnly: !kinds.length && !onNurture,       // tagged only with a label (#referral / #reengage): held for a person. #nurture runs the slow drip.
       startable: !!(ownTouches.length || kinds.includes('Shark') || m || startNewLds || onNurture),
     });

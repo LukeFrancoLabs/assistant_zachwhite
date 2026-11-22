@@ -219,6 +219,16 @@ function myLeadsPayload(now = new Date()) {
         reconnectLabel,
         spanDays,
         inRamp,
+        productIds: e.lead.productIds || [],
+        primaryProductId: e.lead.primaryProductId || null,
+        primaryProduct: e.lead.primaryProduct || null,
+        products: e.lead.products || [],
+        proposal: (() => {
+          try {
+            return require('./products').proposalTokens(e.lead.primaryProduct || null);
+          } catch (_) { return null; }
+        })(),
+        productCommand: 'node textLog.js --product-lead ' + (e.lead.accountId || '') + ' --product essentials',
         nurtureCommand: 'node textLog.js --nurture-lead ' + (e.lead.accountId || '') + ' --until summer',
         addCommand: null,
       };
@@ -306,6 +316,62 @@ function setLeadBoard(accountId, board, opts = {}) {
   };
 }
 
+function setLeadProducts(accountId, opts = {}) {
+  const manualShark = require('./manualShark');
+  const r = manualShark.setLeadProducts({
+    ref: accountId,
+    products: opts.products || opts.product || null,
+    primary: opts.primary || null,
+    note: opts.note || null,
+  });
+  if (!r.ok) return { ok: false, error: r.reason };
+  return {
+    ok: true,
+    products: r.products,
+    primary: r.primary,
+    primaryProduct: r.primaryProduct || null,
+    proposal: r.proposal || null,
+    myLeads: myLeadsPayload(new Date()),
+  };
+}
+
+/** Product catalog + blast audience preview (DNC / banned already excluded by the board). */
+function productsPayload({ product = null, noHigher = false, days = 5 } = {}) {
+  const catalog = require('./products').loadCatalog();
+  const eb = require('./emailBlast');
+  const preview = eb.fromBoard({
+    textLog: require('./textLog'),
+    cadence: require('./cadence'),
+    days: Number(days) || 5,
+    includeNever: true,
+    product: product || null,
+    noHigher: !!noHigher,
+  });
+  return {
+    catalog,
+    filter: { product: product || null, noHigher: !!noHigher, days: Number(days) || 5 },
+    audience: {
+      ready: preview.stats.ready,
+      noProduct: preview.stats.noProduct || 0,
+      wrongProduct: preview.stats.wrongProduct || 0,
+      byProduct: preview.stats.byProduct || {},
+      leads: preview.leads.slice(0, 40).map((l) => ({
+        name: l.name,
+        accountId: l.accountId,
+        url: l.url,
+        primaryProductId: l.primaryProductId || null,
+        productIds: l.productIds || [],
+        daysSince: l.daysSince,
+      })),
+    },
+    blastCommand: product
+      ? `zw --email --blast --product ${product}${noHigher ? ' --no-higher' : ''} --days ${Number(days) || 5} --range 1-25 --dry-run`
+      : 'zw --email --blast --product essentials --no-higher --days 5 --range 1-25 --dry-run',
+    tip: 'Essentials end-of-year sale: filter --product essentials --no-higher so Max / Above pitches never see that promo.',
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 function build() {
   const now = new Date();
   const morning = []
@@ -333,7 +399,7 @@ function build() {
   };
 }
 
-module.exports = { build, loadKit, DEFAULT_KIT, SHARED_DIR, DESK_FILE, setLeadBoard, myLeadsPayload };
+module.exports = { build, loadKit, DEFAULT_KIT, SHARED_DIR, DESK_FILE, setLeadBoard, setLeadProducts, productsPayload, myLeadsPayload };
 
 if (require.main === module) {
   const d = build();

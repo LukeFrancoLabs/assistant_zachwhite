@@ -11,6 +11,7 @@ Personal day management for every AE — morning queue, replies, post-call kit, 
 | **Quick kit** | Day-after-demo email, book-demo text, soft follow-ups — copy a command |
 | **My leads** | Hand-added follow-ups + next stage |
 | **Board** | Default **HVAC board** as an n8n-style flow graph. Also **Plumbing**, **Electrical**, **Interior cleaning**, **Pressure washing**, Post-demo, Nurture, cold drip — switch pack, edit Day/template |
+| **Products** | Save pitched plan (**Essentials / Max / Above**) on My leads → tailored proposals + product-filtered blasts (`--product essentials --no-higher` skips Max/Above; DNC always out) |
 | **Content** | Sales Content Finder library — filter by trade / need / competitor, copy link or subject |
 | **Today** | What already went out today |
 | Sends / Templates / Scoreboard / DNC | Same as before |

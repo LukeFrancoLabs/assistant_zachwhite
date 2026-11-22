@@ -341,6 +341,53 @@ function nurtureLead({ ref, dryRun = false, now = new Date(), expiresAt = null, 
 }
 
 /**
+ * Save which HCP product(s) were pitched on this opportunity (Essentials / Max / Above).
+ * Used for tailored proposals and product-filtered email blasts.
+ * → { ok, products, primary, adds }
+ */
+function setLeadProducts({ ref, products = null, primary = null, note = null, dryRun = false, now = new Date() } = {}) {
+  const p = parseAccountRef(ref); if (p.error) return { ok: false, reason: p.error };
+  const catalog = require('./products');
+  const norm = catalog.normalizeIds(products);
+  if (norm.error) return { ok: false, reason: norm.error };
+  let primaryId = primary ? String(primary).toLowerCase().trim() : null;
+  if (primaryId && !norm.ids.includes(primaryId)) {
+    return { ok: false, reason: `primary "${primaryId}" must be one of the pitched products (${norm.ids.join(', ')})` };
+  }
+  if (!primaryId) {
+    const resolved = catalog.resolve(norm.ids);
+    primaryId = resolved.primary ? resolved.primary.id : norm.ids[0];
+  }
+  const adds = textLog.readManualRecords().adds.filter((a) => k15(a.accountId) === k15(p.id));
+  if (!adds.length) return { ok: false, reason: 'no lead added by hand matches that account — add them first (My leads / --add-lead), then set products' };
+  const at = (now instanceof Date ? now : new Date(now)).toISOString();
+  const resolved = catalog.resolve(norm.ids);
+  const out = {
+    ok: true,
+    dryRun: !!dryRun,
+    products: norm.ids,
+    primary: primaryId,
+    catalog: resolved.products,
+    primaryProduct: resolved.products.find((x) => x.id === primaryId) || resolved.primary,
+    adds,
+    proposal: catalog.proposalTokens(resolved.products.find((x) => x.id === primaryId) || resolved.primary),
+  };
+  if (dryRun) return out;
+  const lines = adds.map((a) => JSON.stringify({
+    type: 'product',
+    id: a.id,
+    at,
+    accountId: a.accountId,
+    accountName: a.accountName,
+    products: norm.ids,
+    primary: primaryId,
+    note: note ? String(note).trim() : null,
+  }));
+  fs.appendFileSync(textLog.MANUAL_FILE, lines.join('\n') + '\n', 'utf8');
+  return out;
+}
+
+/**
  * Nurture leads whose expiration date has passed → off nurture, onto #reengage list.
  * Safe to call often (dayDesk / members); only writes when someone actually expires.
  * → { graduated: [{ accountId, name, expiresAt, tags }], skipped }
@@ -446,8 +493,8 @@ function emailStanding(leads, { minDays = 3 } = {}) {
 }
 
 // ---- command line ------------------------------------------------------------------------------------------------------------------------------------------------
-const VALUE_FLAGS = new Set(['--did', '--on', '--name', '--note', '--tag', '--board', '--expires', '--expires-days', '--until', '--reconnect']);
-const BOOL_FLAGS = new Set(['--dry-run', '--again']);
+const VALUE_FLAGS = new Set(['--did', '--on', '--name', '--note', '--tag', '--board', '--expires', '--expires-days', '--until', '--reconnect', '--product', '--products', '--primary']);
+const BOOL_FLAGS = new Set(['--dry-run', '--again', '--no-higher']);
 function parseArgs(tokens) {
   const o = { refs: [], flags: {} };
   for (let i = 0; i < tokens.length; i++) {
@@ -499,6 +546,26 @@ function cli(argv, out = console.log) {
     if (!r.graduated.length) out('  (nobody past their nurture expiration date)');
     out('');
     return { code: 0, changed: !dry && r.graduated.length > 0 };
+  }
+  if (cmd === '--product-lead') {
+    if (a.refs.length !== 1 || !(a.flags['--product'] || a.flags['--products'])) {
+      out('\nUsage:  node textLog.js --product-lead <SF link> --product essentials|max|above[,…] [--primary essentials] [--note "…"] [--dry-run]\n        Save what was pitched so proposals + product blasts stay accurate.\n');
+      return { code: 1, changed: false };
+    }
+    const r = setLeadProducts({
+      ref: a.refs[0],
+      products: a.flags['--product'] || a.flags['--products'],
+      primary: a.flags['--primary'] || null,
+      note: a.flags['--note'] || null,
+      dryRun: dry,
+    });
+    if (!r.ok) { out(`\n❌ ${r.reason}\n`); return { code: 1, changed: false }; }
+    const name = (r.adds[0] && (r.adds[0].accountName || r.adds[0].accountId)) || a.refs[0];
+    const labels = (r.catalog || []).map((p) => p.name + (p.id === r.primary ? ' (primary)' : '')).join(', ');
+    out(`\n${dry ? '(dry run) would save' : '📦 Saved'} products for ${name}: ${labels}`);
+    if (r.proposal && r.proposal.product_price) out(`   Proposal price: ${r.proposal.product_price}${r.proposal.product_promo ? ' · promo ' + r.proposal.product_promo : ''}`);
+    out(`   Essentials-only blast later:  email --email --blast --product essentials --no-higher\n`);
+    return { code: 0, changed: !dry };
   }
   if (cmd === '--nurture-lead' || cmd === '--set-board') {
     if (a.refs.length !== 1) {
@@ -572,6 +639,6 @@ function cli(argv, out = console.log) {
 
 module.exports = {
   parseAccountRef, parseWhen, parseTags, addLead, tagLead, setLeadBoard, nurtureLead,
-  graduateExpiredNurture, removeLead, listLeads, emailLeads, emailStanding,
+  setLeadProducts, graduateExpiredNurture, removeLead, listLeads, emailLeads, emailStanding,
   stage2Day, stage2Lines, cli, STAGE2_DAYS, DIDS, MAX_TAGS,
 };

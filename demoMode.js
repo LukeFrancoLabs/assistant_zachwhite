@@ -172,7 +172,7 @@ function replies() {
 function myLeads() {
   const summer = daysFromNow(190);
   return [
-    {
+    attachProducts({
       ...lead('Lake Country HVAC', IDS.lakeHVAC),
       tags: ['hvac', 'demo'],
       state: 'due',
@@ -192,9 +192,10 @@ function myLeads() {
       spanDays: null,
       inRamp: false,
       nurtureCommand: 'node textLog.js --nurture-lead ' + IDS.lakeHVAC + ' --until summer',
+      productCommand: 'node textLog.js --product-lead ' + IDS.lakeHVAC + ' --product essentials',
       addCommand: null,
-    },
-    {
+    }, 'essentials'),
+    attachProducts({
       ...lead('Summit AC Pros', IDS.summitAC),
       tags: ['hvac'],
       state: 'due',
@@ -214,9 +215,10 @@ function myLeads() {
       spanDays: null,
       inRamp: false,
       nurtureCommand: 'node textLog.js --nurture-lead ' + IDS.summitAC + ' --until summer',
+      productCommand: 'node textLog.js --product-lead ' + IDS.summitAC + ' --product essentials',
       addCommand: null,
-    },
-    {
+    }, 'essentials'),
+    attachProducts({
       ...lead('Harbor Mechanical', IDS.harborMech),
       tags: ['referral', 'demo'],
       state: 'due',
@@ -236,8 +238,9 @@ function myLeads() {
       spanDays: null,
       inRamp: false,
       nurtureCommand: 'node textLog.js --nurture-lead ' + IDS.harborMech + ' --until summer',
+      productCommand: 'node textLog.js --product-lead ' + IDS.harborMech + ' --product max',
       addCommand: null,
-    },
+    }, 'max'),
     {
       ...lead('Green Therm Comfort', IDS.greenTherm),
       tags: ['nurture', 'hvac'],
@@ -304,7 +307,7 @@ function myLeads() {
       nurtureCommand: 'node textLog.js --nurture-lead ' + IDS.metroPlumb + ' --until summer',
       addCommand: null,
     },
-    {
+    attachProducts({
       ...lead('Sparkle Interior Clean', IDS.sparkleClean),
       tags: ['cleaning'],
       state: 'due',
@@ -324,9 +327,10 @@ function myLeads() {
       spanDays: null,
       inRamp: false,
       nurtureCommand: 'node textLog.js --nurture-lead ' + IDS.sparkleClean + ' --until summer',
+      productCommand: 'node textLog.js --product-lead ' + IDS.sparkleClean + ' --product essentials',
       addCommand: null,
-    },
-    {
+    }, 'essentials'),
+    attachProducts({
       ...lead('Bright Side Pressure Wash', IDS.brightWash),
       tags: ['pressure-washing'],
       state: 'waiting',
@@ -346,8 +350,9 @@ function myLeads() {
       spanDays: null,
       inRamp: false,
       nurtureCommand: 'node textLog.js --nurture-lead ' + IDS.brightWash + ' --until summer',
+      productCommand: 'node textLog.js --product-lead ' + IDS.brightWash + ' --product above',
       addCommand: null,
-    },
+    }, 'above'),
   ];
 }
 
@@ -489,6 +494,54 @@ function health(port = DEMO_PORT) {
   };
 }
 
+function attachProducts(lead, productId) {
+  try {
+    const catalog = require('./products');
+    const resolved = catalog.resolve([productId]);
+    lead.productIds = [productId];
+    lead.primaryProductId = productId;
+    lead.products = resolved.products;
+    lead.primaryProduct = resolved.primary;
+    lead.proposal = catalog.proposalTokens(resolved.primary);
+  } catch (_) { /* optional */ }
+  return lead;
+}
+
+function productsPayload(searchParams) {
+  const product = (searchParams && typeof searchParams.get === 'function')
+    ? (searchParams.get('product') || 'essentials')
+    : (searchParams && searchParams.product) || 'essentials';
+  const noHigher = (searchParams && typeof searchParams.get === 'function')
+    ? (searchParams.get('noHigher') === '1' || searchParams.get('noHigher') === 'true')
+    : !!(searchParams && searchParams.noHigher);
+  const catalog = require('./products').loadCatalog();
+  const sample = [
+    { name: 'Lake Country HVAC', accountId: IDS.lakeHVAC, primaryProductId: 'essentials', productIds: ['essentials'], daysSince: 12 },
+    { name: 'Summit AC Pros', accountId: IDS.summitAC, primaryProductId: 'essentials', productIds: ['essentials'], daysSince: 8 },
+    { name: 'Sparkle Interior Clean', accountId: IDS.sparkleClean, primaryProductId: 'essentials', productIds: ['essentials'], daysSince: 20 },
+    { name: 'Harbor Mechanical', accountId: IDS.harborMech, primaryProductId: 'max', productIds: ['max'], daysSince: 6 },
+    { name: 'Bright Side Pressure Wash', accountId: IDS.brightWash, primaryProductId: 'above', productIds: ['above'], daysSince: 15 },
+  ].filter((l) => {
+    if (!product) return true;
+    return require('./products').matchesLead(l, { productId: product, noHigher });
+  });
+  return {
+    demo: true,
+    catalog,
+    filter: { product: product || null, noHigher: !!noHigher, days: 5 },
+    audience: {
+      ready: sample.length,
+      noProduct: 2,
+      wrongProduct: noHigher ? 2 : 0,
+      byProduct: { essentials: 3, max: 1, above: 1 },
+      leads: sample.map((l) => ({ ...l, url: sfUrl(l.accountId) })),
+    },
+    blastCommand: `zw --email --blast --product ${product || 'essentials'}${noHigher ? ' --no-higher' : ''} --days 5 --range 1-25 --dry-run`,
+    tip: 'DEMO — Essentials end-of-year sale: --product essentials --no-higher keeps Max / Above off the list.',
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 module.exports = {
   isDemo,
   DEMO_PORT,
@@ -497,6 +550,7 @@ module.exports = {
   analytics,
   dnc,
   health,
+  productsPayload,
   IDS,
 };
 

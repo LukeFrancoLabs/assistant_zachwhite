@@ -497,6 +497,32 @@ async function handleApi(req, res, url) {
       }));
     } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }
+  if (req.method === 'PUT' && url.pathname === '/api/leads/products') {
+    if (DEMO) {
+      return sendJson(res, 200, { ok: true, demo: true, message: 'Demo mode — products not saved.', myLeads: demoMode.daydesk().myLeads });
+    }
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    const id = j.accountId || j.id || j.ref;
+    if (!id) return sendJson(res, 400, { ok: false, error: 'accountId required' });
+    try {
+      return sendJson(res, 200, require('./dayDesk').setLeadProducts(id, {
+        products: j.products || j.product,
+        primary: j.primary || null,
+        note: j.note || null,
+      }));
+    } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/products') {
+    if (DEMO) return sendJson(res, 200, demoMode.productsPayload(url.searchParams));
+    try {
+      return sendJson(res, 200, require('./dayDesk').productsPayload({
+        product: url.searchParams.get('product') || null,
+        noHigher: url.searchParams.get('noHigher') === '1' || url.searchParams.get('noHigher') === 'true',
+        days: url.searchParams.get('days') || 5,
+      }));
+    } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
   if (req.method === 'GET' && url.pathname === '/api/board') {
     try {
       const board = boardPayload();

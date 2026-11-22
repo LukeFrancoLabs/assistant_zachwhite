@@ -179,6 +179,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     <button type="button" role="tab" id="tab-replies" aria-selected="false" data-view="replies">Replies</button>
     <button type="button" role="tab" id="tab-kit" aria-selected="false" data-view="kit">Quick kit</button>
     <button type="button" role="tab" id="tab-myleads" aria-selected="false" data-view="myleads">My leads</button>
+    <button type="button" role="tab" id="tab-products" aria-selected="false" data-view="products">Products</button>
     <button type="button" role="tab" id="tab-board" aria-selected="false" data-view="board">Board</button>
     <button type="button" role="tab" id="tab-content" aria-selected="false" data-view="content">Content</button>
     <button type="button" role="tab" id="tab-today" aria-selected="false" data-view="today">Today</button>
@@ -222,7 +223,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   </section>
 
   <section id="view-myleads" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Your personal follow-up board. Pro wants to reconnect in summer? <b>Move to Nurture</b> until then — quiet touches now, ramp near that date, then <b>Re-engage</b>.</p>
+    <p class="sub" style="margin:14px 0 0">Your personal follow-up board. Save the <b>product pitched</b> (Essentials / Max / Above) for accurate proposals. Pro wants summer? <b>Move to Nurture</b> until then.</p>
     <div id="addLeadBox" class="desk-card" style="margin-top:12px">
       <div class="desk-title">Add after a call</div>
       <h3>Put someone on your board</h3>
@@ -234,6 +235,40 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     </div>
     <div id="myLeadsList" class="desk-list"></div>
     <div class="empty" id="myLeadsEmpty" hidden>No hand-added leads yet. After a good call, use the command above.</div>
+  </section>
+
+  <section id="view-products" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Save what was pitched on an opportunity, then blast only that segment. Example: Essentials end-of-year sale with <b>no higher tiers</b> so Max / Above never see the wrong promo. DNC is always excluded.</p>
+    <div id="productsFlash" class="flash" hidden></div>
+    <div class="controls" style="align-items:flex-end;flex-wrap:wrap">
+      <div>
+        <label for="prodFilter" class="meta" style="display:block;margin:0 0 4px">Product filter</label>
+        <select id="prodFilter" aria-label="Product filter"></select>
+      </div>
+      <label class="meta" style="display:flex;align-items:center;gap:8px;margin:0;padding-bottom:8px">
+        <input type="checkbox" id="prodNoHigher" checked> No higher tiers
+      </label>
+      <button type="button" class="btn primary" id="prodPreview">Preview audience</button>
+    </div>
+    <p class="desk-meta" id="prodTip" style="margin:8px 0 0"></p>
+    <div class="cards" style="grid-template-columns:repeat(3,1fr);margin-top:12px">
+      <div class="card"><div class="k">Ready to blast</div><div class="n" id="prodReady">0</div><div class="s" id="prodReadyS">not on DNC</div></div>
+      <div class="card"><div class="k">No product set</div><div class="n" id="prodUnset">0</div><div class="s">left out of filter</div></div>
+      <div class="card"><div class="k">Wrong / higher tier</div><div class="n" id="prodWrong">0</div><div class="s">excluded on purpose</div></div>
+    </div>
+    <div id="prodCatalog" class="kit-grid"></div>
+    <div class="desk-card" style="margin-top:12px">
+      <div class="desk-title">Blast command</div>
+      <pre class="desk-cmd" id="prodCmd"></pre>
+      <div class="desk-actions"><button type="button" class="btn" id="prodCopyCmd">Copy command</button></div>
+    </div>
+    <div class="tablewrap" style="margin-top:12px">
+      <table>
+        <thead><tr><th>Who</th><th>Pitched</th><th>Last email</th></tr></thead>
+        <tbody id="prodRows"></tbody>
+      </table>
+      <div class="empty" id="prodEmpty" hidden>Preview a product filter to see who would get the blast.</div>
+    </div>
   </section>
 
   <section id="view-board" role="tabpanel" hidden>
@@ -399,7 +434,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   'use strict';
   var POLL_MS = 3000, MAX_DRAWN = 500, LS = 'outreach-dashboard:';
   var LIVE = location.protocol === 'http:' || location.protocol === 'https:';
-  var DESK_VIEWS = ['morning', 'replies', 'kit', 'myleads', 'board', 'content', 'today', 'sends', 'templates', 'analytics', 'dnc'];
+  var DESK_VIEWS = ['morning', 'replies', 'kit', 'myleads', 'products', 'board', 'content', 'today', 'sends', 'templates', 'analytics', 'dnc'];
   var state = {
     view: 'morning', channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0,
     tk: 'text', tq: '', templates: null, editing: null,
@@ -407,7 +442,9 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     dnc: null, dncQ: '',
     desk: null, rq: '',
     board: null,
-    boardMode: 'graph'
+    boardMode: 'graph',
+    products: null,
+    productCatalog: []
   };
 
   function $(id) { return document.getElementById(id); }
@@ -472,6 +509,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     if (view === 'board') loadBoard();
     if (view === 'content') loadContent();
     if (view === 'morning' || view === 'replies' || view === 'kit' || view === 'myleads' || view === 'today') loadDayDesk();
+    if (view === 'products') loadProducts();
   }
 
   function flashBoard(msg, ok) {
@@ -1034,6 +1072,30 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     }
   }
 
+  function flashMyLeads(msg, ok) {
+    var el = $('deskHint');
+    if (!el) return;
+    el.hidden = false;
+    el.textContent = msg;
+    el.className = 'banner' + (ok ? '' : '');
+  }
+
+  function saveLeadProducts(accountId, product) {
+    if (!LIVE) return Promise.resolve(false);
+    return fetch('/api/leads/products', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: accountId, products: [product], primary: product })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.ok) { flashMyLeads((j && j.error) || 'Could not save product', false); return false; }
+      if (j.myLeads && state.desk) state.desk.myLeads = j.myLeads;
+      else loadDayDesk();
+      renderMyLeads();
+      flashMyLeads('Saved product' + (j.primaryProduct ? ': ' + j.primaryProduct.name : ''), true);
+      return true;
+    }).catch(function () { flashMyLeads('Could not save product', false); return false; });
+  }
+
   function setLeadBoard(accountId, board, extra) {
     if (!LIVE || !accountId) return Promise.resolve(false);
     var body = { accountId: accountId, board: board };
@@ -1095,10 +1157,54 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
         if (m.onNurture && m.inRamp) bits.push('ramping up');
         else if (m.onNurture) bits.push('quiet period');
         if (m.next && !m.onReengage) bits.push('Next: ' + m.next);
+        if (m.primaryProduct) bits.push('Pitched: ' + m.primaryProduct.name + (m.primaryProduct.priceLabel ? ' · ' + m.primaryProduct.priceLabel : ''));
+        else if (m.primaryProductId) bits.push('Pitched: ' + m.primaryProductId);
         if (m.tags && m.tags.length) bits.push('#' + m.tags.join(' #'));
         if (m.hold) bits.push(m.hold);
         if (bits.length) card.appendChild(make('div', 'desk-meta', bits.join(' · ')));
+
+        var prodRow = document.createElement('div');
+        prodRow.className = 'controls';
+        prodRow.style.margin = '10px 0 0';
+        var prodLab = make('label', 'meta');
+        prodLab.setAttribute('for', 'prod-' + m.accountId);
+        prodLab.textContent = 'Product pitched';
+        prodRow.appendChild(prodLab);
+        var prodSel = document.createElement('select');
+        prodSel.id = 'prod-' + m.accountId;
+        prodSel.style.width = '100%';
+        prodSel.style.marginTop = '4px';
+        var blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = '— pick Essentials / Max / Above —';
+        prodSel.appendChild(blank);
+        var cats = state.productCatalog.length ? state.productCatalog : [
+          { id: 'essentials', name: 'Essentials' },
+          { id: 'max', name: 'Max' },
+          { id: 'above', name: 'Above / Key Accounts' }
+        ];
+        for (var ci = 0; ci < cats.length; ci++) {
+          var co = document.createElement('option');
+          co.value = cats[ci].id;
+          co.textContent = cats[ci].name + (cats[ci].priceLabel ? ' · ' + cats[ci].priceLabel : '');
+          if (String(m.primaryProductId || '') === String(cats[ci].id)) co.selected = true;
+          prodSel.appendChild(co);
+        }
+        prodRow.appendChild(prodSel);
+        card.appendChild(prodRow);
+        if (m.proposal && m.proposal.product_summary) {
+          card.appendChild(make('div', 'desk-detail', m.proposal.product_summary + (m.proposal.product_price ? ' · ' + m.proposal.product_price : '')));
+        }
+
         var actions = make('div', 'desk-actions');
+        var saveProd = make('button', 'btn primary', 'Save product');
+        saveProd.type = 'button';
+        saveProd.addEventListener('click', function () {
+          if (!prodSel.value) { flashMyLeads('Pick a product first', false); return; }
+          saveProd.disabled = true;
+          saveLeadProducts(m.accountId, prodSel.value).then(function (ok) { if (!ok) saveProd.disabled = false; });
+        });
+        actions.appendChild(saveProd);
         if (m.onReengage) {
           var tip = make('div', 'desk-meta', 'Reconnect window hit. Use Quick kit / email — research-reengage, why-now, or day-after-demo.');
           card.appendChild(tip);
@@ -1210,6 +1316,81 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
       if (j.demo || (j.meta && j.meta.demo)) showDemoBanner(true);
       renderDayDesk();
     }).catch(function () {});
+    if (!state.productCatalog.length) {
+      fetch('/api/products').then(function (r) { return r.json(); }).then(function (j) {
+        if (j && j.catalog) {
+          state.productCatalog = j.catalog;
+          if (state.view === 'myleads') renderMyLeads();
+        }
+      }).catch(function () {});
+    }
+  }
+
+  function loadProducts() {
+    if (!LIVE) return;
+    var product = ($('prodFilter') && $('prodFilter').value) || '';
+    var noHigher = $('prodNoHigher') ? $('prodNoHigher').checked : true;
+    var qs = [];
+    if (product) qs.push('product=' + encodeURIComponent(product));
+    if (noHigher) qs.push('noHigher=1');
+    qs.push('days=5');
+    fetch('/api/products?' + qs.join('&')).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || j.ok === false) return;
+      state.products = j;
+      if (j.catalog) state.productCatalog = j.catalog;
+      renderProducts();
+    }).catch(function () {});
+  }
+
+  function renderProducts() {
+    var j = state.products || {};
+    var cat = j.catalog || state.productCatalog || [];
+    var sel = $('prodFilter');
+    if (sel && !sel.options.length) {
+      var o0 = document.createElement('option');
+      o0.value = '';
+      o0.textContent = 'All with any product';
+      sel.appendChild(o0);
+      for (var i = 0; i < cat.length; i++) {
+        var o = document.createElement('option');
+        o.value = cat[i].id;
+        o.textContent = cat[i].name + ' (tier ' + cat[i].tier + ')';
+        sel.appendChild(o);
+      }
+    }
+    var box = $('prodCatalog');
+    if (box) {
+      box.innerHTML = '';
+      for (var c = 0; c < cat.length; c++) {
+        var p = cat[c];
+        var card = make('div', 'desk-card');
+        card.appendChild(make('div', 'desk-title', 'Tier ' + p.tier));
+        card.appendChild(make('h3', null, p.name));
+        card.appendChild(make('div', 'desk-meta', (p.priceLabel || '') + (p.promoLabel ? ' · ' + p.promoLabel : '')));
+        if (p.summary) card.appendChild(make('div', 'desk-detail', p.summary));
+        box.appendChild(card);
+      }
+    }
+    var aud = j.audience || {};
+    $('prodReady').textContent = fNum.format(aud.ready || 0);
+    $('prodUnset').textContent = fNum.format(aud.noProduct || 0);
+    $('prodWrong').textContent = fNum.format(aud.wrongProduct || 0);
+    $('prodReadyS').textContent = (j.filter && j.filter.product)
+      ? (j.filter.product + (j.filter.noHigher ? ' · no higher' : ''))
+      : 'pick a product filter';
+    $('prodTip').textContent = j.tip || '';
+    $('prodCmd').textContent = j.blastCommand || '';
+    var body = $('prodRows'); body.innerHTML = '';
+    var leads = aud.leads || [];
+    for (var r = 0; r < leads.length; r++) {
+      var L = leads[r];
+      var tr = make('tr', 'row');
+      var td = make('td', 'who'); td.appendChild(personLink(L.name, L.url)); tr.appendChild(td);
+      td = make('td'); td.textContent = (L.productIds || []).join(', ') || (L.primaryProductId || '—'); tr.appendChild(td);
+      td = make('td'); td.textContent = L.daysSince == null ? 'never' : (Math.floor(L.daysSince) + 'd ago'); tr.appendChild(td);
+      body.appendChild(tr);
+    }
+    $('prodEmpty').hidden = leads.length > 0;
   }
 
   function ingest(d) {
@@ -1774,6 +1955,17 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     });
     $('boardViewGraph').addEventListener('click', function () { setBoardMode('graph'); });
     $('boardViewList').addEventListener('click', function () { setBoardMode('list'); });
+    if ($('prodPreview')) $('prodPreview').addEventListener('click', function () { loadProducts(); });
+    if ($('prodFilter')) $('prodFilter').addEventListener('change', function () { loadProducts(); });
+    if ($('prodNoHigher')) $('prodNoHigher').addEventListener('change', function () { loadProducts(); });
+    if ($('prodCopyCmd')) $('prodCopyCmd').addEventListener('click', function () {
+      var cmd = $('prodCmd').textContent || '';
+      if (!cmd) return;
+      copyText(cmd).then(function () {
+        $('prodCopyCmd').textContent = 'Copied';
+        setTimeout(function () { $('prodCopyCmd').textContent = 'Copy command'; }, 1200);
+      }).catch(function () {});
+    });
     window.addEventListener('resize', function () {
       if (state.view !== 'board') return;
       var root = $('boardGraph');

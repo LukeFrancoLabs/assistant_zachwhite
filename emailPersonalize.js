@@ -150,9 +150,9 @@ function fill(text, profile) {
   });
 }
 
-/** → { subject, body, profile } for this account. */
-function render({ subject, body }, accountName) {
-  const profile = profileFor(accountName);
+/** → { subject, body, profile } for this account. Optional `extra` merges product proposal tokens. */
+function render({ subject, body }, accountName, extra = null) {
+  const profile = Object.assign({}, profileFor(accountName), extra || {});
   if (/\{\{\s*industryBlock\b/.test(`${subject}\n${body}`)) { const c = contentFor(profile.industryLabel); profile.industryBlock = ''; profile.industryBlock = fill(c.block, profile); profile.industryAsset = c.asset ? `${c.asset.type}: ${c.asset.title}` : ''; }
   const out = { subject: fill(subject, profile), body: fill(body, profile), profile };
   if (/\{\{|\}\}/.test(out.subject + out.body)) throw new Error('email has an unresolved {{token}} after personalizing');
@@ -162,10 +162,20 @@ function render({ subject, body }, accountName) {
   return out;
 }
 
+/** Proposal email filled with the lead's pitched product pricing. */
+function renderProposal({ subject, body }, accountName, productOrId) {
+  let product = productOrId;
+  if (typeof productOrId === 'string') {
+    product = require('./products').byId().get(String(productOrId).toLowerCase()) || null;
+  }
+  const tokens = require('./products').proposalTokens(product);
+  return render({ subject, body }, accountName, tokens);
+}
+
 /** True when the text uses any {{token}} (so callers can skip work / logging for plain templates). */
 function hasTokens(text) { return /\{\{[^}]+\}\}/.test(String(text || '')); }
 
-module.exports = { contentFor, pickAsset, TRADE_FOR, blockFor, industryContent, render, fill, profileFor, businessName, firstName, stripLegal, hasTokens };
+module.exports = { contentFor, pickAsset, TRADE_FOR, blockFor, industryContent, render, renderProposal, fill, profileFor, businessName, firstName, stripLegal, hasTokens };
 
 // node emailPersonalize.js "Account Name" ["subject" "body"]   → preview, no browser, nothing sent
 if (require.main === module) {

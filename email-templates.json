@@ -452,6 +452,38 @@
       ""
     ]
   },
+  "proposal-product": {
+    "name": "Product proposal (pitched plan)",
+    "subject": "{{product_name}} pricing for {{business|your shop}}",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Following up on what we walked through — here's the {{product_name}} package we discussed for {{business|your team}}.",
+      "",
+      "{{product_summary}}",
+      "",
+      "{{product_bullets}}",
+      "",
+      "Pricing we talked about: {{product_price}} ({{product_promo|standard pricing}}).",
+      "",
+      "If that still lines up, reply here or grab a time with the link below and we can lock next steps.",
+      ""
+    ]
+  },
+  "promo-essentials-eoy": {
+    "name": "Essentials end-of-year promo",
+    "subject": "End-of-year Essentials offer for {{business|your shop}}",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Quick note for Pros we walked through Essentials with — we have an end-of-year offer on that plan (first month $26, no contracts).",
+      "",
+      "This note is only going to shops pitched Essentials, so the pricing matches what you already saw.",
+      "",
+      "Want the details or a quick rebook? Reply here or use the link below.",
+      ""
+    ]
+  },
   "pressure-drip-3": {
     "name": "Pressure washing drip · season + reviews",
     "subject": "Seasonal washes and reviews that refill the board",

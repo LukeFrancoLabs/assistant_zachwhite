@@ -102,7 +102,7 @@ const manualTags = (a) => (a && Array.isArray(a.tags) && a.tags.length ? a.tags 
 function readManualRecords() {
   let sig; try { const st = fs.statSync(MANUAL_FILE); sig = `${st.size}:${st.mtimeMs}`; } catch (_) { return { adds: [], removed: new Set() }; }
   if (_manualRec && _manualRec.sig === sig) return _manualRec.val;
-  const adds = [], removed = new Set(), retag = new Map(), reboard = new Map();
+  const adds = [], removed = new Set(), retag = new Map(), reboard = new Map(), reproduct = new Map();
   for (const r of readRows(MANUAL_FILE)) {
     if (!r || !r.id) continue;
     if (r.type === 'remove') removed.add(r.id);
@@ -119,6 +119,13 @@ function readManualRecords() {
         spanDays: r.spanDays != null ? Number(r.spanDays) : null,
         graduatedFrom: r.graduatedFrom || null,
       });
+    } else if (r.type === 'product' && Array.isArray(r.products)) {
+      reproduct.set(r.id, {
+        productIds: r.products.map((x) => String(x).toLowerCase()),
+        primaryProductId: r.primary ? String(r.primary).toLowerCase() : (r.products[0] ? String(r.products[0]).toLowerCase() : null),
+        productsAt: r.at || null,
+        productsNote: r.note || null,
+      });
     }
   }
   _manualRec = {
@@ -127,6 +134,7 @@ function readManualRecords() {
       adds: adds.filter((a) => !removed.has(a.id)).map((a) => {
         const tags = manualTags(retag.has(a.id) ? { tags: retag.get(a.id) } : a);
         const b = reboard.get(a.id);
+        const p = reproduct.get(a.id);
         return {
           ...a,
           tags,
@@ -138,6 +146,10 @@ function readManualRecords() {
           nurtureStages: b ? b.nurtureStages : (a.nurtureStages || a.stages || null),
           spanDays: b ? b.spanDays : (a.spanDays != null ? a.spanDays : null),
           graduatedFrom: b ? b.graduatedFrom : (a.graduatedFrom || null),
+          productIds: p ? p.productIds : (Array.isArray(a.productIds) ? a.productIds : (Array.isArray(a.products) ? a.products : [])),
+          primaryProductId: p ? p.primaryProductId : (a.primaryProductId || a.primary || null),
+          productsAt: p ? p.productsAt : (a.productsAt || null),
+          productsNote: p ? p.productsNote : (a.productsNote || null),
         };
       }),
       removed,
@@ -3636,7 +3648,7 @@ if (require.main === module) {
   // node textLog.js --add-lead <Salesforce account link or id> […] --tag shark,lds,referral   a lead you worked by hand (stage 1 done by you), #tagged with its kind, tracked for stage 2 (manualShark.js)
   // node textLog.js --tag-lead <link or id> --tag lds   change its tags  ·  --remove-lead <link or id>   take it back out  ·  --manual-leads   who was added, and when stage 2 starts
   // (--add-shark / --remove-shark / --manual-shark are the first names of the same three: --add-shark means --tag shark)
-  if (['--add-lead', '--tag-lead', '--remove-lead', '--manual-leads', '--nurture-lead', '--set-board', '--graduate-nurture', '--add-shark', '--remove-shark', '--manual-shark'].includes(argv[0])) {
+  if (['--add-lead', '--tag-lead', '--remove-lead', '--manual-leads', '--nurture-lead', '--set-board', '--graduate-nurture', '--product-lead', '--add-shark', '--remove-shark', '--manual-shark'].includes(argv[0])) {
     const res = require('./manualShark').cli(argv);
     if (res.changed) console.log('dashboard written:', generateDashboard());
     process.exit(res.code);
