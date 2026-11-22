@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install-for-rep.sh — Luke (or the rep) stands up a Day Desk copy for one person.
+# install-for-rep.sh — Luke (or the rep) stands up an Outreach Assistant copy for one person.
 #
 # Usage:
 #   ./install-for-rep.sh "Zach White"
@@ -31,7 +31,7 @@ slug="$(printf '%s' "$NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/
 TARGET="${2:-$HOME/assistant_${slug}}"
 
 echo ""
-echo "  Installing Day Desk for:  $NAME"
+echo "  Installing Outreach Assistant for:  $NAME"
 echo "  Target folder:            $TARGET"
 echo ""
 
@@ -117,8 +117,8 @@ echo "  Done. Hand this to $NAME:"
 echo ""
 echo "    1. Open a new terminal and type:  zw"
 echo "    2. First time: Settings → fill booking link + phone"
-echo "    3. Browser opens localhost Day Desk (Morning / Replies / Kit)"
-echo "    4. Optional — replies in Day Desk: node replyPoller.js --setup"
+echo "    3. Browser opens localhost Outreach Assistant (Morning / Replies / Kit)"
+echo "    4. Optional — replies in Outreach Assistant: node replyPoller.js --setup"
 echo "    5. Optional — Luke updates templates: node teamSync.js --pull"
 echo ""
 echo "  Folder:  $TARGET"

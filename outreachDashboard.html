@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Day Desk</title>
+<title>Outreach Assistant</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%AC%3C/text%3E%3C/svg%3E">
 <style>
 :root{
@@ -135,13 +135,13 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 <main class="wrap">
   <header class="top">
     <div>
-      <h1>Day Desk</h1>
+      <h1>Outreach Assistant</h1>
       <p class="sub"><span class="dot" id="dot"></span><span id="status">Waiting for data …</span></p>
     </div>
     <a class="link" id="fullLog" href="/full-log" hidden>Full outreach log &rarr;</a>
   </header>
   <div class="banner" id="banner" hidden>Practice flag in use (--test / --dry-run). This page lists only sends that actually went out, so it stays empty unless one does.</div>
-  <div class="banner" id="fileMode" hidden>Opened as a file — Day Desk needs the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page.</div>
+  <div class="banner" id="fileMode" hidden>Opened as a file — Outreach Assistant needs the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page.</div>
   <div class="banner" id="deskHint" hidden></div>
 
   <nav class="nav" role="tablist" aria-label="Dashboard sections">
@@ -603,7 +603,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     $('nAll').textContent = fNum.format(t.sends || 0);
     $('sAll').textContent = split({ text: t.texts || 0, email: t.emails || 0 }) + ' · people ' + fNum.format(t.people || 0);
     $('kRun').textContent = 'This run' + (isFinite(rs) ? ' · since ' + stamp(rs, false) : '');
-    document.title = 'Day Desk · ' + fNum.format(tod.all) + ' today';
+    document.title = 'Outreach Assistant · ' + fNum.format(tod.all) + ' today';
   }
 
   function whatNodes(r) {

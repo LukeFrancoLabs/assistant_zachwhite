@@ -307,16 +307,16 @@ if [ $TOMORROW = 1 ] && [ -f "$SCRIPT_DIR/tomorrow.lock" ]; then
   fi
 fi
 
-# Day Desk (outreachDashboard.js): http://127.0.0.1:9340/ — Morning / Replies / Kit / Templates / Scoreboard / DNC.
+# Outreach Assistant (outreachDashboard.js): http://127.0.0.1:9340/ — Morning / Replies / Kit / Templates / Scoreboard / DNC.
 # Starts a background --serve by default BEFORE Chrome, so the page is always live on localhost.
 # Skipped for --help / --inspect / --sent. ASSISTANT_NO_DASHBOARD=1 turns it off; ASSISTANT_DASHBOARD_PORT overrides 9340.
 case "${ASSISTANT_NO_DASHBOARD:-}" in
   ''|0|false|FALSE|False|no|NO|No|off|OFF|Off)
     DASH_MSG=$(node "$SCRIPT_DIR/outreachDashboard.js" --launch "$@" 2>&1) || true
     if curl -s -m 2 "http://127.0.0.1:${ASSISTANT_DASHBOARD_PORT:-9340}/api/health" >/dev/null 2>&1; then
-      echo "📬 Day Desk: http://127.0.0.1:${ASSISTANT_DASHBOARD_PORT:-9340}/"
+      echo "📬 Outreach Assistant: http://127.0.0.1:${ASSISTANT_DASHBOARD_PORT:-9340}/"
     else
-      echo "⚠️  Day Desk did not start on port ${ASSISTANT_DASHBOARD_PORT:-9340}."
+      echo "⚠️  Outreach Assistant did not start on port ${ASSISTANT_DASHBOARD_PORT:-9340}."
       echo "   Fix:  cd \"$SCRIPT_DIR\" && node outreachDashboard.js --serve"
       [ -n "$DASH_MSG" ] && echo "   ($DASH_MSG)" | head -c 400; echo
     fi

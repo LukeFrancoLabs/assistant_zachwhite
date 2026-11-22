@@ -427,7 +427,7 @@ function serveLog(line) {
   } catch (_) { /* never block a launch */ }
 }
 
-/** Keep a detached --serve process running so Day Desk (Templates / Morning / …) stays up after launch exits. Default on every zw. */
+/** Keep a detached --serve process running so Outreach Assistant (Templates / Morning / …) stays up after launch exits. Default on every zw. */
 async function ensureServing() {
   if (await healthOk()) return true;
   serveLog('starting --serve on port ' + PORT);
@@ -508,7 +508,7 @@ function openPage(target) {
 
 /**
  * What run.sh calls once per launch: build the page, start (or reuse) the localhost server, open the browser.
- * Day Desk always tries to serve on 127.0.0.1 by default (ASSISTANT_NO_DASHBOARD=1 to opt out).
+ * Outreach Assistant always tries to serve on 127.0.0.1 by default (ASSISTANT_NO_DASHBOARD=1 to opt out).
  * → the dashboard URL, a file path (server could not start), 'skipped', or 'failed'.
  */
 async function launch(flags = []) {
@@ -519,12 +519,12 @@ async function launch(flags = []) {
   if (!live) live = await ensureServing(); // one retry — first spawn sometimes races on a busy Mac
   if (live) {
     openPage(dashUrl());
-    try { console.log('Day Desk: ' + dashUrl()); } catch (_) {}
+    try { console.log('Outreach Assistant: ' + dashUrl()); } catch (_) {}
     return dashUrl();
   }
   // Last resort: open the static file (Sends only). Prefer telling the user how to start the live server.
   try {
-    console.error('Day Desk server did not start on port ' + PORT + '. Run: node outreachDashboard.js --serve');
+    console.error('Outreach Assistant server did not start on port ' + PORT + '. Run: node outreachDashboard.js --serve');
     console.error('(details: ' + SERVE_LOG + ')');
   } catch (_) {}
   openPage(file);

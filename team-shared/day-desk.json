@@ -1,5 +1,5 @@
 {
-  "_comment": "Managed Day Desk kit. Luke edits this (or copies via teamSync); each rep pulls with: node teamSync.js --pull",
+  "_comment": "Managed Outreach Assistant kit. Luke edits this (or copies via teamSync); each rep pulls with: node teamSync.js --pull",
   "kit": [
     {
       "id": "day-after-demo",
