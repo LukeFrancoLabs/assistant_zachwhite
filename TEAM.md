@@ -1,4 +1,4 @@
-# Outreach Assistant for the team
+# Pipeline Assistant for the team
 
 Personal day management for every AE — morning queue, replies, post-call kit, my leads, today’s log. **Not** Shark / LDS mass campaigns.
 
@@ -10,6 +10,7 @@ Personal day management for every AE — morning queue, replies, post-call kit, 
 | **Replies** | Inbound replies this copy knows about |
 | **Quick kit** | Day-after-demo email, book-demo text, soft follow-ups — copy a command |
 | **My leads** | Hand-added follow-ups + next stage |
+| **Board** | Follow-up stages — assign any text/email template per stage |
 | **Today** | What already went out today |
 | Sends / Templates / Scoreboard / DNC | Same as before |
 
@@ -33,7 +34,7 @@ Hand them:
 
 1. New terminal → `zw`
 2. Settings → booking link + phone
-3. Browser opens Outreach Assistant on localhost
+3. Browser opens Pipeline Assistant on localhost
 4. Optional replies: `node replyPoller.js --setup`
 5. When you change team templates: `node teamSync.js --pull`
 
@@ -87,7 +88,7 @@ Per-rep `sender.json` (name, booking link, phone, text overrides) is **never** o
 ## Day-to-day for a rep
 
 ```text
-zw                  → welcome menu + Outreach Assistant in the browser
+zw                  → welcome menu + Pipeline Assistant in the browser
 Morning tab         → work the queue
 Quick kit           → after a call/demo, copy a send command
 My leads            → add the account after a good conversation
@@ -101,6 +102,6 @@ node textLog.js --add-lead <Salesforce account URL> --tag referral --did email,t
 
 ---
 
-## Your own Outreach Assistant
+## Your own Pipeline Assistant
 
 Same app — just run `zw`. Shark / report / Claude-off tooling stays on your copy; reps mostly live in Morning → Kit → My leads.

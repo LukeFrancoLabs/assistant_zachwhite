@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Outreach Assistant</title>
+<title>Pipeline Assistant</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%AC%3C/text%3E%3C/svg%3E">
 <style>
 :root{
@@ -135,13 +135,13 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 <main class="wrap">
   <header class="top">
     <div>
-      <h1>Outreach Assistant</h1>
+      <h1>Pipeline Assistant</h1>
       <p class="sub"><span class="dot" id="dot"></span><span id="status">Waiting for data …</span></p>
     </div>
     <a class="link" id="fullLog" href="/full-log" hidden>Full outreach log &rarr;</a>
   </header>
   <div class="banner" id="banner" hidden>Practice flag in use (--test / --dry-run). This page lists only sends that actually went out, so it stays empty unless one does.</div>
-  <div class="banner" id="fileMode" hidden>Opened as a file — Outreach Assistant needs the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page.</div>
+  <div class="banner" id="fileMode" hidden>Opened as a file — Pipeline Assistant needs the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page.</div>
   <div class="banner" id="deskHint" hidden></div>
 
   <nav class="nav" role="tablist" aria-label="Dashboard sections">
@@ -149,6 +149,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     <button type="button" role="tab" id="tab-replies" aria-selected="false" data-view="replies">Replies</button>
     <button type="button" role="tab" id="tab-kit" aria-selected="false" data-view="kit">Quick kit</button>
     <button type="button" role="tab" id="tab-myleads" aria-selected="false" data-view="myleads">My leads</button>
+    <button type="button" role="tab" id="tab-board" aria-selected="false" data-view="board">Board</button>
     <button type="button" role="tab" id="tab-today" aria-selected="false" data-view="today">Today</button>
     <button type="button" role="tab" id="tab-sends" aria-selected="false" data-view="sends">Sends</button>
     <button type="button" role="tab" id="tab-templates" aria-selected="false" data-view="templates">Templates</button>
@@ -202,6 +203,13 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     </div>
     <div id="myLeadsList" class="desk-list"></div>
     <div class="empty" id="myLeadsEmpty" hidden>No hand-added leads yet. After a good call, use the command above.</div>
+  </section>
+
+  <section id="view-board" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Your follow-up board — each stage can use any text or email template. Changes save to <code>follow-up-cadence.json</code> and apply on the next board run.</p>
+    <div id="boardFlash" class="flash" hidden></div>
+    <div id="boardList" class="desk-list"></div>
+    <p class="foot" id="boardFoot">Text stages pick from Templates → Texts. Email stages pick from Templates → Emails. Reset restores the built-in default for that stage.</p>
   </section>
 
   <section id="view-today" role="tabpanel" hidden>
@@ -310,13 +318,14 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   'use strict';
   var POLL_MS = 3000, MAX_DRAWN = 500, LS = 'outreach-dashboard:';
   var LIVE = location.protocol === 'http:' || location.protocol === 'https:';
-  var DESK_VIEWS = ['morning', 'replies', 'kit', 'myleads', 'today', 'sends', 'templates', 'analytics', 'dnc'];
+  var DESK_VIEWS = ['morning', 'replies', 'kit', 'myleads', 'board', 'today', 'sends', 'templates', 'analytics', 'dnc'];
   var state = {
     view: 'morning', channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0,
     tk: 'text', tq: '', templates: null, editing: null,
     analytics: null,
     dnc: null, dncQ: '',
-    desk: null, rq: ''
+    desk: null, rq: '',
+    board: null
   };
 
   function $(id) { return document.getElementById(id); }
@@ -377,7 +386,127 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     if (view === 'templates') loadTemplates();
     if (view === 'analytics') loadAnalytics();
     if (view === 'dnc') loadDnc();
+    if (view === 'board') loadBoard();
     if (view === 'morning' || view === 'replies' || view === 'kit' || view === 'myleads' || view === 'today') loadDayDesk();
+  }
+
+  function flashBoard(msg, ok) {
+    var el = $('boardFlash');
+    el.hidden = false;
+    el.className = 'flash ' + (ok ? 'ok' : 'err');
+    el.textContent = msg;
+    clearTimeout(flashBoard._t);
+    flashBoard._t = setTimeout(function () { el.hidden = true; }, 3200);
+  }
+
+  function loadBoard() {
+    if (!LIVE) return;
+    fetch('/api/board').then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || j.ok === false) { flashBoard((j && j.error) || 'Could not load board', false); return; }
+      state.board = j;
+      renderBoard();
+    }).catch(function () { flashBoard('Could not load board', false); });
+  }
+
+  function saveBoardStage(id, body) {
+    return fetch('/api/board/stages/' + encodeURIComponent(id), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.ok) { flashBoard((j && j.error) || 'Save failed', false); return false; }
+      state.board = j.board || state.board;
+      renderBoard();
+      flashBoard('Saved — applies on the next board run', true);
+      return true;
+    }).catch(function () { flashBoard('Save failed', false); return false; });
+  }
+
+  function renderBoard() {
+    var j = state.board || {};
+    var stages = j.stages || [];
+    var textOpts = j.textOptions || [];
+    var emailOpts = j.emailOptions || [];
+    var box = $('boardList'); box.innerHTML = '';
+    for (var i = 0; i < stages.length; i++) {
+      (function (s) {
+        var card = make('div', 'desk-card' + (s.customized ? ' due' : ''));
+        var title = make('div', 'desk-title');
+        title.appendChild(make('span', 'pill ' + (s.ch === 'email' ? 'email' : 'text'), s.ch === 'email' ? 'Email' : 'Text'));
+        title.appendChild(document.createTextNode('  ' + (s.label || s.id)));
+        if (s.customized) title.appendChild(make('span', 'pill ok', ' Custom'));
+        if (s.byHand) title.appendChild(make('span', 'pill warn', ' By hand'));
+        card.appendChild(title);
+        card.appendChild(make('h3', null, s.copyName || (s.ch === 'email' ? 'Email sequence / template' : 'Text template')));
+
+        var lab = make('label', 'meta');
+        lab.setAttribute('for', 'board-sel-' + s.id);
+        lab.textContent = s.ch === 'email' ? 'Email template for this stage' : 'Text template for this stage';
+        card.appendChild(lab);
+
+        var sel = document.createElement('select');
+        sel.id = 'board-sel-' + s.id;
+        sel.style.width = '100%';
+        sel.style.marginTop = '4px';
+        var opts = s.ch === 'email' ? emailOpts : textOpts;
+        var cur = s.ch === 'email' ? (s.emailTemplate || '') : (s.template || '');
+        if (s.ch === 'email' && !cur) {
+          var ph = document.createElement('option');
+          ph.value = '';
+          ph.textContent = 'Default email sequence (touch ' + s.n + ')';
+          sel.appendChild(ph);
+        }
+        for (var k = 0; k < opts.length; k++) {
+          var o = document.createElement('option');
+          o.value = opts[k].id;
+          o.textContent = (s.ch === 'text' ? ('#' + opts[k].id + ' · ') : '') + opts[k].name;
+          if (String(opts[k].id) === String(cur)) o.selected = true;
+          sel.appendChild(o);
+        }
+        if (cur && !opts.some(function (x) { return String(x.id) === String(cur); })) {
+          var miss = document.createElement('option');
+          miss.value = cur;
+          miss.textContent = (cur + ' (missing — pick another)');
+          miss.selected = true;
+          sel.appendChild(miss);
+        }
+        card.appendChild(sel);
+
+        if (s.preview) card.appendChild(make('div', 'desk-detail', s.preview));
+        if (s.note) card.appendChild(make('div', 'desk-meta', s.note));
+
+        var actions = make('div', 'desk-actions');
+        var save = make('button', 'btn primary', 'Save');
+        save.type = 'button';
+        save.addEventListener('click', function () {
+          var val = sel.value;
+          if (s.ch === 'email') {
+            if (!val) { flashBoard('Pick an email template (or use Reset for the default sequence)', false); return; }
+            save.disabled = true;
+            saveBoardStage(s.id, { emailTemplate: val }).then(function () { save.disabled = false; });
+          } else {
+            if (!val) { flashBoard('Pick a text template', false); return; }
+            save.disabled = true;
+            saveBoardStage(s.id, { template: val }).then(function () { save.disabled = false; });
+          }
+        });
+        actions.appendChild(save);
+        if (s.customized) {
+          var reset = make('button', 'btn', 'Reset to default');
+          reset.type = 'button';
+          reset.addEventListener('click', function () {
+            reset.disabled = true;
+            saveBoardStage(s.id, { reset: true }).then(function () { reset.disabled = false; });
+          });
+          actions.appendChild(reset);
+        }
+        card.appendChild(actions);
+        box.appendChild(card);
+      })(stages[i]);
+    }
+    if (!stages.length) {
+      box.appendChild(make('div', 'empty', 'No board stages found.'));
+    }
   }
 
   function copyText(text) {
@@ -603,7 +732,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     $('nAll').textContent = fNum.format(t.sends || 0);
     $('sAll').textContent = split({ text: t.texts || 0, email: t.emails || 0 }) + ' · people ' + fNum.format(t.people || 0);
     $('kRun').textContent = 'This run' + (isFinite(rs) ? ' · since ' + stamp(rs, false) : '');
-    document.title = 'Outreach Assistant · ' + fNum.format(tod.all) + ' today';
+    document.title = 'Pipeline Assistant · ' + fNum.format(tod.all) + ' today';
   }
 
   function whatNodes(r) {

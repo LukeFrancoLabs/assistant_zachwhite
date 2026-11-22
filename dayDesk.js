@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * dayDesk — data for the Outreach Assistant localhost page (no Shark/LDS campaigns).
+ * dayDesk — data for the Pipeline Assistant localhost page (no Shark/LDS campaigns).
  *
  * Builds one JSON payload for /api/daydesk:
  *   morning   — ranked "what needs me today" (holds, interested replies needing follow-up, personal board due)
@@ -275,7 +275,7 @@ module.exports = { build, loadKit, DEFAULT_KIT, SHARED_DIR, DESK_FILE };
 
 if (require.main === module) {
   const d = build();
-  console.log(`\n  Outreach Assistant  morning=${d.morning.length}  replies=${d.replies.length}  myLeads=${d.myLeads.length}  today=${d.today.sends}\n`);
+  console.log(`\n  Pipeline Assistant  morning=${d.morning.length}  replies=${d.replies.length}  myLeads=${d.myLeads.length}  today=${d.today.sends}\n`);
   for (const m of d.morning.slice(0, 8)) console.log(`  • [${m.kind}] ${m.name} — ${m.title}`);
   console.log('');
 }

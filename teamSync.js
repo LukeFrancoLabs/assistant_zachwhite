@@ -13,8 +13,8 @@
  *   node teamSync.js --pull --dry-run  show only
  *   node teamSync.js --pack            refresh team-shared/ from this copy (Luke: publish)
  *
- * After --pull, Outreach Assistant kit + email templates match Luke’s pack. Text bodies still
- * live in sender.json (per-rep); Outreach Assistant kit points at template numbers, not bodies.
+ * After --pull, Pipeline Assistant kit + email templates match Luke’s pack. Text bodies still
+ * live in sender.json (per-rep); Pipeline Assistant kit points at template numbers, not bodies.
  */
 
 const fs = require('fs');
@@ -79,7 +79,7 @@ function pull({ dryRun = false } = {}) {
     console.log(`  pulled  ${name}`);
     n++;
   }
-  console.log(dryRun ? `\n  ${n} file(s) would update.\n` : `\n  ${n} file(s) updated. Open Outreach Assistant / Templates on localhost to see them.\n`);
+  console.log(dryRun ? `\n  ${n} file(s) would update.\n` : `\n  ${n} file(s) updated. Open Pipeline Assistant / Templates on localhost to see them.\n`);
 }
 
 /** Luke: copy this machine's managed files into team-shared/ so others can --pull (or so Dropbox gets the update). */

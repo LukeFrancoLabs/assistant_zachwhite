@@ -334,11 +334,121 @@ function sendText(res, status, type, text) {
   res.end(text);
 }
 
+function readCadenceFile() {
+  const file = require('./cadence').FILE;
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')) || {}; } catch (_) { return {}; }
+}
+
+function writeCadenceFile(obj) {
+  writeAtomic(require('./cadence').FILE, JSON.stringify(obj, null, 2) + '\n');
+}
+
+/** Follow-up board stages + which template each one uses (editable → follow-up-cadence.json). */
+function boardPayload() {
+  const cadence = require('./cadence');
+  const cfg = cadence.loadConfig();
+  const defById = Object.fromEntries(cadence.DEFAULT_STAGES.map((s) => [s.id, s]));
+  const rawFile = readCadenceFile();
+  const over = (rawFile.stages && typeof rawFile.stages === 'object') ? rawFile.stages : {};
+  const tpl = templatesPayload();
+  const textMap = {};
+  for (const t of tpl.texts || []) textMap[String(t.id)] = { name: t.name, text: t.text };
+  const textOptions = (tpl.texts || []).map((t) => ({ id: String(t.id), name: t.name || ('Text ' + t.id), preview: clip(t.text, 140) }));
+  const emailOptions = (tpl.emails || []).map((t) => ({
+    id: t.key,
+    name: t.name || t.key,
+    preview: clip((t.subject || '') + (t.body ? ' — ' + (Array.isArray(t.body) ? t.body.join(' ') : t.body) : ''), 140),
+  }));
+  const stages = cfg.stages.map((s) => {
+    const d = defById[s.id] || {};
+    const o = over[s.id] && typeof over[s.id] === 'object' ? over[s.id] : {};
+    const copy = cadence.copyOf(s, textMap);
+    const customized = o.template !== undefined || o.emailTemplate !== undefined || o.message !== undefined;
+    return {
+      id: s.id,
+      label: s.label,
+      day: s.day,
+      ch: s.ch,
+      n: s.n,
+      byHand: !!s.byHand,
+      manual: !!s.manual,
+      template: s.template != null ? String(s.template) : null,
+      emailTemplate: s.emailTemplate || null,
+      defaultTemplate: d.template != null ? String(d.template) : null,
+      defaultEmailTemplate: d.emailTemplate || null,
+      customized: !!customized,
+      copyName: copy ? copy.name : null,
+      preview: copy ? clip(copy.text || copy.subject || '', 220) : null,
+      note: s.byHand ? 'By hand — board skips sending this stage' : (s.manual ? 'Marked manual (board can still send)' : null),
+    };
+  });
+  return {
+    stages,
+    textOptions,
+    emailOptions,
+    file: path.basename(cadence.FILE),
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+/** Assign a text/email template to one board stage, or reset that stage to the built-in default. */
+function saveBoardStage(id, payload) {
+  const cadence = require('./cadence');
+  const stage = cadence.DEFAULT_STAGES.find((s) => s.id === id);
+  if (!stage) return { ok: false, error: 'Unknown stage "' + id + '".' };
+  const user = readCadenceFile();
+  if (!user.stages || typeof user.stages !== 'object') user.stages = {};
+  const cur = { ...(user.stages[id] || {}) };
+
+  if (payload && payload.reset) {
+    delete cur.template;
+    delete cur.emailTemplate;
+    delete cur.message;
+    if (Object.keys(cur).length) user.stages[id] = cur; else delete user.stages[id];
+    try { writeCadenceFile(user); } catch (e) { return { ok: false, error: 'Could not save: ' + e.message }; }
+    return { ok: true, board: boardPayload() };
+  }
+
+  if (stage.ch === 'text') {
+    const tid = payload && payload.template != null ? String(payload.template).trim() : '';
+    if (!tid) return { ok: false, error: 'Pick a text template.' };
+    const texts = templatesPayload().texts || [];
+    if (!texts.some((t) => String(t.id) === tid)) return { ok: false, error: 'No text template "' + tid + '".' };
+    cur.template = tid;
+    delete cur.message;
+    user.stages[id] = cur;
+  } else {
+    const key = payload && payload.emailTemplate != null ? String(payload.emailTemplate).trim() : '';
+    if (!key) return { ok: false, error: 'Pick an email template.' };
+    const emails = templatesPayload().emails || [];
+    if (!emails.some((t) => t.key === key)) return { ok: false, error: 'No email template "' + key + '".' };
+    cur.emailTemplate = key;
+    user.stages[id] = cur;
+  }
+  try { writeCadenceFile(user); } catch (e) { return { ok: false, error: 'Could not save: ' + e.message }; }
+  return { ok: true, board: boardPayload() };
+}
+
 async function handleApi(req, res, url) {
   const setup = require('./senderSetup');
   if (req.method === 'GET' && url.pathname === '/api/health') return sendJson(res, 200, { ok: true, port: PORT });
   if (req.method === 'GET' && url.pathname === '/api/daydesk') {
     try { return sendJson(res, 200, require('./dayDesk').build()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/board') {
+    try { return sendJson(res, 200, boardPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
+  const boardStage = url.pathname.match(/^\/api\/board\/stages\/([^/]+)$/);
+  if (boardStage && req.method === 'PUT') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, saveBoardStage(decodeURIComponent(boardStage[1]), j));
+  }
+  if (boardStage && req.method === 'POST') {
+    // reset: POST /api/board/stages/:id with { reset: true }
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, saveBoardStage(decodeURIComponent(boardStage[1]), j));
   }
   if (req.method === 'GET' && url.pathname === '/api/templates') {
     try { return sendJson(res, 200, templatesPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
@@ -427,7 +537,7 @@ function serveLog(line) {
   } catch (_) { /* never block a launch */ }
 }
 
-/** Keep a detached --serve process running so Outreach Assistant (Templates / Morning / …) stays up after launch exits. Default on every zw. */
+/** Keep a detached --serve process running so Pipeline Assistant (Templates / Morning / …) stays up after launch exits. Default on every zw. */
 async function ensureServing() {
   if (await healthOk()) return true;
   serveLog('starting --serve on port ' + PORT);
@@ -508,7 +618,7 @@ function openPage(target) {
 
 /**
  * What run.sh calls once per launch: build the page, start (or reuse) the localhost server, open the browser.
- * Outreach Assistant always tries to serve on 127.0.0.1 by default (ASSISTANT_NO_DASHBOARD=1 to opt out).
+ * Pipeline Assistant always tries to serve on 127.0.0.1 by default (ASSISTANT_NO_DASHBOARD=1 to opt out).
  * → the dashboard URL, a file path (server could not start), 'skipped', or 'failed'.
  */
 async function launch(flags = []) {
@@ -519,12 +629,12 @@ async function launch(flags = []) {
   if (!live) live = await ensureServing(); // one retry — first spawn sometimes races on a busy Mac
   if (live) {
     openPage(dashUrl());
-    try { console.log('Outreach Assistant: ' + dashUrl()); } catch (_) {}
+    try { console.log('Pipeline Assistant: ' + dashUrl()); } catch (_) {}
     return dashUrl();
   }
   // Last resort: open the static file (Sends only). Prefer telling the user how to start the live server.
   try {
-    console.error('Outreach Assistant server did not start on port ' + PORT + '. Run: node outreachDashboard.js --serve');
+    console.error('Pipeline Assistant server did not start on port ' + PORT + '. Run: node outreachDashboard.js --serve');
     console.error('(details: ' + SERVE_LOG + ')');
   } catch (_) {}
   openPage(file);
@@ -532,7 +642,7 @@ async function launch(flags = []) {
 }
 
 
-module.exports = { touch, build, launch, openPage, buildData, ensureServing, dashUrl, runServe, templatesPayload, analyticsPayload, dncPayload, dncAdd, dncClear, PAGE, DATA, DIR, PORT, HOST };
+module.exports = { touch, build, launch, openPage, buildData, ensureServing, dashUrl, runServe, templatesPayload, analyticsPayload, dncPayload, dncAdd, dncClear, boardPayload, saveBoardStage, PAGE, DATA, DIR, PORT, HOST };
 
 if (require.main === module) {
   const [cmd, ...rest] = process.argv.slice(2);
