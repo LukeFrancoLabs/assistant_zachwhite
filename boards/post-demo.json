@@ -1,0 +1,53 @@
+{
+  "id": "post-demo",
+  "name": "Post-demo follow-up",
+  "description": "After a live demo: outline → next-day personal + feature → next-steps with the decision maker (Tue/Fri friendly).",
+  "tag": "post-demo",
+  "stages": [
+    {
+      "id": "pd1",
+      "outreach": 1,
+      "day": 0,
+      "ch": "email",
+      "n": 1,
+      "label": "Outreach 1 · Outline",
+      "emailTemplate": "demo-outline",
+      "afterMin": 0,
+      "hint": "Same day as the demo — send the outline while it’s fresh."
+    },
+    {
+      "id": "pd2",
+      "outreach": 2,
+      "day": 1,
+      "ch": "email",
+      "n": 2,
+      "label": "Outreach 2 · Demo callout",
+      "emailTemplate": "demo-callout",
+      "afterMin": 0,
+      "hint": "Next day — reference something specific they said on the demo. Edit the template (or fill {{demo_note}}) before sending."
+    },
+    {
+      "id": "pd3",
+      "outreach": 3,
+      "day": 1,
+      "ch": "email",
+      "n": 3,
+      "label": "Outreach 3 · Feature deep-dive",
+      "emailTemplate": "demo-feature",
+      "afterMin": 60,
+      "hint": "Same day as Outreach 2 by default (about an hour later). Change Day to 2+ if you want it later — e.g. Day 5 instead of Day 1."
+    },
+    {
+      "id": "pd4",
+      "outreach": 4,
+      "day": 4,
+      "ch": "email",
+      "n": 4,
+      "label": "Outreach 4 · Next steps / decision maker",
+      "emailTemplate": "demo-next-steps",
+      "afterMin": 0,
+      "preferWeekdays": ["Tuesday", "Friday"],
+      "hint": "A few days later — circle back on next steps with the next decision maker. Prefer Tuesday or Friday (Mon/Tue demos → Friday; Wed–Fri demos → next Tuesday). Or set Day below."
+    }
+  ]
+}

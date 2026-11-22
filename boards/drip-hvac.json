@@ -1,0 +1,86 @@
+{
+  "id": "drip-hvac",
+  "name": "HVAC drip (2 weeks)",
+  "description": "Industry drip for HVAC — texts + emails over ~14 days (season, booking, financing, pipeline, soft close). Change any Day or template on the Board tab.",
+  "tag": "hvac",
+  "industry": "HVAC",
+  "stages": [
+    {
+      "id": "hvac1",
+      "outreach": 1,
+      "day": 0,
+      "ch": "text",
+      "n": 1,
+      "label": "Day 0 · Text intro",
+      "template": "hvac-t1",
+      "afterMin": 0,
+      "hint": "First touch — peak-season / missed-call angle for HVAC."
+    },
+    {
+      "id": "hvac2",
+      "outreach": 2,
+      "day": 1,
+      "ch": "email",
+      "n": 1,
+      "label": "Day 1 · Email opener",
+      "emailTemplate": "hvac-drip-1",
+      "afterMin": 0,
+      "hint": "Next day email — campaigns + Pipeline for HVAC shops."
+    },
+    {
+      "id": "hvac3",
+      "outreach": 3,
+      "day": 3,
+      "ch": "text",
+      "n": 2,
+      "label": "Day 3 · Text booking",
+      "template": "hvac-t2",
+      "afterMin": 0,
+      "hint": "Online booking / after-hours AC calls."
+    },
+    {
+      "id": "hvac4",
+      "outreach": 4,
+      "day": 5,
+      "ch": "email",
+      "n": 2,
+      "label": "Day 5 · Email financing",
+      "emailTemplate": "hvac-drip-2",
+      "afterMin": 0,
+      "hint": "Bigger installs stall on payment — card / ACH / financing."
+    },
+    {
+      "id": "hvac5",
+      "outreach": 5,
+      "day": 8,
+      "ch": "text",
+      "n": 3,
+      "label": "Day 8 · Text pipeline",
+      "template": "hvac-t3",
+      "afterMin": 0,
+      "hint": "Quotes going cold — Pipeline follow-up."
+    },
+    {
+      "id": "hvac6",
+      "outreach": 6,
+      "day": 11,
+      "ch": "email",
+      "n": 3,
+      "label": "Day 11 · Email reviews",
+      "emailTemplate": "hvac-drip-3",
+      "afterMin": 0,
+      "hint": "Maintenance plans + Google reviews on autopilot."
+    },
+    {
+      "id": "hvac7",
+      "outreach": 7,
+      "day": 14,
+      "ch": "text",
+      "n": 4,
+      "label": "Day 14 · Text soft close",
+      "template": "hvac-t4",
+      "afterMin": 0,
+      "hint": "Soft close — book a demo or leave it here."
+    }
+  ]
+}

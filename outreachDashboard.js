@@ -27,6 +27,7 @@ const PAGE_SRC = path.join(__dirname, 'outreachDashboard.html'); // tracked sour
 const DATA = path.join(DIR, 'data.js');
 const RUN_FILE = path.join(DIR, 'run.json');         // { startedAt, pid } of the newest process that has sent something
 const PID_FILE = path.join(DIR, 'server.pid');
+const SERVE_LOG = path.join(DIR, 'server.log');   // why --serve failed (launch swallows console; this file keeps a trail)
 const LOG_FILE = path.join(__dirname, 'texted-log.jsonl');
 const EMAIL_TEMPLATES = path.join(__dirname, 'email-templates.json');
 const FULL_DASH = path.join(__dirname, 'texted-dashboard.html');   // the bigger Outreach Log page (email --sent): linked from this one once it exists
@@ -246,6 +247,23 @@ function flush(kind, flags) {
 
 // ---- Templates + analytics (localhost APIs) ----------------------------------------------------------------
 
+function industryDripTexts(values, setup) {
+  let all = {};
+  try { all = JSON.parse(fs.readFileSync(path.join(__dirname, 'industry-drip-texts.json'), 'utf8')) || {}; } catch (_) { return []; }
+  return Object.keys(all).filter((k) => !k.startsWith('_') && all[k] && typeof all[k] === 'object').map((id) => {
+    const t = all[id];
+    const text = String(t.text || '');
+    return {
+      id,
+      name: t.name || id,
+      text,
+      kind: 'industry',
+      channel: 'text',
+      preview: setup ? setup.expandTokens(text, values || {}) : text,
+    };
+  });
+}
+
 function templatesPayload() {
   const setup = require('./senderSetup');
   let values = {};
@@ -258,7 +276,7 @@ function templatesPayload() {
     kind: item.kind,
     channel: 'text',
     preview: setup.expandTokens(item.text, values),
-  }));
+  })).concat(industryDripTexts(values, setup));
   let emails = [];
   try {
     const all = JSON.parse(fs.readFileSync(EMAIL_TEMPLATES, 'utf8')) || {};
@@ -333,9 +351,154 @@ function sendText(res, status, type, text) {
   res.end(text);
 }
 
+/** Modular boards (post-demo, cold drip, …) — stages, day offsets, templates. */
+function boardPayload() {
+  const boards = require('./boards');
+  const cadence = require('./cadence');
+  const active = boards.loadActive();
+  const basePack = boards.loadPackFile(active.id) || active;
+  const defById = Object.fromEntries((basePack.stages || []).map((s) => [s.id, s]));
+  const over = active.overrides || {};
+  const tpl = templatesPayload();
+  const textMap = {};
+  for (const t of tpl.texts || []) textMap[String(t.id)] = { name: t.name, text: t.text };
+  const textOptions = (tpl.texts || []).map((t) => ({ id: String(t.id), name: t.name || ('Text ' + t.id), preview: clip(t.text, 140) }));
+  const emailOptions = (tpl.emails || []).map((t) => ({
+    id: t.key,
+    name: t.name || t.key,
+    preview: clip((t.subject || '') + (t.body ? ' — ' + (Array.isArray(t.body) ? t.body.join(' ') : t.body) : ''), 140),
+  }));
+  const tip = boards.suggestNextStepsDay();
+  const stages = active.stages.map((s) => {
+    const d = defById[s.id] || {};
+    const o = over[s.id] && typeof over[s.id] === 'object' ? over[s.id] : {};
+    const copy = cadence.copyOf(s, textMap);
+    const customized = o.template !== undefined || o.emailTemplate !== undefined || o.message !== undefined || o.day !== undefined || o.afterMin !== undefined;
+    return {
+      id: s.id,
+      outreach: s.outreach != null ? s.outreach : null,
+      label: s.label,
+      day: s.day,
+      defaultDay: d.day,
+      afterMin: s.afterMin || 0,
+      ch: s.ch,
+      n: s.n,
+      byHand: !!s.byHand,
+      manual: !!s.manual,
+      template: s.template != null ? String(s.template) : null,
+      emailTemplate: s.emailTemplate || null,
+      defaultTemplate: d.template != null ? String(d.template) : null,
+      defaultEmailTemplate: d.emailTemplate || null,
+      preferWeekdays: s.preferWeekdays || null,
+      customized: !!customized,
+      copyName: copy ? copy.name : null,
+      preview: copy ? clip(copy.text || copy.subject || '', 220) : null,
+      hint: s.hint || null,
+      note: s.byHand ? 'By hand — board skips sending this stage' : (s.manual ? 'Marked manual (board can still send)' : null),
+    };
+  });
+  return {
+    activeBoard: active.id,
+    boardName: active.name,
+    boardDescription: active.description || '',
+    packs: boards.listPacks(),
+    stages,
+    textOptions,
+    emailOptions,
+    nextStepsTip: tip,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+/** Save day / template for one stage on the active (or named) board pack. */
+function saveBoardStage(id, payload) {
+  const boards = require('./boards');
+  const packId = (payload && payload.board) || boards.activeBoardId();
+  const pack = boards.loadPackFile(packId);
+  if (!pack) return { ok: false, error: 'Unknown board "' + packId + '".' };
+  const stage = pack.stages.find((s) => s.id === id);
+  if (!stage) return { ok: false, error: 'Unknown stage "' + id + '".' };
+
+  if (payload && payload.reset) {
+    const r = boards.saveStage(packId, id, { reset: true });
+    if (!r.ok) return r;
+    return { ok: true, board: boardPayload() };
+  }
+
+  const body = {};
+  if (payload && payload.day !== undefined) body.day = payload.day;
+  if (payload && payload.afterMin !== undefined) body.afterMin = payload.afterMin;
+
+  if (stage.ch === 'text') {
+    if (payload && payload.template != null && String(payload.template).trim()) {
+      const tid = String(payload.template).trim();
+      const texts = templatesPayload().texts || [];
+      if (!texts.some((t) => String(t.id) === tid)) return { ok: false, error: 'No text template "' + tid + '".' };
+      body.template = tid;
+    } else if (payload && payload.day === undefined && payload.afterMin === undefined) {
+      return { ok: false, error: 'Pick a text template (or change the day).' };
+    }
+  } else if (payload && payload.emailTemplate != null && String(payload.emailTemplate).trim()) {
+    const key = String(payload.emailTemplate).trim();
+    const emails = templatesPayload().emails || [];
+    if (!emails.some((t) => t.key === key)) return { ok: false, error: 'No email template "' + key + '".' };
+    body.emailTemplate = key;
+  } else if (payload && payload.day === undefined && payload.afterMin === undefined) {
+    return { ok: false, error: 'Pick an email template (or change the day).' };
+  }
+
+  const r = boards.saveStage(packId, id, body);
+  if (!r.ok) return r;
+  return { ok: true, board: boardPayload() };
+}
+
+function setActiveBoard(id) {
+  const r = require('./boards').setActiveBoard(id);
+  if (!r.ok) return r;
+  return { ok: true, board: boardPayload() };
+}
+
 async function handleApi(req, res, url) {
   const setup = require('./senderSetup');
   if (req.method === 'GET' && url.pathname === '/api/health') return sendJson(res, 200, { ok: true, port: PORT });
+  if (req.method === 'GET' && url.pathname === '/api/daydesk') {
+    try { return sendJson(res, 200, require('./dayDesk').build()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/board') {
+    try { return sendJson(res, 200, boardPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/content') {
+    try {
+      const q = {
+        trade: url.searchParams.get('trade') || '',
+        need: url.searchParams.get('need') || '',
+        competitor: url.searchParams.get('competitor') || '',
+        segment: url.searchParams.get('segment') || '',
+        region: url.searchParams.get('region') || '',
+        stage: url.searchParams.get('stage') || 'demo',
+        q: url.searchParams.get('q') || '',
+        type: url.searchParams.get('type') || '',
+        limit: url.searchParams.get('limit') || '80',
+      };
+      return sendJson(res, 200, require('./contentLibrary').payload(q));
+    } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
+  if (req.method === 'PUT' && url.pathname === '/api/board/active') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, setActiveBoard(j.id || j.board));
+  }
+  const boardStage = url.pathname.match(/^\/api\/board\/stages\/([^/]+)$/);
+  if (boardStage && req.method === 'PUT') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, saveBoardStage(decodeURIComponent(boardStage[1]), j));
+  }
+  if (boardStage && req.method === 'POST') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, saveBoardStage(decodeURIComponent(boardStage[1]), j));
+  }
   if (req.method === 'GET' && url.pathname === '/api/templates') {
     try { return sendJson(res, 200, templatesPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }
@@ -416,23 +579,39 @@ function healthOk() {
   });
 }
 
-/** Keep a detached --serve process running so Templates / Analytics stay editable after launch exits. */
+function serveLog(line) {
+  try {
+    fs.mkdirSync(DIR, { recursive: true });
+    fs.appendFileSync(SERVE_LOG, new Date().toISOString() + ' ' + String(line || '') + '\n');
+  } catch (_) { /* never block a launch */ }
+}
+
+/** Keep a detached --serve process running so Pipeline Assistant (Templates / Morning / …) stays up after launch exits. Default on every zw. */
 async function ensureServing() {
   if (await healthOk()) return true;
+  serveLog('starting --serve on port ' + PORT);
   try {
+    const out = fs.openSync(SERVE_LOG, 'a');
     const child = spawn(process.execPath, [__filename, '--serve'], {
       detached: true,
-      stdio: 'ignore',
+      stdio: ['ignore', out, out],
       cwd: __dirname,
       env: process.env,
     });
     child.unref();
+    try { fs.closeSync(out); } catch (_) {}
     try { writeAtomic(PID_FILE, String(child.pid) + '\n'); } catch (_) { /* optional */ }
-  } catch (_) { return false; }
-  for (let i = 0; i < 40; i++) {
-    await new Promise((r) => setTimeout(r, 100));
-    if (await healthOk()) return true;
+    serveLog('spawned pid ' + child.pid);
+  } catch (e) {
+    serveLog('spawn failed: ' + (e && e.message));
+    return false;
   }
+  // Wait up to ~5s — Mac cold start + antivirus can be slow; never open the browser until health passes.
+  for (let i = 0; i < 50; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    if (await healthOk()) { serveLog('healthy'); return true; }
+  }
+  serveLog('health check failed after spawn');
   return false;
 }
 
@@ -488,23 +667,31 @@ function openPage(target) {
 
 /**
  * What run.sh calls once per launch: build the page, start (or reuse) the localhost server, open the browser.
+ * Pipeline Assistant always tries to serve on 127.0.0.1 by default (ASSISTANT_NO_DASHBOARD=1 to opt out).
  * → the dashboard URL, a file path (server could not start), 'skipped', or 'failed'.
  */
 async function launch(flags = []) {
   if (off() || flags.some((f) => SKIP_OPEN.has(f))) return 'skipped';
   const file = build('launch', flags);
   if (!file) return 'failed';
-  const live = await ensureServing();
+  let live = await ensureServing();
+  if (!live) live = await ensureServing(); // one retry — first spawn sometimes races on a busy Mac
   if (live) {
     openPage(dashUrl());
+    try { console.log('Pipeline Assistant: ' + dashUrl()); } catch (_) {}
     return dashUrl();
   }
+  // Last resort: open the static file (Sends only). Prefer telling the user how to start the live server.
+  try {
+    console.error('Pipeline Assistant server did not start on port ' + PORT + '. Run: node outreachDashboard.js --serve');
+    console.error('(details: ' + SERVE_LOG + ')');
+  } catch (_) {}
   openPage(file);
   return file;
 }
 
 
-module.exports = { touch, build, launch, openPage, buildData, ensureServing, dashUrl, runServe, templatesPayload, analyticsPayload, dncPayload, dncAdd, dncClear, PAGE, DATA, DIR, PORT, HOST };
+module.exports = { touch, build, launch, openPage, buildData, ensureServing, dashUrl, runServe, templatesPayload, analyticsPayload, dncPayload, dncAdd, dncClear, boardPayload, saveBoardStage, setActiveBoard, PAGE, DATA, DIR, PORT, HOST };
 
 if (require.main === module) {
   const [cmd, ...rest] = process.argv.slice(2);

@@ -1,0 +1,337 @@
+{
+  "day-after-demo": {
+    "name": "Day After Demo Follow Up",
+    "subject": "We met yesterday on Housecall Pro",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Thanks for taking the time yesterday to go through Housecall Pro with me.",
+      "",
+      "Housecall Pro puts the day-to-day in one place: scheduling and dispatch, estimates and invoicing, and getting paid on the spot by card, ACH, or financing, all from your phone.",
+      "",
+      "If you have any questions about what we covered, just reply here. When you are ready to get started, grab a time that works using the link below."
+    ]
+  },
+  "demo-outline": {
+    "name": "Post-demo: outline",
+    "subject": "Outline from today's Housecall Pro demo",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Great meeting you today. Here's a short outline of what we covered on Housecall Pro:",
+      "",
+      "• Scheduling and dispatch from your phone",
+      "• Estimates, invoices, and getting paid on the spot (card, ACH, or financing)",
+      "• Online booking + Pipeline so leads don't slip",
+      "• Campaigns and reviews so past customers come back",
+      "",
+      "{{outline_note}}",
+      "",
+      "If anything here looks off or you want a deeper look at one piece, just reply. When you're ready for next steps, grab a time with the link below."
+    ]
+  },
+  "demo-callout": {
+    "name": "Post-demo: what you said",
+    "subject": "Quick follow-up from our demo",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Thanks again for the time yesterday.",
+      "",
+      "You mentioned {{demo_note|something that stuck with me from the demo}} — that is exactly the kind of day-to-day Housecall Pro is built to take off your plate.",
+      "",
+      "I put a short note below on how Pros usually handle that inside the product. If I have it wrong, tell me and I'll adjust.",
+      "",
+      "Reply here anytime, or grab a time that works using the link below."
+    ]
+  },
+  "demo-feature": {
+    "name": "Post-demo: feature deep-dive",
+    "subject": "How {{feature|that feature}} looks for {{business|your shop}}",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Quick add-on from our demo — focusing on {{feature|the piece you cared about most}}.",
+      "",
+      "{{feature_note|Here is how it usually works in Housecall Pro for a shop like yours: set it up once, then it runs in the background so you are not chasing it between jobs.}}",
+      "",
+      "If you want, I can walk you through a 10-minute screen share on just this. Reply here, or use the booking link below."
+    ]
+  },
+  "demo-next-steps": {
+    "name": "Post-demo: next steps / decision maker",
+    "subject": "Next steps with {{decision_maker|your team}}",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Circling back after our demo — hoping you had a chance to sit with the outline.",
+      "",
+      "Typical next step from here is a short call with {{decision_maker|whoever else needs to weigh in}} so we can line up onboarding, pricing, and timeline without you having to re-explain the product.",
+      "",
+      "Does {{next_window|Tuesday or Friday}} work for a quick next-steps call? Reply with a time, or grab a slot with the link below.",
+      ""
+    ]
+  },
+  "research-reengage": {
+    "name": "Research: re-engage past customers",
+    "subject": "Some research on repeat jobs",
+    "body": [
+      "{{greeting}}",
+      "",
+      "I came across some interesting research recently regarding how home service businesses use targeted marketing campaigns and pipeline management to re-engage past customers.",
+      "",
+      "The data shows that it's significantly cheaper to book a repeat job than to acquire a new customer, yet most businesses leave that revenue on the table simply because they lack a system to track those past clients.",
+      "",
+      "I thought this would be relevant to your goals for {{business|your business}}. If you're interested, I can show you how we automate this process in Housecall Pro so you can keep your calendar full without the manual hustle.",
+      "",
+      "Cheers,"
+    ]
+  },
+  "curiosity": {
+    "name": "Curiosity: Campaigns + Pipeline + booking alerts",
+    "subject": "What if new jobs found {{business|you}} while you were on the job?",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Imagine having Housecall Pro work for you 24/7, and getting an alert the moment an online booking comes in.",
+      "",
+      "Here's what's behind it:",
+      "",
+      "• Campaigns: postcards and email campaigns that bring customers back and put new leads in front of you",
+      "• Pipeline: every lead lands in one view, and automated follow-ups go out for you so none slip through",
+      "• Online booking: when someone books, you get the alert right away",
+      "",
+      "Curious how it would look for {{business|your business}}? Reply here and I'll show you, or grab a time that works using the link below.",
+      ""
+    ],
+    "ps": "$26 for the first month, no contracts or activation fees, plus over $250 value in gift cards and lead credits."
+  },
+  "autopilot": {
+    "name": "Autopilot: thank you + review + referral + 12-month re-engagement",
+    "subject": "What if {{business|you}} could follow up after every job on autopilot?",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Quick question — what happens after your team finishes a job?",
+      "",
+      "Most contractors do great work, but once the invoice is paid, there’s rarely a consistent process for turning that happy customer into more business.",
+      "",
+      "That’s where Housecall Pro’s Marketing Campaigns comes in.",
+      "",
+      "Imagine having an automated follow-up system working for you after every completed job:",
+      "",
+      "Day 1 – Build Loyalty: Automatically send a personalized thank-you text to your customer.",
+      "",
+      "Day 3 – Generate Reviews: Send an email encouraging them to leave a Google review.",
+      "",
+      "Week 3 – Drive Referrals: Mail a postcard reminding them to recommend your business to friends and family.",
+      "",
+      "Month 12 – Win Repeat Business: Reconnect with past customers to generate new service opportunities.",
+      "",
+      "The best part? Once your campaigns are set up, they run automatically.",
+      "",
+      "No spreadsheets. No remembering to follow up. Just consistent customer engagement that helps turn completed jobs into future revenue.",
+      "",
+      "Would you be open to a quick 10-minute walkthrough to see how this could work for {{business|your business}}?",
+      "",
+      "Just reply “Interested” and I’ll show you how it works!",
+      "",
+      "Best,",
+      "",
+      "Luke Franco",
+      "Account Executive | Housecall Pro",
+      "Text: 833-337-0813",
+      "Call: 970-338-3120",
+      "",
+      "Book a Demo: https://tinyurl.com/HousecallProDemo"
+    ]
+  },
+  "csr-ai": {
+    "name": "Drip: CSR AI (who answers when you can't)",
+    "subject": "Who answers when {{business|you}} can't?",
+    "body": [
+      "{{greeting}}",
+      "",
+      "When you're under a sink or up on a roof, the next customer who calls just moves on to the next name on Google.",
+      "",
+      "CSR AI is built for that moment. It picks up when you can't, answers the customer's questions, and books the job so the lead doesn't walk. About a quarter of the jobs it books (26%) come in after hours.",
+      "",
+      "Want to hear how it sounds? Reply here and I'll set it up, or grab a time that works using the link below.",
+      ""
+    ]
+  },
+  "past-customers": {
+    "name": "Drip: past customers + reviews on autopilot",
+    "subject": "What if past customers kept coming back on their own?",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Your past customers already know your work, and following up with them is the first thing that slips when you're busy. Campaigns does it for you:",
+      "",
+      "• Email and postcard campaigns that bring past customers back",
+      "• Automated review requests that build your Google reviews after every job",
+      "",
+      "Reviews do real work: in our homeowner survey, homeowners rank speed, reviews, and communication over price when hiring. One HVAC shop on Housecall Pro built 400+ reviews on autopilot while Pipeline handled its follow-up.",
+      "",
+      "Want me to set up a first campaign for {{business|your business}}? Reply here, or grab a time that works using the link below.",
+      ""
+    ]
+  },
+  "why-now": {
+    "name": "Drip: the short version + the offer",
+    "subject": "72% of homeowners would pay more for a fix within 24 hours",
+    "body": [
+      "{{greeting}}",
+      "",
+      "It's been a few weeks since I first reached out, so here's the short version of what Housecall Pro does for a shop like {{business|yours}}:",
+      "",
+      "• Online booking and Pipeline bring leads in and follow up for you",
+      "• CSR AI answers the calls you can't take",
+      "• Campaigns bring past customers back and build your reviews",
+      "• Get paid on the spot by card, ACH, or financing",
+      "",
+      "Speed wins the job: in the 2026 homeowner survey, 72% would pay more for a fix within 24 hours and 62% were more likely to book when financing was offered. Over 200,000 Pros use Housecall Pro.",
+      "",
+      "To make it easy to start, we have our get-started offer: $26 for your first month with no contracts, plus a $100 Amazon gift card after your 2nd onboarding session with us.",
+      "",
+      "Worth a quick look? Reply here, or grab a time that works using the link below.",
+      ""
+    ]
+  },
+  "hvac-drip-1": {
+    "name": "HVAC drip · opener",
+    "subject": "Keeping {{business|your HVAC shop}} booked when the heat hits",
+    "body": [
+      "{{greeting}}",
+      "",
+      "When the first heat wave hits, every missed call is a missed install. Housecall Pro is built for HVAC shops that need dispatch, online booking, and follow-up in one place.",
+      "",
+      "• Online booking + instant alerts when a homeowner requests AC or furnace work",
+      "• Pipeline so every estimate gets a follow-up without you chasing a spreadsheet",
+      "• Campaigns that bring past customers back for tune-ups before peak season",
+      "",
+      "Curious how it would look for {{business|your team}}? Reply here, or grab a time with the link below.",
+      ""
+    ]
+  },
+  "hvac-drip-2": {
+    "name": "HVAC drip · financing / get paid",
+    "subject": "Bigger HVAC jobs stall when payment is hard",
+    "body": [
+      "{{greeting}}",
+      "",
+      "A full system quote often dies on sticker shock — not on your work. With Housecall Pro you can get paid on the spot by card, ACH, or financing, right from the job.",
+      "",
+      "In the 2026 homeowner survey, 62% were more likely to book when financing was offered. HVAC Pros use that to close installs that used to go quiet.",
+      "",
+      "Want a 10-minute look at how it works on a real estimate? Reply here or use the booking link below.",
+      ""
+    ]
+  },
+  "hvac-drip-3": {
+    "name": "HVAC drip · maintenance + reviews",
+    "subject": "Tune-ups and reviews on autopilot for {{business|your HVAC shop}}",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Maintenance agreements and Google reviews are the first things that slip when you're slammed on service calls. Campaigns in Housecall Pro can:",
+      "",
+      "• Nudge past customers back for seasonal tune-ups",
+      "• Ask for a Google review after every completed job",
+      "• Keep your name in front of homeowners who already trust you",
+      "",
+      "Open to a quick walkthrough for {{business|your shop}}? Reply here, or grab a time below.",
+      ""
+    ]
+  },
+  "plumbing-drip-1": {
+    "name": "Plumbing drip · opener",
+    "subject": "Fewer missed plumbing emergencies for {{business|your shop}}",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Drain and water-heater calls don't wait for a free minute on your phone. Housecall Pro helps plumbing shops keep booking, dispatch, and follow-up moving while you're on a job.",
+      "",
+      "• Online booking so homeowners can request a plumber without phone tag",
+      "• Instant alerts when a job comes in",
+      "• Pipeline so quotes and follow-ups don't disappear under service calls",
+      "",
+      "Want to see it for {{business|your team}}? Reply here, or grab a time with the link below.",
+      ""
+    ]
+  },
+  "plumbing-drip-2": {
+    "name": "Plumbing drip · get paid",
+    "subject": "Get paid before you leave the job site",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Chasing checks after a water-heater swap eats the margin. With Housecall Pro you invoice and get paid on the spot — card, ACH, or financing — from your phone.",
+      "",
+      "Plumbing Pros use it to close the job before they roll up the hose, and to offer financing when a bigger repair surprises the homeowner.",
+      "",
+      "Open to a 10-minute look? Reply here or book with the link below.",
+      ""
+    ]
+  },
+  "plumbing-drip-3": {
+    "name": "Plumbing drip · campaigns",
+    "subject": "Past plumbing customers are sitting on your next jobs",
+    "body": [
+      "{{greeting}}",
+      "",
+      "The easiest plumbing jobs are often people you've already helped — if something reminds them to call. Campaigns in Housecall Pro can:",
+      "",
+      "• Follow up after every job with a thank-you and review ask",
+      "• Bring past customers back for seasonal or reminder work",
+      "• Run without you building another spreadsheet",
+      "",
+      "Curious for {{business|your shop}}? Reply here, or grab a time below.",
+      ""
+    ]
+  },
+  "electrical-drip-1": {
+    "name": "Electrical drip · opener",
+    "subject": "Keeping {{business|your electrical shop}} ahead of the board",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Panel upgrades, service calls, and punch-list work stack up fast. Housecall Pro gives electrical shops one place for scheduling, estimates, and follow-up so nothing sits in a text thread.",
+      "",
+      "• Online booking from your site or Google",
+      "• Dispatch that keeps techs moving",
+      "• Pipeline so every estimate gets a nudge",
+      "",
+      "Want a quick look for {{business|your team}}? Reply here, or grab a time with the link below.",
+      ""
+    ]
+  },
+  "electrical-drip-2": {
+    "name": "Electrical drip · financing",
+    "subject": "Panel jobs close faster when payment is easy",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Whole-home and panel work often stalls when the homeowner can't pay up front. Housecall Pro lets you collect by card, ACH, or financing from the job site.",
+      "",
+      "Electrical Pros use that to turn a \"let me think about it\" into a booked install — without another week of phone tag.",
+      "",
+      "10 minutes to see how it looks? Reply here or use the booking link below.",
+      ""
+    ]
+  },
+  "electrical-drip-3": {
+    "name": "Electrical drip · reputation",
+    "subject": "Reviews that keep electrical leads coming in",
+    "body": [
+      "{{greeting}}",
+      "",
+      "Homeowners hire electricians they trust — and Google reviews do a lot of that work. Campaigns in Housecall Pro can ask for a review after every job and stay in touch with past customers for the next service call.",
+      "",
+      "Set it up once; it runs while you're on a panel.",
+      "",
+      "Open to a walkthrough for {{business|your shop}}? Reply here, or grab a time below.",
+      ""
+    ]
+  }
+}

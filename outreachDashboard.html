@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Outreach</title>
+<title>Pipeline Assistant</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%AC%3C/text%3E%3C/svg%3E">
 <style>
 :root{
@@ -97,6 +97,20 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 .flash.ok{background:#d1fadf;color:#067647}
 .flash.err{background:#fee4e2;color:#b42318}
 .rep-text{white-space:pre-wrap;max-width:520px}
+.desk-list{display:grid;gap:10px;margin-top:12px}
+.desk-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.desk-card.due{border-color:var(--accent)}
+.desk-card .desk-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 4px}
+.desk-card h3{margin:0;font-size:16px}
+.desk-card .desk-detail{margin:8px 0 0;color:var(--muted);font-size:13px;white-space:pre-wrap;word-break:break-word}
+.desk-card .desk-meta{margin:8px 0 0;font-size:12px;color:var(--muted)}
+.desk-card .desk-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.desk-cmd{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;color:var(--muted);word-break:break-all}
+.prio{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;margin-right:6px}
+.prio.hold{background:#fee4e2;color:#b42318}
+.prio.interested{background:#d1fadf;color:#067647}
+.prio.board{background:var(--email-bg);color:var(--email-fg)}
+.kit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:12px}
 @media (max-width:680px){
   .wrap{padding:14px 12px 40px}
   .cards,.cards.four{grid-template-columns:1fr 1fr;gap:8px}
@@ -121,22 +135,138 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 <main class="wrap">
   <header class="top">
     <div>
-      <h1>Outreach</h1>
+      <h1>Pipeline Assistant</h1>
       <p class="sub"><span class="dot" id="dot"></span><span id="status">Waiting for data …</span></p>
     </div>
     <a class="link" id="fullLog" href="/full-log" hidden>Full outreach log &rarr;</a>
   </header>
   <div class="banner" id="banner" hidden>Practice flag in use (--test / --dry-run). This page lists only sends that actually went out, so it stays empty unless one does.</div>
-  <div class="banner" id="fileMode" hidden>Opened as a file — Templates, Scoreboard, and DNC need the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page.</div>
+  <div class="banner" id="fileMode" hidden>Opened as a file — Pipeline Assistant needs the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page.</div>
+  <div class="banner" id="deskHint" hidden></div>
 
   <nav class="nav" role="tablist" aria-label="Dashboard sections">
-    <button type="button" role="tab" id="tab-sends" aria-selected="true" data-view="sends">Sends</button>
+    <button type="button" role="tab" id="tab-morning" aria-selected="true" data-view="morning">Morning</button>
+    <button type="button" role="tab" id="tab-replies" aria-selected="false" data-view="replies">Replies</button>
+    <button type="button" role="tab" id="tab-kit" aria-selected="false" data-view="kit">Quick kit</button>
+    <button type="button" role="tab" id="tab-myleads" aria-selected="false" data-view="myleads">My leads</button>
+    <button type="button" role="tab" id="tab-board" aria-selected="false" data-view="board">Board</button>
+    <button type="button" role="tab" id="tab-content" aria-selected="false" data-view="content">Content</button>
+    <button type="button" role="tab" id="tab-today" aria-selected="false" data-view="today">Today</button>
+    <button type="button" role="tab" id="tab-sends" aria-selected="false" data-view="sends">Sends</button>
     <button type="button" role="tab" id="tab-templates" aria-selected="false" data-view="templates">Templates</button>
     <button type="button" role="tab" id="tab-analytics" aria-selected="false" data-view="analytics">Scoreboard</button>
     <button type="button" role="tab" id="tab-dnc" aria-selected="false" data-view="dnc">DNC</button>
   </nav>
 
-  <section id="view-sends" role="tabpanel">
+  <section id="view-morning" role="tabpanel">
+    <p class="sub" style="margin:14px 0 0">What needs you today — held threads, interested replies waiting on a follow-up, and personal board touches that are due.</p>
+    <div class="cards" aria-label="Morning counts" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card"><div class="k">Needs you</div><div class="n" id="mNeed">0</div><div class="s" id="mNeedS"></div></div>
+      <div class="card"><div class="k">Holds</div><div class="n" id="mHold">0</div><div class="s">paused sends</div></div>
+      <div class="card"><div class="k">Board due</div><div class="n" id="mBoard">0</div><div class="s">your hand-added leads</div></div>
+    </div>
+    <div id="morningList" class="desk-list"></div>
+    <div class="empty" id="morningEmpty" hidden>Nothing queued — nice. Add a lead under My leads after a call, or wait for a reply.</div>
+  </section>
+
+  <section id="view-replies" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Inbound replies this copy knows about. Interested ones that still need a follow-up also show on Morning.</p>
+    <div class="controls">
+      <input id="rq" type="search" placeholder="Search replies …" aria-label="Search replies" style="flex:1;min-width:180px">
+      <span class="sub" id="replyCount"></span>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>When</th><th>Who</th><th>How</th><th>What they said</th></tr></thead>
+        <tbody id="replyRows"></tbody>
+      </table>
+      <div class="empty" id="replyEmpty" hidden></div>
+    </div>
+    <p class="foot" id="replyFoot">Replies come from a Gmail feed (<code>node replyPoller.js --setup</code>). Holds still appear on Morning without that.</p>
+  </section>
+
+  <section id="view-kit" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Post-call / post-demo helpers. Copy the command, open Salesforce from Morning or My leads, then paste into a terminal — or send from the usual <code>zw</code> menu.</p>
+    <div id="kitList" class="kit-grid"></div>
+    <p class="foot">Luke can change this kit for everyone: edit <code>team-shared/day-desk.json</code>, then each machine runs <code>node teamSync.js --pull</code>.</p>
+  </section>
+
+  <section id="view-myleads" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Your personal follow-up board — leads you added by hand after a call or demo.</p>
+    <div id="addLeadBox" class="desk-card" style="margin-top:12px">
+      <div class="desk-title">Add after a call</div>
+      <h3>Put someone on your board</h3>
+      <p class="desk-detail" id="addLeadHint"></p>
+      <div class="desk-cmd" id="addLeadCmd"></div>
+      <div class="desk-actions">
+        <button type="button" class="btn" id="copyAddLead">Copy command</button>
+      </div>
+    </div>
+    <div id="myLeadsList" class="desk-list"></div>
+    <div class="empty" id="myLeadsEmpty" hidden>No hand-added leads yet. After a good call, use the command above.</div>
+  </section>
+
+  <section id="view-board" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Modular boards — Post-demo, HVAC / Plumbing / Electrical 2-week drips (text + email), or the 60-day cold drip. Change Day or template on any outreach.</p>
+    <div id="boardFlash" class="flash" hidden></div>
+    <div class="controls" style="align-items:flex-end">
+      <div style="flex:1;min-width:200px">
+        <label for="boardPack" class="meta" style="display:block;margin:0 0 4px">Active board</label>
+        <select id="boardPack" aria-label="Active board" style="width:100%"></select>
+      </div>
+      <span class="sub" id="boardPackDesc" style="flex:2"></span>
+    </div>
+    <p class="desk-meta" id="boardTip" style="margin:8px 0 0"></p>
+    <div id="boardList" class="desk-list"></div>
+    <p class="foot" id="boardFoot">Change <b>Day</b> to move an outreach (e.g. Outreach 3 on day 5 instead of day 1). Templates come from the Templates tab. Saves to <code>boards-local.json</code>.</p>
+  </section>
+
+  <section id="view-content" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Sales Content Finder library — every trade × need path scored the same way as <a href="https://hcp-brand-content.github.io/sales-content-finder/" target="_blank" rel="noopener">hcp-brand-content</a>. Pick filters, copy the link or subject, drop into a send.</p>
+    <div class="controls" style="align-items:flex-end;flex-wrap:wrap">
+      <div>
+        <label for="cTrade" class="meta" style="display:block;margin:0 0 4px">Trade</label>
+        <select id="cTrade" aria-label="Trade"></select>
+      </div>
+      <div>
+        <label for="cNeed" class="meta" style="display:block;margin:0 0 4px">Need</label>
+        <select id="cNeed" aria-label="Need"><option value="">Any</option></select>
+      </div>
+      <div>
+        <label for="cCompetitor" class="meta" style="display:block;margin:0 0 4px">Competitor</label>
+        <select id="cCompetitor" aria-label="Competitor"><option value="">Any</option></select>
+      </div>
+      <div style="flex:1;min-width:160px">
+        <label for="cQ" class="meta" style="display:block;margin:0 0 4px">Search</label>
+        <input id="cQ" type="search" placeholder="Title, trigger, subject…" aria-label="Search content" style="width:100%">
+      </div>
+      <button type="button" class="btn" id="cGo">Find</button>
+    </div>
+    <p class="desk-meta" id="cMeta" style="margin:8px 0 0"></p>
+    <div id="cBest" class="desk-list" style="margin-top:12px"></div>
+    <h3 class="meta" style="margin:18px 0 8px">Full catalog</h3>
+    <div id="cList" class="desk-list"></div>
+    <div class="empty" id="cEmpty" hidden>No assets match. Widen the filters or clear search.</div>
+    <p class="foot">Refresh from the finder: <code>node syncContentLibrary.js</code> · snapshot in <code>content-library/</code></p>
+  </section>
+
+  <section id="view-today" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">What already went out from this copy today.</p>
+    <div class="cards" aria-label="Today totals">
+      <div class="card"><div class="k">Today</div><div class="n" id="tSends">0</div><div class="s" id="tSplit"></div></div>
+      <div class="card"><div class="k">Texts</div><div class="n" id="tTexts">0</div><div class="s">sent today</div></div>
+      <div class="card"><div class="k">Emails</div><div class="n" id="tEmails">0</div><div class="s">sent today</div></div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>When</th><th>Who</th><th>How</th><th>What</th></tr></thead>
+        <tbody id="todayRows"></tbody>
+      </table>
+      <div class="empty" id="todayEmpty" hidden>Nothing sent yet today.</div>
+    </div>
+  </section>
+
+  <section id="view-sends" role="tabpanel" hidden>
     <div class="cards" aria-label="Totals">
       <div class="card"><div class="k" id="kRun">This run</div><div class="n" id="nRun">0</div><div class="s" id="sRun"></div></div>
       <div class="card"><div class="k">Today</div><div class="n" id="nToday">0</div><div class="s" id="sToday"></div></div>
@@ -226,11 +356,14 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   'use strict';
   var POLL_MS = 3000, MAX_DRAWN = 500, LS = 'outreach-dashboard:';
   var LIVE = location.protocol === 'http:' || location.protocol === 'https:';
+  var DESK_VIEWS = ['morning', 'replies', 'kit', 'myleads', 'board', 'content', 'today', 'sends', 'templates', 'analytics', 'dnc'];
   var state = {
-    view: 'sends', channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0,
+    view: 'morning', channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0,
     tk: 'text', tq: '', templates: null, editing: null,
     analytics: null,
-    dnc: null, dncQ: ''
+    dnc: null, dncQ: '',
+    desk: null, rq: '',
+    board: null
   };
 
   function $(id) { return document.getElementById(id); }
@@ -243,7 +376,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 
   var c0 = lsGet('channel'); if (c0 === 'text' || c0 === 'email') state.channel = c0;
   var r0 = lsGet('range'); if (r0 === 'run' || r0 === 'today' || r0 === 'week' || r0 === 'all') state.range = r0;
-  var v0 = lsGet('view'); if (v0 === 'sends' || v0 === 'templates' || v0 === 'analytics' || v0 === 'dnc') state.view = v0;
+  var v0 = lsGet('view'); if (DESK_VIEWS.indexOf(v0) >= 0) state.view = v0;
 
   var fTime = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' });
   var fTimeSec = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
@@ -280,9 +413,10 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   function href(u) { return typeof u === 'string' && /^https?:[/][/]/i.test(u) ? u : null; }
 
   function setView(view) {
+    if (DESK_VIEWS.indexOf(view) < 0) view = 'morning';
     state.view = view;
     lsSet('view', view);
-    ['sends', 'templates', 'analytics', 'dnc'].forEach(function (v) {
+    DESK_VIEWS.forEach(function (v) {
       var pane = $('view-' + v), tab = $('tab-' + v);
       if (pane) pane.hidden = v !== view;
       if (tab) tab.setAttribute('aria-selected', v === view ? 'true' : 'false');
@@ -290,6 +424,477 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     if (view === 'templates') loadTemplates();
     if (view === 'analytics') loadAnalytics();
     if (view === 'dnc') loadDnc();
+    if (view === 'board') loadBoard();
+    if (view === 'content') loadContent();
+    if (view === 'morning' || view === 'replies' || view === 'kit' || view === 'myleads' || view === 'today') loadDayDesk();
+  }
+
+  function flashBoard(msg, ok) {
+    var el = $('boardFlash');
+    el.hidden = false;
+    el.className = 'flash ' + (ok ? 'ok' : 'err');
+    el.textContent = msg;
+    clearTimeout(flashBoard._t);
+    flashBoard._t = setTimeout(function () { el.hidden = true; }, 3200);
+  }
+
+  function loadBoard() {
+    if (!LIVE) return;
+    fetch('/api/board').then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || j.ok === false) { flashBoard((j && j.error) || 'Could not load board', false); return; }
+      state.board = j;
+      renderBoard();
+    }).catch(function () { flashBoard('Could not load board', false); });
+  }
+
+  function contentQuery() {
+    return {
+      trade: ($('cTrade') && $('cTrade').value) || 'any',
+      need: ($('cNeed') && $('cNeed').value) || '',
+      competitor: ($('cCompetitor') && $('cCompetitor').value) || '',
+      q: ($('cQ') && $('cQ').value) || ''
+    };
+  }
+
+  function loadContent() {
+    if (!LIVE) return;
+    var q = contentQuery();
+    var qs = Object.keys(q).filter(function (k) { return q[k]; }).map(function (k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(q[k]);
+    }).join('&');
+    fetch('/api/content' + (qs ? '?' + qs : '')).then(function (r) { return r.json(); }).then(function (j) {
+      state.content = j;
+      fillContentFilters(j);
+      renderContent();
+    }).catch(function () {
+      $('cMeta').textContent = 'Could not load content library.';
+    });
+  }
+
+  function fillSelect(sel, options, blankLabel, blankValue, keep) {
+    if (!sel) return;
+    var cur = keep != null ? keep : sel.value;
+    sel.innerHTML = '';
+    if (blankLabel != null) {
+      var blank = document.createElement('option');
+      blank.value = blankValue == null ? '' : blankValue;
+      blank.textContent = blankLabel;
+      sel.appendChild(blank);
+    }
+    (options || []).forEach(function (t) {
+      var id = typeof t === 'object' ? t.id : t;
+      var label = typeof t === 'object' ? (t.label || t.id) : t;
+      if (!id && id !== 0) return;
+      var o = document.createElement('option');
+      o.value = id;
+      o.textContent = label;
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+  }
+
+  function fillContentFilters(j) {
+    if (!j) return;
+    fillSelect($('cTrade'), j.trades, 'All trades', 'any', ($('cTrade') && $('cTrade').value) || 'any');
+    fillSelect($('cNeed'), j.needs, 'Any', '', ($('cNeed') && $('cNeed').value) || '');
+    fillSelect($('cCompetitor'), j.competitors, 'Any', '', ($('cCompetitor') && $('cCompetitor').value) || '');
+  }
+
+  function contentCard(a, badge) {
+    var card = make('div', 'desk-card');
+    var title = make('div', 'desk-title');
+    if (badge) title.appendChild(make('span', 'pill ok', badge));
+    title.appendChild(make('span', 'pill', a.type || 'Asset'));
+    if (a.trade) title.appendChild(make('span', 'pill', a.trade));
+    card.appendChild(title);
+    card.appendChild(make('h3', null, a.title || a.id));
+    if (a.subject) card.appendChild(make('div', 'desk-detail', 'Subject: ' + a.subject));
+    if (a.why) card.appendChild(make('div', 'desk-meta', a.why));
+    if (a.score != null) card.appendChild(make('div', 'desk-meta', 'Score ' + a.score + (a.reasons && a.reasons.length ? ' · ' + a.reasons.join(', ') : '')));
+    var actions = make('div', 'desk-actions');
+    if (a.url) {
+      var open = make('a', 'btn');
+      open.href = a.url;
+      open.target = '_blank';
+      open.rel = 'noopener';
+      open.textContent = 'Open';
+      actions.appendChild(open);
+      var copyUrl = make('button', 'btn', 'Copy link');
+      copyUrl.type = 'button';
+      copyUrl.addEventListener('click', function () {
+        navigator.clipboard.writeText(a.url).then(function () { copyUrl.textContent = 'Copied'; setTimeout(function () { copyUrl.textContent = 'Copy link'; }, 1200); });
+      });
+      actions.appendChild(copyUrl);
+    }
+    if (a.subject) {
+      var copySub = make('button', 'btn', 'Copy subject');
+      copySub.type = 'button';
+      copySub.addEventListener('click', function () {
+        navigator.clipboard.writeText(a.subject).then(function () { copySub.textContent = 'Copied'; setTimeout(function () { copySub.textContent = 'Copy subject'; }, 1200); });
+      });
+      actions.appendChild(copySub);
+    }
+    if (a.sms) {
+      var copySms = make('button', 'btn', 'Copy SMS');
+      copySms.type = 'button';
+      copySms.addEventListener('click', function () {
+        navigator.clipboard.writeText(a.sms).then(function () { copySms.textContent = 'Copied'; setTimeout(function () { copySms.textContent = 'Copy SMS'; }, 1200); });
+      });
+      actions.appendChild(copySms);
+    }
+    card.appendChild(actions);
+    return card;
+  }
+
+  function renderContent() {
+    var j = state.content || {};
+    var meta = (j.assetCount || 0) + ' assets · ' + (j.pathCount || 0) + ' paths';
+    if (j.syncedAt) meta += ' · synced ' + stamp(Date.parse(j.syncedAt) || Date.now());
+    $('cMeta').textContent = meta;
+
+    var bestBox = $('cBest'); bestBox.innerHTML = '';
+    var m = j.match;
+    if (m && m.best) {
+      bestBox.appendChild(make('h3', 'meta', m.approximate ? 'Closest match for this path' : 'Best for this path'));
+      bestBox.appendChild(contentCard(m.best, 'Best'));
+      (m.also || []).slice(0, 3).forEach(function (a) { bestBox.appendChild(contentCard(a, 'Also')); });
+    } else if (j.query && (j.query.need || j.query.trade !== 'any')) {
+      bestBox.appendChild(make('div', 'desk-meta', 'No scored path match — browsing catalog below.'));
+    }
+
+    var list = $('cList'); list.innerHTML = '';
+    var assets = j.assets || [];
+    $('cEmpty').hidden = assets.length > 0;
+    assets.forEach(function (a) { list.appendChild(contentCard(a)); });
+  }
+
+  function saveBoardStage(id, body) {
+    return fetch('/api/board/stages/' + encodeURIComponent(id), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.ok) { flashBoard((j && j.error) || 'Save failed', false); return false; }
+      state.board = j.board || state.board;
+      renderBoard();
+      flashBoard('Saved — applies on the next board run', true);
+      return true;
+    }).catch(function () { flashBoard('Save failed', false); return false; });
+  }
+
+  function renderBoard() {
+    var j = state.board || {};
+    var stages = j.stages || [];
+    var textOpts = j.textOptions || [];
+    var emailOpts = j.emailOptions || [];
+    var packs = j.packs || [];
+    var packSel = $('boardPack');
+    var prev = packSel.value;
+    packSel.innerHTML = '';
+    for (var p = 0; p < packs.length; p++) {
+      var opt = document.createElement('option');
+      opt.value = packs[p].id;
+      opt.textContent = packs[p].name + ' (' + packs[p].stageCount + ' stages)';
+      if (packs[p].id === j.activeBoard) opt.selected = true;
+      packSel.appendChild(opt);
+    }
+    if (prev && prev !== j.activeBoard) { /* kept selected from server */ }
+    $('boardPackDesc').textContent = j.boardDescription || '';
+    var tip = j.nextStepsTip;
+    $('boardTip').textContent = tip
+      ? ('Tue/Fri tip: aim for Day ' + tip.dayOffset + ' (' + tip.weekday + '). ' + tip.reason)
+      : '';
+
+    var box = $('boardList'); box.innerHTML = '';
+    for (var i = 0; i < stages.length; i++) {
+      (function (s) {
+        var card = make('div', 'desk-card' + (s.customized ? ' due' : ''));
+        var title = make('div', 'desk-title');
+        title.appendChild(make('span', 'pill ' + (s.ch === 'email' ? 'email' : 'text'), s.ch === 'email' ? 'Email' : 'Text'));
+        title.appendChild(document.createTextNode('  ' + (s.label || s.id)));
+        if (s.customized) title.appendChild(make('span', 'pill ok', ' Custom'));
+        if (s.byHand) title.appendChild(make('span', 'pill warn', ' By hand'));
+        card.appendChild(title);
+        card.appendChild(make('h3', null, s.copyName || (s.ch === 'email' ? 'Email template' : 'Text template')));
+
+        var row = document.createElement('div');
+        row.className = 'controls';
+        row.style.margin = '10px 0 0';
+
+        var dayWrap = document.createElement('div');
+        dayWrap.style.minWidth = '100px';
+        var dayLab = make('label', 'meta');
+        dayLab.setAttribute('for', 'board-day-' + s.id);
+        dayLab.textContent = 'Day (after demo / start)';
+        dayWrap.appendChild(dayLab);
+        var dayIn = document.createElement('input');
+        dayIn.type = 'number';
+        dayIn.min = '0';
+        dayIn.max = '365';
+        dayIn.id = 'board-day-' + s.id;
+        dayIn.value = String(s.day != null ? s.day : 0);
+        dayIn.style.width = '100%';
+        dayIn.style.marginTop = '4px';
+        dayWrap.appendChild(dayIn);
+        row.appendChild(dayWrap);
+
+        var tplWrap = document.createElement('div');
+        tplWrap.style.flex = '1';
+        tplWrap.style.minWidth = '180px';
+        var lab = make('label', 'meta');
+        lab.setAttribute('for', 'board-sel-' + s.id);
+        lab.textContent = s.ch === 'email' ? 'Email template' : 'Text template';
+        tplWrap.appendChild(lab);
+        var sel = document.createElement('select');
+        sel.id = 'board-sel-' + s.id;
+        sel.style.width = '100%';
+        sel.style.marginTop = '4px';
+        var opts = s.ch === 'email' ? emailOpts : textOpts;
+        var cur = s.ch === 'email' ? (s.emailTemplate || '') : (s.template || '');
+        if (s.ch === 'email' && !cur) {
+          var ph = document.createElement('option');
+          ph.value = '';
+          ph.textContent = 'Default email sequence (touch ' + s.n + ')';
+          sel.appendChild(ph);
+        }
+        for (var k = 0; k < opts.length; k++) {
+          var o = document.createElement('option');
+          o.value = opts[k].id;
+          o.textContent = (s.ch === 'text' ? ('#' + opts[k].id + ' · ') : '') + opts[k].name;
+          if (String(opts[k].id) === String(cur)) o.selected = true;
+          sel.appendChild(o);
+        }
+        if (cur && !opts.some(function (x) { return String(x.id) === String(cur); })) {
+          var miss = document.createElement('option');
+          miss.value = cur;
+          miss.textContent = cur + ' (missing — pick another)';
+          miss.selected = true;
+          sel.appendChild(miss);
+        }
+        tplWrap.appendChild(sel);
+        row.appendChild(tplWrap);
+        card.appendChild(row);
+
+        if (s.hint) card.appendChild(make('div', 'desk-meta', s.hint));
+        if (s.preferWeekdays && s.preferWeekdays.length) {
+          card.appendChild(make('div', 'desk-meta', 'Prefer: ' + s.preferWeekdays.join(' / ')));
+        }
+        if (s.preview) card.appendChild(make('div', 'desk-detail', s.preview));
+        if (s.note) card.appendChild(make('div', 'desk-meta', s.note));
+
+        var actions = make('div', 'desk-actions');
+        var save = make('button', 'btn primary', 'Save');
+        save.type = 'button';
+        save.addEventListener('click', function () {
+          var body = { day: Number(dayIn.value) };
+          var val = sel.value;
+          if (s.ch === 'email') {
+            if (val) body.emailTemplate = val;
+          } else {
+            if (!val) { flashBoard('Pick a text template', false); return; }
+            body.template = val;
+          }
+          save.disabled = true;
+          saveBoardStage(s.id, body).then(function () { save.disabled = false; });
+        });
+        actions.appendChild(save);
+        if (s.customized) {
+          var reset = make('button', 'btn', 'Reset to default');
+          reset.type = 'button';
+          reset.addEventListener('click', function () {
+            reset.disabled = true;
+            saveBoardStage(s.id, { reset: true }).then(function () { reset.disabled = false; });
+          });
+          actions.appendChild(reset);
+        }
+        card.appendChild(actions);
+        box.appendChild(card);
+      })(stages[i]);
+    }
+    if (!stages.length) {
+      box.appendChild(make('div', 'empty', 'No board stages found.'));
+    }
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    return Promise.reject();
+  }
+
+  function personLink(name, url) {
+    var wrap = document.createElement('span');
+    var h = href(url);
+    if (h) {
+      var a = make('a', null, name || 'Open');
+      a.href = h; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.title = 'Open in Salesforce';
+      wrap.appendChild(a);
+    } else wrap.appendChild(make('span', 'nm', name || '(unknown)'));
+    return wrap;
+  }
+
+  function renderMorning() {
+    var j = state.desk || {};
+    var list = j.morning || [];
+    var holds = 0, board = 0, interested = 0, i;
+    for (i = 0; i < list.length; i++) {
+      if (list[i].kind === 'hold') holds++;
+      else if (list[i].kind === 'board') board++;
+      else interested++;
+    }
+    $('mNeed').textContent = fNum.format(list.length);
+    $('mNeedS').textContent = interested + ' interested · ' + holds + ' holds · ' + board + ' board';
+    $('mHold').textContent = fNum.format(holds);
+    $('mBoard').textContent = fNum.format(board);
+    var box = $('morningList'); box.innerHTML = '';
+    for (i = 0; i < list.length; i++) {
+      var m = list[i];
+      var card = make('div', 'desk-card' + (m.kind === 'hold' || m.kind === 'interested' ? ' due' : ''));
+      var title = make('div', 'desk-title');
+      title.appendChild(make('span', 'prio ' + (m.kind || ''), m.kind === 'hold' ? 'Hold' : m.kind === 'interested' ? 'Interested' : 'Board'));
+      title.appendChild(document.createTextNode(m.title || ''));
+      card.appendChild(title);
+      var h = make('h3'); h.appendChild(personLink(m.name, m.url)); card.appendChild(h);
+      if (m.detail) card.appendChild(make('div', 'desk-detail', m.detail));
+      var meta = [];
+      if (m.at) meta.push(ago(Date.parse(m.at)));
+      if (m.ageDays != null) meta.push(m.ageDays + 'd since reply');
+      if (m.action) meta.push(m.action);
+      if (meta.length) card.appendChild(make('div', 'desk-meta', meta.join(' · ')));
+      box.appendChild(card);
+    }
+    $('morningEmpty').hidden = list.length > 0;
+    var hint = $('deskHint');
+    if (j.meta && j.meta.replyHint) { hint.hidden = false; hint.textContent = j.meta.replyHint; }
+    else hint.hidden = true;
+  }
+
+  function renderReplies() {
+    var j = state.desk || {};
+    var rows = j.replies || [];
+    var q = state.rq.toLowerCase();
+    var body = $('replyRows'); body.innerHTML = '';
+    var frag = document.createDocumentFragment(), n = 0, i, r, tr, td, pill;
+    for (i = 0; i < rows.length; i++) {
+      r = rows[i];
+      if (q && [r.name, r.reply, r.accountId].join(' ').toLowerCase().indexOf(q) < 0) continue;
+      n++;
+      tr = make('tr', 'row');
+      td = make('td', 't');
+      var t = Date.parse(r.at);
+      td.appendChild(make('span', 'time', isFinite(t) ? stamp(t, false) : '—'));
+      if (isFinite(t)) { var ag = make('span', 'ago', ago(t)); td.appendChild(ag); }
+      tr.appendChild(td);
+      td = make('td', 'who'); td.appendChild(personLink(r.name, r.url)); tr.appendChild(td);
+      td = make('td', 'how');
+      pill = make('span', 'pill ' + (r.ch === 'email' ? 'email' : 'text'), r.ch === 'email' ? 'Email' : 'Text');
+      td.appendChild(pill);
+      if (r.interested) td.appendChild(make('span', 'pill ok', ' Interested'));
+      if (r.optout) td.appendChild(make('span', 'pill warn', ' Opt-out'));
+      tr.appendChild(td);
+      td = make('td'); td.appendChild(make('div', 'rep-text', r.reply || '')); tr.appendChild(td);
+      frag.appendChild(tr);
+    }
+    body.appendChild(frag);
+    $('replyCount').textContent = n + ' shown';
+    var em = $('replyEmpty');
+    if (!n) {
+      em.hidden = false;
+      em.textContent = rows.length ? 'No replies match this search.' : 'No replies yet. Set up the Gmail feed: node replyPoller.js --setup';
+    } else em.hidden = true;
+  }
+
+  function renderKit() {
+    var kit = (state.desk && state.desk.kit) || [];
+    var box = $('kitList'); box.innerHTML = '';
+    for (var i = 0; i < kit.length; i++) {
+      (function (k) {
+        var card = make('div', 'desk-card');
+        card.appendChild(make('div', 'desk-title', k.kind === 'email' ? 'Email' : 'Text'));
+        card.appendChild(make('h3', null, k.label || k.id));
+        if (k.hint) card.appendChild(make('div', 'desk-meta', k.hint));
+        if (k.subject) card.appendChild(make('div', 'tpl', k.subject));
+        if (k.preview) card.appendChild(make('div', 'desk-detail', k.preview));
+        if (k.command) {
+          card.appendChild(make('div', 'desk-cmd', k.command));
+          var actions = make('div', 'desk-actions');
+          var btn = make('button', 'btn', 'Copy command');
+          btn.type = 'button';
+          btn.addEventListener('click', function () {
+            copyText(k.command).then(function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy command'; }, 1200); }).catch(function () {});
+          });
+          actions.appendChild(btn);
+          card.appendChild(actions);
+        }
+        box.appendChild(card);
+      })(kit[i]);
+    }
+  }
+
+  function renderMyLeads() {
+    var j = state.desk || {};
+    var add = j.addLead || {};
+    $('addLeadHint').textContent = add.hint || '';
+    $('addLeadCmd').textContent = add.command || '';
+    var list = j.myLeads || [];
+    var box = $('myLeadsList'); box.innerHTML = '';
+    for (var i = 0; i < list.length; i++) {
+      var m = list[i];
+      var card = make('div', 'desk-card' + (m.dueNow ? ' due' : ''));
+      card.appendChild(make('div', 'desk-title', m.dueNow ? 'Due now' : (m.state || 'On board')));
+      var h = make('h3'); h.appendChild(personLink(m.name, m.url)); card.appendChild(h);
+      var bits = [];
+      if (m.next) bits.push('Next: ' + m.next);
+      if (m.tags && m.tags.length) bits.push('#' + m.tags.join(' #'));
+      if (m.hold) bits.push(m.hold);
+      if (bits.length) card.appendChild(make('div', 'desk-meta', bits.join(' · ')));
+      box.appendChild(card);
+    }
+    $('myLeadsEmpty').hidden = list.length > 0;
+  }
+
+  function renderTodayDesk() {
+    var t = (state.desk && state.desk.today) || { sends: 0, texts: 0, emails: 0, rows: [] };
+    $('tSends').textContent = fNum.format(t.sends || 0);
+    $('tTexts').textContent = fNum.format(t.texts || 0);
+    $('tEmails').textContent = fNum.format(t.emails || 0);
+    $('tSplit').textContent = 'texts ' + fNum.format(t.texts || 0) + ' · emails ' + fNum.format(t.emails || 0);
+    var body = $('todayRows'); body.innerHTML = '';
+    var rows = t.rows || [], frag = document.createDocumentFragment(), i, r, tr, td;
+    for (i = 0; i < rows.length; i++) {
+      r = rows[i];
+      tr = make('tr', 'row');
+      td = make('td', 't');
+      var ts = Date.parse(r.at);
+      td.appendChild(make('span', 'time', isFinite(ts) ? stamp(ts, false) : '—'));
+      tr.appendChild(td);
+      td = make('td', 'who'); td.appendChild(personLink(r.name, r.url)); tr.appendChild(td);
+      td = make('td', 'how'); td.appendChild(make('span', 'pill ' + (r.channel === 'email' ? 'email' : 'text'), r.channel === 'email' ? 'Email' : 'Text')); tr.appendChild(td);
+      td = make('td');
+      td.appendChild(make('div', 'tpl', r.subject || r.template || (r.channel === 'email' ? 'Email' : 'Text')));
+      if (r.preview) td.appendChild(make('span', 'prev', r.preview));
+      tr.appendChild(td);
+      frag.appendChild(tr);
+    }
+    body.appendChild(frag);
+    $('todayEmpty').hidden = rows.length > 0;
+  }
+
+  function renderDayDesk() {
+    if (!state.desk) return;
+    renderMorning();
+    renderReplies();
+    renderKit();
+    renderMyLeads();
+    renderTodayDesk();
+  }
+
+  function loadDayDesk() {
+    if (!LIVE) return;
+    fetch('/api/daydesk').then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || j.ok === false) return;
+      state.desk = j;
+      renderDayDesk();
+    }).catch(function () {});
   }
 
   function ingest(d) {
@@ -334,7 +939,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     $('nAll').textContent = fNum.format(t.sends || 0);
     $('sAll').textContent = split({ text: t.texts || 0, email: t.emails || 0 }) + ' · people ' + fNum.format(t.people || 0);
     $('kRun').textContent = 'This run' + (isFinite(rs) ? ' · since ' + stamp(rs, false) : '');
-    document.title = 'Outreach · ' + fNum.format(tod.all) + ' today';
+    document.title = 'Pipeline Assistant · ' + fNum.format(tod.all) + ' today';
   }
 
   function whatNodes(r) {
@@ -822,6 +1427,55 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
       clearTimeout(dncTimer);
       dncTimer = setTimeout(function () { state.dncQ = v.trim(); renderDnc(); }, 120);
     });
+
+    var rqTimer = null;
+    $('rq').addEventListener('input', function () {
+      var v = this.value;
+      clearTimeout(rqTimer);
+      rqTimer = setTimeout(function () { state.rq = v.trim(); renderReplies(); }, 120);
+    });
+    $('copyAddLead').addEventListener('click', function () {
+      var cmd = $('addLeadCmd').textContent || '';
+      if (!cmd) return;
+      copyText(cmd).then(function () {
+        $('copyAddLead').textContent = 'Copied';
+        setTimeout(function () { $('copyAddLead').textContent = 'Copy command'; }, 1200);
+      }).catch(function () {});
+    });
+
+    $('boardPack').addEventListener('change', function () {
+      var id = this.value;
+      if (!id || !LIVE) return;
+      fetch('/api/board/active', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        if (!j || !j.ok) { flashBoard((j && j.error) || 'Could not switch board', false); return; }
+        state.board = j.board;
+        renderBoard();
+        flashBoard('Switched to ' + ((j.board && j.board.boardName) || id), true);
+      }).catch(function () { flashBoard('Could not switch board', false); });
+    });
+
+    function bindContentFind() {
+      if ($('cGo')) $('cGo').addEventListener('click', function () { loadContent(); });
+      ['cTrade', 'cNeed', 'cCompetitor'].forEach(function (id) {
+        var el = $(id);
+        if (el) el.addEventListener('change', function () { loadContent(); });
+      });
+      if ($('cQ')) {
+        var t;
+        $('cQ').addEventListener('input', function () {
+          clearTimeout(t);
+          t = setTimeout(function () { loadContent(); }, 280);
+        });
+        $('cQ').addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); loadContent(); }
+        });
+      }
+    }
+    bindContentFind();
 
   })();
 
