@@ -150,6 +150,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     <button type="button" role="tab" id="tab-kit" aria-selected="false" data-view="kit">Quick kit</button>
     <button type="button" role="tab" id="tab-myleads" aria-selected="false" data-view="myleads">My leads</button>
     <button type="button" role="tab" id="tab-board" aria-selected="false" data-view="board">Board</button>
+    <button type="button" role="tab" id="tab-content" aria-selected="false" data-view="content">Content</button>
     <button type="button" role="tab" id="tab-today" aria-selected="false" data-view="today">Today</button>
     <button type="button" role="tab" id="tab-sends" aria-selected="false" data-view="sends">Sends</button>
     <button type="button" role="tab" id="tab-templates" aria-selected="false" data-view="templates">Templates</button>
@@ -218,6 +219,35 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     <p class="desk-meta" id="boardTip" style="margin:8px 0 0"></p>
     <div id="boardList" class="desk-list"></div>
     <p class="foot" id="boardFoot">Change <b>Day</b> to move an outreach (e.g. Outreach 3 on day 5 instead of day 1). Templates come from the Templates tab. Saves to <code>boards-local.json</code>.</p>
+  </section>
+
+  <section id="view-content" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Sales Content Finder library — every trade × need path scored the same way as <a href="https://hcp-brand-content.github.io/sales-content-finder/" target="_blank" rel="noopener">hcp-brand-content</a>. Pick filters, copy the link or subject, drop into a send.</p>
+    <div class="controls" style="align-items:flex-end;flex-wrap:wrap">
+      <div>
+        <label for="cTrade" class="meta" style="display:block;margin:0 0 4px">Trade</label>
+        <select id="cTrade" aria-label="Trade"></select>
+      </div>
+      <div>
+        <label for="cNeed" class="meta" style="display:block;margin:0 0 4px">Need</label>
+        <select id="cNeed" aria-label="Need"><option value="">Any</option></select>
+      </div>
+      <div>
+        <label for="cCompetitor" class="meta" style="display:block;margin:0 0 4px">Competitor</label>
+        <select id="cCompetitor" aria-label="Competitor"><option value="">Any</option></select>
+      </div>
+      <div style="flex:1;min-width:160px">
+        <label for="cQ" class="meta" style="display:block;margin:0 0 4px">Search</label>
+        <input id="cQ" type="search" placeholder="Title, trigger, subject…" aria-label="Search content" style="width:100%">
+      </div>
+      <button type="button" class="btn" id="cGo">Find</button>
+    </div>
+    <p class="desk-meta" id="cMeta" style="margin:8px 0 0"></p>
+    <div id="cBest" class="desk-list" style="margin-top:12px"></div>
+    <h3 class="meta" style="margin:18px 0 8px">Full catalog</h3>
+    <div id="cList" class="desk-list"></div>
+    <div class="empty" id="cEmpty" hidden>No assets match. Widen the filters or clear search.</div>
+    <p class="foot">Refresh from the finder: <code>node syncContentLibrary.js</code> · snapshot in <code>content-library/</code></p>
   </section>
 
   <section id="view-today" role="tabpanel" hidden>
@@ -326,7 +356,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   'use strict';
   var POLL_MS = 3000, MAX_DRAWN = 500, LS = 'outreach-dashboard:';
   var LIVE = location.protocol === 'http:' || location.protocol === 'https:';
-  var DESK_VIEWS = ['morning', 'replies', 'kit', 'myleads', 'board', 'today', 'sends', 'templates', 'analytics', 'dnc'];
+  var DESK_VIEWS = ['morning', 'replies', 'kit', 'myleads', 'board', 'content', 'today', 'sends', 'templates', 'analytics', 'dnc'];
   var state = {
     view: 'morning', channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0,
     tk: 'text', tq: '', templates: null, editing: null,
@@ -395,6 +425,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     if (view === 'analytics') loadAnalytics();
     if (view === 'dnc') loadDnc();
     if (view === 'board') loadBoard();
+    if (view === 'content') loadContent();
     if (view === 'morning' || view === 'replies' || view === 'kit' || view === 'myleads' || view === 'today') loadDayDesk();
   }
 
@@ -414,6 +445,127 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
       state.board = j;
       renderBoard();
     }).catch(function () { flashBoard('Could not load board', false); });
+  }
+
+  function contentQuery() {
+    return {
+      trade: ($('cTrade') && $('cTrade').value) || 'any',
+      need: ($('cNeed') && $('cNeed').value) || '',
+      competitor: ($('cCompetitor') && $('cCompetitor').value) || '',
+      q: ($('cQ') && $('cQ').value) || ''
+    };
+  }
+
+  function loadContent() {
+    if (!LIVE) return;
+    var q = contentQuery();
+    var qs = Object.keys(q).filter(function (k) { return q[k]; }).map(function (k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(q[k]);
+    }).join('&');
+    fetch('/api/content' + (qs ? '?' + qs : '')).then(function (r) { return r.json(); }).then(function (j) {
+      state.content = j;
+      fillContentFilters(j);
+      renderContent();
+    }).catch(function () {
+      $('cMeta').textContent = 'Could not load content library.';
+    });
+  }
+
+  function fillSelect(sel, options, blankLabel, blankValue, keep) {
+    if (!sel) return;
+    var cur = keep != null ? keep : sel.value;
+    sel.innerHTML = '';
+    if (blankLabel != null) {
+      var blank = document.createElement('option');
+      blank.value = blankValue == null ? '' : blankValue;
+      blank.textContent = blankLabel;
+      sel.appendChild(blank);
+    }
+    (options || []).forEach(function (t) {
+      var id = typeof t === 'object' ? t.id : t;
+      var label = typeof t === 'object' ? (t.label || t.id) : t;
+      if (!id && id !== 0) return;
+      var o = document.createElement('option');
+      o.value = id;
+      o.textContent = label;
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+  }
+
+  function fillContentFilters(j) {
+    if (!j) return;
+    fillSelect($('cTrade'), j.trades, 'All trades', 'any', ($('cTrade') && $('cTrade').value) || 'any');
+    fillSelect($('cNeed'), j.needs, 'Any', '', ($('cNeed') && $('cNeed').value) || '');
+    fillSelect($('cCompetitor'), j.competitors, 'Any', '', ($('cCompetitor') && $('cCompetitor').value) || '');
+  }
+
+  function contentCard(a, badge) {
+    var card = make('div', 'desk-card');
+    var title = make('div', 'desk-title');
+    if (badge) title.appendChild(make('span', 'pill ok', badge));
+    title.appendChild(make('span', 'pill', a.type || 'Asset'));
+    if (a.trade) title.appendChild(make('span', 'pill', a.trade));
+    card.appendChild(title);
+    card.appendChild(make('h3', null, a.title || a.id));
+    if (a.subject) card.appendChild(make('div', 'desk-detail', 'Subject: ' + a.subject));
+    if (a.why) card.appendChild(make('div', 'desk-meta', a.why));
+    if (a.score != null) card.appendChild(make('div', 'desk-meta', 'Score ' + a.score + (a.reasons && a.reasons.length ? ' · ' + a.reasons.join(', ') : '')));
+    var actions = make('div', 'desk-actions');
+    if (a.url) {
+      var open = make('a', 'btn');
+      open.href = a.url;
+      open.target = '_blank';
+      open.rel = 'noopener';
+      open.textContent = 'Open';
+      actions.appendChild(open);
+      var copyUrl = make('button', 'btn', 'Copy link');
+      copyUrl.type = 'button';
+      copyUrl.addEventListener('click', function () {
+        navigator.clipboard.writeText(a.url).then(function () { copyUrl.textContent = 'Copied'; setTimeout(function () { copyUrl.textContent = 'Copy link'; }, 1200); });
+      });
+      actions.appendChild(copyUrl);
+    }
+    if (a.subject) {
+      var copySub = make('button', 'btn', 'Copy subject');
+      copySub.type = 'button';
+      copySub.addEventListener('click', function () {
+        navigator.clipboard.writeText(a.subject).then(function () { copySub.textContent = 'Copied'; setTimeout(function () { copySub.textContent = 'Copy subject'; }, 1200); });
+      });
+      actions.appendChild(copySub);
+    }
+    if (a.sms) {
+      var copySms = make('button', 'btn', 'Copy SMS');
+      copySms.type = 'button';
+      copySms.addEventListener('click', function () {
+        navigator.clipboard.writeText(a.sms).then(function () { copySms.textContent = 'Copied'; setTimeout(function () { copySms.textContent = 'Copy SMS'; }, 1200); });
+      });
+      actions.appendChild(copySms);
+    }
+    card.appendChild(actions);
+    return card;
+  }
+
+  function renderContent() {
+    var j = state.content || {};
+    var meta = (j.assetCount || 0) + ' assets · ' + (j.pathCount || 0) + ' paths';
+    if (j.syncedAt) meta += ' · synced ' + stamp(Date.parse(j.syncedAt) || Date.now());
+    $('cMeta').textContent = meta;
+
+    var bestBox = $('cBest'); bestBox.innerHTML = '';
+    var m = j.match;
+    if (m && m.best) {
+      bestBox.appendChild(make('h3', 'meta', m.approximate ? 'Closest match for this path' : 'Best for this path'));
+      bestBox.appendChild(contentCard(m.best, 'Best'));
+      (m.also || []).slice(0, 3).forEach(function (a) { bestBox.appendChild(contentCard(a, 'Also')); });
+    } else if (j.query && (j.query.need || j.query.trade !== 'any')) {
+      bestBox.appendChild(make('div', 'desk-meta', 'No scored path match — browsing catalog below.'));
+    }
+
+    var list = $('cList'); list.innerHTML = '';
+    var assets = j.assets || [];
+    $('cEmpty').hidden = assets.length > 0;
+    assets.forEach(function (a) { list.appendChild(contentCard(a)); });
   }
 
   function saveBoardStage(id, body) {
@@ -1305,6 +1457,25 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
         flashBoard('Switched to ' + ((j.board && j.board.boardName) || id), true);
       }).catch(function () { flashBoard('Could not switch board', false); });
     });
+
+    function bindContentFind() {
+      if ($('cGo')) $('cGo').addEventListener('click', function () { loadContent(); });
+      ['cTrade', 'cNeed', 'cCompetitor'].forEach(function (id) {
+        var el = $(id);
+        if (el) el.addEventListener('change', function () { loadContent(); });
+      });
+      if ($('cQ')) {
+        var t;
+        $('cQ').addEventListener('input', function () {
+          clearTimeout(t);
+          t = setTimeout(function () { loadContent(); }, 280);
+        });
+        $('cQ').addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); loadContent(); }
+        });
+      }
+    }
+    bindContentFind();
 
   })();
 

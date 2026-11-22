@@ -467,6 +467,22 @@ async function handleApi(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/board') {
     try { return sendJson(res, 200, boardPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }
+  if (req.method === 'GET' && url.pathname === '/api/content') {
+    try {
+      const q = {
+        trade: url.searchParams.get('trade') || '',
+        need: url.searchParams.get('need') || '',
+        competitor: url.searchParams.get('competitor') || '',
+        segment: url.searchParams.get('segment') || '',
+        region: url.searchParams.get('region') || '',
+        stage: url.searchParams.get('stage') || 'demo',
+        q: url.searchParams.get('q') || '',
+        type: url.searchParams.get('type') || '',
+        limit: url.searchParams.get('limit') || '80',
+      };
+      return sendJson(res, 200, require('./contentLibrary').payload(q));
+    } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
   if (req.method === 'PUT' && url.pathname === '/api/board/active') {
     const raw = await readBody(req);
     let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }

@@ -11,6 +11,7 @@ Personal day management for every AE — morning queue, replies, post-call kit, 
 | **Quick kit** | Day-after-demo email, book-demo text, soft follow-ups — copy a command |
 | **My leads** | Hand-added follow-ups + next stage |
 | **Board** | Modular boards — Post-demo, **HVAC / Plumbing / Electrical** 2-week drips, cold drip; change **Day** + template per outreach |
+| **Content** | Sales Content Finder library — filter by trade / need / competitor, copy link or subject |
 | **Today** | What already went out today |
 | Sends / Templates / Scoreboard / DNC | Same as before |
 
@@ -99,6 +100,18 @@ Add a lead from the terminal:
 ```bash
 node textLog.js --add-lead <Salesforce account URL> --tag referral --did email,text,call
 ```
+
+---
+
+## Content library (Sales Content Finder)
+
+Snapshot of [hcp-brand-content Sales Content Finder](https://hcp-brand-content.github.io/sales-content-finder/) — every trade × need path scored the same way as the site.
+
+```bash
+node syncContentLibrary.js   # refresh content-library/ + email-content.json
+```
+
+Browse in the **Content** tab, or pull assets into emails via `contentPicker.js` / `--library`.
 
 ---
 
