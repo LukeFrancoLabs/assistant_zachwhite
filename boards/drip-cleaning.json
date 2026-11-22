@@ -1,0 +1,86 @@
+{
+  "id": "drip-cleaning",
+  "name": "Interior cleaning board (2 weeks)",
+  "description": "Our interior / home cleaning cadence — texts + emails over ~14 days (recurring jobs, booking, invoices, reviews, soft close). Shown as a flow graph on the Board tab.",
+  "tag": "cleaning",
+  "industry": "Interior cleaning",
+  "stages": [
+    {
+      "id": "clean1",
+      "outreach": 1,
+      "day": 0,
+      "ch": "text",
+      "n": 1,
+      "label": "Day 0 · Text intro",
+      "template": "cleaning-t1",
+      "afterMin": 0,
+      "hint": "First touch — recurring cleans + no-shows for home cleaning Pros."
+    },
+    {
+      "id": "clean2",
+      "outreach": 2,
+      "day": 1,
+      "ch": "email",
+      "n": 1,
+      "label": "Day 1 · Email opener",
+      "emailTemplate": "cleaning-drip-1",
+      "afterMin": 0,
+      "hint": "Next day email — booking + schedule for cleaning teams."
+    },
+    {
+      "id": "clean3",
+      "outreach": 3,
+      "day": 3,
+      "ch": "text",
+      "n": 2,
+      "label": "Day 3 · Text booking",
+      "template": "cleaning-t2",
+      "afterMin": 0,
+      "hint": "Online booking for one-time and recurring cleans."
+    },
+    {
+      "id": "clean4",
+      "outreach": 4,
+      "day": 5,
+      "ch": "email",
+      "n": 2,
+      "label": "Day 5 · Email get paid",
+      "emailTemplate": "cleaning-drip-2",
+      "afterMin": 0,
+      "hint": "Card on file / auto-pay so you leave with payment."
+    },
+    {
+      "id": "clean5",
+      "outreach": 5,
+      "day": 8,
+      "ch": "text",
+      "n": 3,
+      "label": "Day 8 · Text pipeline",
+      "template": "cleaning-t3",
+      "afterMin": 0,
+      "hint": "Quotes and move-out cleans going quiet — Pipeline follow-up."
+    },
+    {
+      "id": "clean6",
+      "outreach": 6,
+      "day": 11,
+      "ch": "email",
+      "n": 3,
+      "label": "Day 11 · Email reviews + recurring",
+      "emailTemplate": "cleaning-drip-3",
+      "afterMin": 0,
+      "hint": "Review asks + bring past clients back on a cadence."
+    },
+    {
+      "id": "clean7",
+      "outreach": 7,
+      "day": 14,
+      "ch": "text",
+      "n": 4,
+      "label": "Day 14 · Text soft close",
+      "template": "cleaning-t4",
+      "afterMin": 0,
+      "hint": "Soft close — book a demo or leave it here."
+    }
+  ]
+}
