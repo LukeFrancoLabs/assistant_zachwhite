@@ -11,7 +11,7 @@ cd "$SCRIPT_DIR"
 for a in "$@"; do case "$a" in --same-day|--today|--nocheck|--no-review|--no-check) exec node Assistant.js "$@" ;; esac; done
 
 # No flags = the EMAIL campaign (Pipeline Assistant opens on its welcome screen). Every flag works exactly as before: `zw --text` is the text campaign, `zw --board` the board, and so on.
-# --test (a practice run on your own list, always a dry run) and --dry-run do not name a campaign either, so `zw --test` and `zw --dry-run` are the email campaign too. So is `zw --no-auto` (it only says: pick a template instead of writing each email from the account's notes).
+# --test (a practice run on your own list, always a dry run) and --dry-run do not name a campaign either, so `zw --test` and `zw --dry-run` are the email campaign too. So is `zw --no-auto` (force a template even if Settings has Claude drafts on; Claude drafts are off by default).
 # Done HERE, before the port is picked below, so the email browser (9324) is the one started.
 ONLY_MODIFIERS=1
 for a in "$@"; do case "$a" in --test|--dry-run|--dryrun|--no-auto) ;; *) ONLY_MODIFIERS=0 ;; esac; done
@@ -32,29 +32,96 @@ if [ -f "$SCRIPT_DIR/senderSetup.js" ]; then
 fi
 # (end of the first-launch setup)
 
-# HCP manta + 3-2-1 while Chrome finishes loading. No other loading animation.
-hcp_manta_countdown() {
-  local CYAN='\033[1;36m' BOLD='\033[1m' RESET='\033[0m'
-  if [ -t 1 ]; then
-    printf '\n%b' "$CYAN"
-    cat <<'MANTA'
-              __
-     .-------()----.
-   .'               '.
-  /   .-.       .-.   \\
- |   /   \\ HCP /   \\   |
-  \\  \\___/     \\___/  /
-   '.     manta     .'
-     '-------------'
-MANTA
-    printf '%b\n' "$RESET"
+# Big colored H → C → P countdown while Chrome finishes loading. Finale: huge HCP + "champion the pro" banners.
+# H = do the work · C = enjoy the journey · P = champion the pro
+hcp_letter_countdown() {
+  local RESET='\033[0m' BOLD='\033[1m'
+  local H_COLOR='\033[38;5;208m'   # orange
+  local C_COLOR='\033[1;36m'       # cyan
+  local P_COLOR='\033[1;32m'       # green
+  local is_tty=0
+  [ -t 1 ] && is_tty=1
+
+  _hcp_show_letter() {
+    local color="$1" letter="$2" tagline="$3"
+    if [ "$is_tty" = 1 ]; then
+      printf '\033[2J\033[H'
+      printf '\n%b%b' "$color" "$BOLD"
+      case "$letter" in
+        H) cat <<'HART'
+    ██  ██
+    ██  ██
+    ██  ██
+    ██████
+    ██  ██
+    ██  ██
+    ██  ██
+HART
+          ;;
+        C) cat <<'CART'
+     █████
+    ██   ██
+    ██
+    ██
+    ██
+    ██   ██
+     █████
+CART
+          ;;
+        P) cat <<'PART'
+    ██████
+    ██   ██
+    ██   ██
+    ██████
+    ██
+    ██
+    ██
+PART
+          ;;
+      esac
+      printf '%b\n' "$RESET"
+      printf '  %b%b%s%b\n\n' "$color" "$BOLD" "$tagline" "$RESET"
+    else
+      printf '\n%c — %s\n\n' "$letter" "$tagline"
+    fi
+    sleep 1
+  }
+
+  _hcp_show_letter "$H_COLOR" H 'do the work'
+  _hcp_show_letter "$C_COLOR" C 'enjoy the journey'
+  _hcp_show_letter "$P_COLOR" P 'champion the pro'
+
+  # Finale: huge HCP wordmark + champion the pro banner (the launch "ready" screen).
+  if [ "$is_tty" = 1 ]; then
+    printf '\033[2J\033[H'
+    printf '\n%b%b' "$BOLD" '\033[1;36m'
+    cat <<'HCPBANNER'
+  ██   ██   ██████   ██████
+  ██   ██  ██       ██   ██
+  ███████  ██       ██████
+  ██   ██  ██       ██
+  ██   ██   ██████  ██
+HCPBANNER
+    printf '%b\n\n' "$RESET"
+    printf '%b%b' "$BOLD" "$P_COLOR"
+    cat <<'CHAMPBANNER'
+   ██████ ██   ██  █████  ███    ███ ██████  ██  ██████  ███    ██
+  ██      ██   ██ ██   ██ ████  ████ ██   ██ ██ ██    ██ ████   ██
+  ██      ███████ ███████ ██ ████ ██ ██████  ██ ██    ██ ██ ██  ██
+  ██      ██   ██ ██   ██ ██  ██  ██ ██      ██ ██    ██ ██  ██ ██
+   ██████ ██   ██ ██   ██ ██      ██ ██      ██  ██████  ██   ████
+
+  ████████ ██   ██ ███████     ██████  ██████   ██████
+     ██    ██   ██ ██          ██   ██ ██   ██ ██    ██
+     ██    ███████ █████       ██████  ██████  ██    ██
+     ██    ██   ██ ██          ██      ██   ██ ██    ██
+     ██    ██   ██ ███████     ██      ██   ██  ██████
+CHAMPBANNER
+    printf '%b\n\n' "$RESET"
+    sleep 0.8
+  else
+    printf '\nHCP\nchampion the pro\n\n'
   fi
-  printf '%b3...%b\n' "$BOLD" "$RESET"
-  sleep 1
-  printf '%b2...%b\n' "$BOLD" "$RESET"
-  sleep 1
-  printf '%b1...%b\n' "$BOLD" "$RESET"
-  sleep 1
 }
 
 # Pick port + profile based on whether this is an email run.
@@ -240,13 +307,19 @@ if [ $TOMORROW = 1 ] && [ -f "$SCRIPT_DIR/tomorrow.lock" ]; then
   fi
 fi
 
-# The OUTREACH DASHBOARD (outreachDashboard.js): a local HTML page, outreach-dashboard/index.html, that lists everyone this run texts or emails and updates itself a few seconds after
-# each send. It opens here, once per launch and BEFORE the browser below starts, so the Salesforce sign-in window still ends up on top. The read-only previews above (--inspect, and
-# --dry-run on --board / --holds ...) exec and never reach it; the script itself also skips --help, --inspect and --sent. It is a convenience: if it cannot be built or opened the run
-# carries on (one warning line is printed), and ASSISTANT_NO_DASHBOARD=1 switches it off (nothing opened, and no send writes it; empty, 0, false, no and off leave it on).
+# Pipeline Assistant (outreachDashboard.js): http://127.0.0.1:9340/ — Morning / Replies / Kit / Templates / Scoreboard / DNC.
+# Starts a background --serve by default BEFORE Chrome, so the page is always live on localhost.
+# Skipped for --help / --inspect / --sent. ASSISTANT_NO_DASHBOARD=1 turns it off; ASSISTANT_DASHBOARD_PORT overrides 9340.
 case "${ASSISTANT_NO_DASHBOARD:-}" in
   ''|0|false|FALSE|False|no|NO|No|off|OFF|Off)
-    node "$SCRIPT_DIR/outreachDashboard.js" --launch "$@" >/dev/null 2>&1 || echo "⚠️  The outreach dashboard could not be opened (the run carries on without it; ASSISTANT_NO_DASHBOARD=1 stops it trying)."
+    DASH_MSG=$(node "$SCRIPT_DIR/outreachDashboard.js" --launch "$@" 2>&1) || true
+    if curl -s -m 2 "http://127.0.0.1:${ASSISTANT_DASHBOARD_PORT:-9340}/api/health" >/dev/null 2>&1; then
+      echo "📬 Pipeline Assistant: http://127.0.0.1:${ASSISTANT_DASHBOARD_PORT:-9340}/"
+    else
+      echo "⚠️  Pipeline Assistant did not start on port ${ASSISTANT_DASHBOARD_PORT:-9340}."
+      echo "   Fix:  cd \"$SCRIPT_DIR\" && node outreachDashboard.js --serve"
+      [ -n "$DASH_MSG" ] && echo "   ($DASH_MSG)" | head -c 400; echo
+    fi
     ;;
 esac
 
@@ -270,7 +343,7 @@ if [ $REUSE = 0 ]; then
   node start-browser.js &
   BROWSER_PID=$!
 
-  # Wait for CDP port to be available (no dollar / lift-off animation — only the manta countdown after)
+  # Wait for CDP port to be available (H → C → P letter countdown plays after)
   for i in $(seq 1 30); do
     if curl -s http://localhost:$CDP_PORT/json/version >/dev/null 2>&1; then
       break
@@ -285,7 +358,7 @@ if [ $REUSE = 0 ]; then
   fi
 
   sleep 1
-  hcp_manta_countdown
+  hcp_letter_countdown
 fi
 
 # Run the texter (connects via CDP)

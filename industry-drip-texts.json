@@ -1,0 +1,51 @@
+{
+  "_comment": "Named texts for industry drip boards (Board tab). Keys are template ids like hvac-t1.",
+  "hvac-t1": {
+    "name": "HVAC · Day 0 intro",
+    "text": "Hey, it's <first name> at Housecall Pro. Peak season turns every missed call into a lost install. Pros on HCP keep dispatch, booking, and follow-up in one place so the board stays full. Worth a quick look? <booking link>"
+  },
+  "hvac-t2": {
+    "name": "HVAC · Day 3 booking",
+    "text": "Quick one from <first name> at Housecall Pro — online booking lets homeowners book AC / furnace jobs from your site or Google, and you get the alert right away. No phone tag on a 95° day. See it here: <booking link>"
+  },
+  "hvac-t3": {
+    "name": "HVAC · Day 8 pipeline",
+    "text": "<first name> at Housecall Pro again. A lot of HVAC quotes go cold because nobody followed up, not because they said no. Pipeline keeps every estimate in one view and sends the follow-ups for you. Want a 10-min look? <booking link>"
+  },
+  "hvac-t4": {
+    "name": "HVAC · Day 14 soft close",
+    "text": "Last note from me (<first name> @ HCP) — first month is $26, no contracts, and we help HVAC shops cut no-shows and close more installs. Prefer we leave it here, or grab 15 mins? <booking link> / <call number>"
+  },
+  "plumbing-t1": {
+    "name": "Plumbing · Day 0 intro",
+    "text": "Hey, it's <first name> at Housecall Pro. After-hours drain and water-heater calls don't wait — and neither should your follow-up. HCP puts scheduling, booking, and getting paid in one app. Open to a quick look? <booking link>"
+  },
+  "plumbing-t2": {
+    "name": "Plumbing · Day 3 booking",
+    "text": "<first name> at Housecall Pro — online booking lets customers book a plumber while you're under a sink, and you get the alert immediately. Fewer missed emergencies, fuller calendar. See how: <booking link>"
+  },
+  "plumbing-t3": {
+    "name": "Plumbing · Day 8 pipeline",
+    "text": "Quick follow-up from <first name> @ HCP. Plumbing estimates go quiet when you're slammed on service calls. Pipeline tracks every lead and nudges them for you. 10 mins to see it on your board? <booking link>"
+  },
+  "plumbing-t4": {
+    "name": "Plumbing · Day 14 soft close",
+    "text": "Wrapping up from <first name> at Housecall Pro — $26 first month, no contracts. Built for plumbing shops that want fewer missed calls and faster paid invoices. Book here or tell me to stop: <booking link> / <call number>"
+  },
+  "electrical-t1": {
+    "name": "Electrical · Day 0 intro",
+    "text": "Hey, it's <first name> at Housecall Pro. Panel upgrades and service calls pile up fast — HCP keeps dispatch, estimates, and follow-up in one place so nothing slips. Worth 15 mins? <booking link>"
+  },
+  "electrical-t2": {
+    "name": "Electrical · Day 3 booking",
+    "text": "<first name> at Housecall Pro — online booking lets homeowners request electrical work from Google or your site, and you get the alert right away. Less phone tag, clearer schedule. See it: <booking link>"
+  },
+  "electrical-t3": {
+    "name": "Electrical · Day 8 pipeline",
+    "text": "Follow-up from <first name> @ HCP. Electrical quotes often stall waiting on the homeowner — Pipeline keeps every estimate visible and follows up for you. Quick walkthrough? <booking link>"
+  },
+  "electrical-t4": {
+    "name": "Electrical · Day 14 soft close",
+    "text": "Last note (<first name> / Housecall Pro) — $26 first month, no contracts. Helps electrical shops book more service work and close panel jobs faster. Grab time or say stop: <booking link> / <call number>"
+  }
+}

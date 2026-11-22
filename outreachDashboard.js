@@ -1,40 +1,38 @@
 'use strict';
 
 /**
- * outreachDashboard — a small LIVE page of everyone the bot texts or emails.
+ * outreachDashboard — LIVE local page of everyone the bot texts or emails, plus editable templates and an analytics / replies board.
  *
- * WHAT: outreach-dashboard/index.html is a plain local file (no server, no port, nothing to sign in to). It lists every send, newest first, with counters for this run,
- * today and all time, and it refreshes itself a few seconds after each send WITHOUT reloading (so a filter, a search or an open message stays as it is). Click a row for the
- * exact text or email that went out.
+ * WHAT: run.sh opens http://127.0.0.1:9340/ (ASSISTANT_DASHBOARD_PORT). Tabs: Sends · Templates · Analytics.
+ *   Sends     — every bot send, newest first; refreshes a few seconds after each send.
+ *   Templates — every text (Settings > T / text-templates.json) and email (email-templates.json); edit in the browser; used on the next launch.
+ *   Scoreboard — total sends: today, this week, this month, all time.
+ * A detached `node outreachDashboard.js --serve` keeps the APIs up so edits work after the launch script exits.
+ * File fallback (outreach-dashboard/index.html) still works for Sends only; Templates/Analytics need localhost.
  *
- * WHERE THE DATA COMES FROM: texted-log.jsonl (textLog.js), the permanent record of every successful text and email. This file adds nothing to that log and sends nothing.
- * Touches added by hand (mode 'manual', "not sent by Pipeline Assistant") are left out: the page is about what the bot sent.
- * After every logged send, textLog.recordOutreach() calls touch(), which rewrites outreach-dashboard/data.js; the page re-reads that file every few seconds (a plain
- * <script> reload, the one way a page opened from a file can read another file).
- * The bigger "Outreach Log" page (texted-dashboard.html, `email --sent`) is a different thing and is not touched by any of this.
+ * WHERE THE DATA COMES FROM: texted-log.jsonl (sends), text-templates.json / email-templates.json (templates), replies.jsonl (replies).
+ * Touches added by hand (mode 'manual') are left out of Sends. The bigger "Outreach Log" (`email --sent`) is separate.
  *
- * WHEN IT OPENS: run.sh runs `node outreachDashboard.js --launch <the run's flags>` once per launch, before the browser starts. `node outreachDashboard.js` on its own
- * builds the page and opens it; `--build` only builds it.
- *
- * "THIS RUN" is counted from the start of the newest process that has SENT something (its first send writes run.json: pid + start time; the stamp only ever moves forward).
- * A launch that sends nothing (a read-only mode, a refused second start, a practice run) therefore never moves it. A fresh launch shows "since now" unless a sending run is
- * still alive (its pid is checked), in which case that run's start is kept.
- *
- * SAFETY: every entry point swallows its own errors, so a problem here can never stop a send (the rewrite itself takes a few milliseconds after each one). There are no timers,
- * no exit handlers and no signal handlers in the bot's process. ASSISTANT_NO_DASHBOARD=1 turns the whole thing off (nothing is opened and nothing is written). What reaches the
- * page from the log (business names, messages) is shown as text, never as HTML, and only http(s) links are made clickable.
+ * SAFETY: send-path entry points swallow errors. ASSISTANT_NO_DASHBOARD=1 turns the whole thing off. Names/messages are shown as text, never HTML.
  */
 
 const fs = require('fs');
+const http = require('http');
 const path = require('path');
 const { spawn } = require('child_process');
 
 const DIR = path.join(__dirname, 'outreach-dashboard');
 const PAGE = path.join(DIR, 'index.html');
+const PAGE_SRC = path.join(__dirname, 'outreachDashboard.html'); // tracked source; copied into DIR on build
 const DATA = path.join(DIR, 'data.js');
 const RUN_FILE = path.join(DIR, 'run.json');         // { startedAt, pid } of the newest process that has sent something
+const PID_FILE = path.join(DIR, 'server.pid');
+const SERVE_LOG = path.join(DIR, 'server.log');   // why --serve failed (launch swallows console; this file keeps a trail)
 const LOG_FILE = path.join(__dirname, 'texted-log.jsonl');
+const EMAIL_TEMPLATES = path.join(__dirname, 'email-templates.json');
 const FULL_DASH = path.join(__dirname, 'texted-dashboard.html');   // the bigger Outreach Log page (email --sent): linked from this one once it exists
+const PORT = Math.max(1, Number(process.env.ASSISTANT_DASHBOARD_PORT) || 9340);
+const HOST = '127.0.0.1';
 
 const MAX_ROWS = 1000;          // the page always holds at least the newest 1000 sends (All time counts the whole log) ...
 const MAX_WINDOW_ROWS = 5000;   // ... and every send since the start of yesterday, up to this many: Today and This run are counted from the rows on the page, so they must all be there
@@ -64,9 +62,16 @@ function readRows() {
 /** One log row, cut down to what the page shows. */
 function slim(r) {
   const channel = r.channel === 'email' ? 'email' : 'text';       // rows with no channel are old texts (same rule as textLog.rowChannel)
+  const accountId = str(r.accountId) || (() => {
+    try {
+      const m = String(r.accountUrl || '').match(/\/Account\/([A-Za-z0-9]{15,18})\b/);
+      return m ? m[1] : null;
+    } catch (_) { return null; }
+  })();
   return {
     at: r.at,
     channel,
+    accountId,
     name: str(r.accountName) || str(r.email) || '(no name)',
     url: safeUrl(r.accountUrl),
     email: str(r.email),
@@ -76,6 +81,91 @@ function slim(r) {
     mode: str(r.mode),
     step: r.step ? (Number(r.step) || null) : null,
   };
+}
+
+/** Active DNC list for the dashboard (banned and not greened). */
+function dncPayload() {
+  const textLog = require('./textLog');
+  const sfId = require('./sfId');
+  const bans = textLog.readBans();
+  const green = textLog.readGreen();
+  const rows = [];
+  const seen = new Set();
+  for (const [, b] of bans) {
+    if (!b || !b.accountId) continue;
+    const stem = String(b.accountId).toLowerCase().slice(0, 15);
+    if (seen.has(stem)) continue;
+    if (!textLog.isBanned(b.accountId, bans, green)) continue; // greened / not active
+    let best = b;
+    for (const [, other] of bans) {
+      if (!other || !other.accountId) continue;
+      if (String(other.accountId).toLowerCase().slice(0, 15) !== stem) continue;
+      if (String(other.accountId).length === 18) best = other;
+    }
+    seen.add(stem);
+    const id = sfId.fix(best.accountId) || best.accountId;
+    const url = sfId.fixUrl('https://housecallpro.lightning.force.com/lightning/r/Account/' + id + '/view');
+    rows.push({
+      accountId: id,
+      name: best.accountName || '(unnamed)',
+      reason: best.reason || null,
+      source: best.source || null,
+      at: best.at || null,
+      url: safeUrl(url),
+    });
+  }
+  rows.sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0));
+  return { rows, count: rows.length, generatedAt: new Date().toISOString() };
+}
+
+/** Parse a Salesforce account id or Account URL. → fixed id or null. */
+function parseAccountRef(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return null;
+  const sfId = require('./sfId');
+  try {
+    const m = s.match(/\/Account\/([A-Za-z0-9]{15,18})\b/);
+    if (m) return sfId.fix(m[1]) || m[1];
+  } catch (_) { /* fall through */ }
+  if (/^[A-Za-z0-9]{15}([A-Za-z0-9]{3})?$/.test(s)) {
+    try { return sfId.fix(s) || s; } catch (_) { return s; }
+  }
+  return null;
+}
+
+/** Put on DNC (banlist). Bans both 18- and 15-char forms. */
+function dncAdd({ accountId, accountName, reason }) {
+  const id = parseAccountRef(accountId);
+  if (!id) return { ok: false, error: 'Need a Salesforce account link or id.' };
+  const textLog = require('./textLog');
+  if (textLog.isBanned(id)) return { ok: true, already: true, accountId: id };
+  const sfId = require('./sfId');
+  const fixed = sfId.fix(id) || id;
+  const ids = String(fixed).length === 18 ? [fixed, fixed.slice(0, 15)] : [String(id).slice(0, 15)];
+  const why = String(reason || 'added from outreach dashboard').trim() || 'added from outreach dashboard';
+  let wrote = 0;
+  for (const one of ids) {
+    if (textLog.recordBan({ accountId: one, accountName: accountName || null, reason: why, source: 'dashboard' })) wrote++;
+  }
+  return { ok: true, accountId: fixed, wrote };
+}
+
+/** Take off DNC (green banlist override). */
+function dncClear({ accountId, accountName, reason }) {
+  const id = parseAccountRef(accountId);
+  if (!id) return { ok: false, error: 'Need a Salesforce account link or id.' };
+  const textLog = require('./textLog');
+  if (!textLog.isBanned(id)) return { ok: true, already: true, accountId: id, note: 'Not on the DNC list (or already cleared).' };
+  const sfId = require('./sfId');
+  const fixed = sfId.fix(id) || id;
+  const bans = textLog.readBans();
+  const name = accountName
+    || (bans.get(String(fixed).toLowerCase()) || bans.get(String(fixed).toLowerCase().slice(0, 15)) || {}).accountName
+    || null;
+  const ids = String(fixed).length === 18 ? [fixed, fixed.slice(0, 15)] : [String(id).slice(0, 15)];
+  const why = String(reason || 'cleared from outreach dashboard').trim() || 'cleared from outreach dashboard';
+  for (const one of ids) textLog.recordGreen({ accountId: one, accountName: name, reason: why });
+  return { ok: true, accountId: fixed };
 }
 
 function readRun() {
@@ -140,15 +230,410 @@ function writeAtomic(file, text) {
   fs.renameSync(tmp, file);
 }
 
-/** The page itself is the same every time; (re)write it only when it is missing or an older version. */
+/** The page itself is the tracked outreachDashboard.html; (re)write the copy under outreach-dashboard/ when missing or stale. */
+function pageHtml() {
+  return fs.readFileSync(PAGE_SRC, 'utf8');
+}
 function ensurePage() {
+  const html = pageHtml();
   let cur = null;
   try { cur = fs.readFileSync(PAGE, 'utf8'); } catch (_) { /* not there yet */ }
-  if (cur !== PAGE_HTML) writeAtomic(PAGE, PAGE_HTML);
+  if (cur !== html) writeAtomic(PAGE, html);
 }
 
 function flush(kind, flags) {
   writeAtomic(DATA, 'window.OUTREACH_DATA = ' + JSON.stringify(buildData(kind, flags)) + ';\n');
+}
+
+// ---- Templates + analytics (localhost APIs) ----------------------------------------------------------------
+
+function industryDripTexts(values, setup) {
+  let all = {};
+  try { all = JSON.parse(fs.readFileSync(path.join(__dirname, 'industry-drip-texts.json'), 'utf8')) || {}; } catch (_) { return []; }
+  return Object.keys(all).filter((k) => !k.startsWith('_') && all[k] && typeof all[k] === 'object').map((id) => {
+    const t = all[id];
+    const text = String(t.text || '');
+    return {
+      id,
+      name: t.name || id,
+      text,
+      kind: 'industry',
+      channel: 'text',
+      preview: setup ? setup.expandTokens(text, values || {}) : text,
+    };
+  });
+}
+
+function templatesPayload() {
+  const setup = require('./senderSetup');
+  let values = {};
+  try { values = setup.load().values || {}; } catch (_) { /* preview without sender.json */ }
+  const view = setup.textsView();
+  const texts = view.items.map((item) => ({
+    id: item.id,
+    name: item.name,
+    text: item.text,
+    kind: item.kind,
+    channel: 'text',
+    preview: setup.expandTokens(item.text, values),
+  })).concat(industryDripTexts(values, setup));
+  let emails = [];
+  try {
+    const all = JSON.parse(fs.readFileSync(EMAIL_TEMPLATES, 'utf8')) || {};
+    emails = Object.keys(all).filter((k) => !k.startsWith('_') && all[k] && typeof all[k] === 'object').map((key) => {
+      const t = all[key];
+      const body = Array.isArray(t.body) ? t.body.join('\n') : String(t.body || '');
+      return { key, name: t.name || key, subject: t.subject || '', body, ps: t.ps || '', channel: 'email' };
+    });
+  } catch (_) { /* missing file */ }
+  return { texts, emails, generatedAt: new Date().toISOString() };
+}
+
+function saveEmailTemplate(key, payload) {
+  let all;
+  try { all = JSON.parse(fs.readFileSync(EMAIL_TEMPLATES, 'utf8')); } catch (e) { return { ok: false, error: 'Could not read email-templates.json: ' + e.message }; }
+  if (!all || typeof all !== 'object' || !all[key] || typeof all[key] !== 'object') return { ok: false, error: 'No email template "' + key + '".' };
+  const name = String(payload.name == null ? all[key].name : payload.name).trim();
+  const subject = String(payload.subject == null ? '' : payload.subject).trim();
+  const bodyRaw = payload.body == null ? '' : payload.body;
+  const body = Array.isArray(bodyRaw) ? bodyRaw.map(String) : String(bodyRaw).replace(/\r\n?/g, '\n').split('\n');
+  if (!name) return { ok: false, error: 'Please give the email a name.' };
+  if (!subject) return { ok: false, error: 'Please give the email a subject.' };
+  if (!body.some((l) => String(l).trim())) return { ok: false, error: 'The body is empty.' };
+  const next = { ...all[key], name, subject, body };
+  const ps = payload.ps == null ? '' : String(payload.ps).trim();
+  if (ps) next.ps = ps; else delete next.ps;
+  all[key] = next;
+  try { writeAtomic(EMAIL_TEMPLATES, JSON.stringify(all, null, 2) + '\n'); } catch (e) { return { ok: false, error: 'Could not save: ' + e.message }; }
+  return { ok: true };
+}
+
+/** Sends scoreboard: daily / weekly / monthly / all-time (texts + emails). */
+function analyticsPayload() {
+  const all = readRows().filter((r) => r && r.mode !== 'manual' && Number.isFinite(Date.parse(r.at)));
+  const now = new Date();
+  const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
+  const week = new Date(startOfDay); week.setDate(week.getDate() - 6); // last 7 calendar days including today
+  const month = new Date(startOfDay); month.setDate(1); // calendar month to date
+  const tDay = startOfDay.getTime(), tWeek = week.getTime(), tMonth = month.getTime();
+  const bucket = () => ({ sends: 0, texts: 0, emails: 0 });
+  const daily = bucket(), weekly = bucket(), monthly = bucket(), allTime = bucket();
+  const add = (b, ch) => { b.sends++; if (ch === 'email') b.emails++; else b.texts++; };
+  for (const r of all) {
+    const t = Date.parse(r.at);
+    const ch = r.channel === 'email' ? 'email' : 'text';
+    add(allTime, ch);
+    if (t >= tMonth) add(monthly, ch);
+    if (t >= tWeek) add(weekly, ch);
+    if (t >= tDay) add(daily, ch);
+  }
+  return { daily, weekly, monthly, allTime, generatedAt: new Date().toISOString() };
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let n = 0;
+    req.on('data', (c) => { n += c.length; if (n > 2e6) { reject(new Error('Body too large')); req.destroy(); return; } chunks.push(c); });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+
+function sendJson(res, status, obj) {
+  const body = JSON.stringify(obj);
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Length': Buffer.byteLength(body) });
+  res.end(body);
+}
+
+function sendText(res, status, type, text) {
+  res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', 'Content-Length': Buffer.byteLength(text) });
+  res.end(text);
+}
+
+/** Modular boards (post-demo, cold drip, …) — stages, day offsets, templates. */
+function boardPayload() {
+  const boards = require('./boards');
+  const cadence = require('./cadence');
+  const active = boards.loadActive();
+  const basePack = boards.loadPackFile(active.id) || active;
+  const defById = Object.fromEntries((basePack.stages || []).map((s) => [s.id, s]));
+  const over = active.overrides || {};
+  const tpl = templatesPayload();
+  const textMap = {};
+  for (const t of tpl.texts || []) textMap[String(t.id)] = { name: t.name, text: t.text };
+  const textOptions = (tpl.texts || []).map((t) => ({ id: String(t.id), name: t.name || ('Text ' + t.id), preview: clip(t.text, 140) }));
+  const emailOptions = (tpl.emails || []).map((t) => ({
+    id: t.key,
+    name: t.name || t.key,
+    preview: clip((t.subject || '') + (t.body ? ' — ' + (Array.isArray(t.body) ? t.body.join(' ') : t.body) : ''), 140),
+  }));
+  const tip = boards.suggestNextStepsDay();
+  const stages = active.stages.map((s) => {
+    const d = defById[s.id] || {};
+    const o = over[s.id] && typeof over[s.id] === 'object' ? over[s.id] : {};
+    const copy = cadence.copyOf(s, textMap);
+    const customized = o.template !== undefined || o.emailTemplate !== undefined || o.message !== undefined || o.day !== undefined || o.afterMin !== undefined;
+    return {
+      id: s.id,
+      outreach: s.outreach != null ? s.outreach : null,
+      label: s.label,
+      day: s.day,
+      defaultDay: d.day,
+      afterMin: s.afterMin || 0,
+      ch: s.ch,
+      n: s.n,
+      byHand: !!s.byHand,
+      manual: !!s.manual,
+      template: s.template != null ? String(s.template) : null,
+      emailTemplate: s.emailTemplate || null,
+      defaultTemplate: d.template != null ? String(d.template) : null,
+      defaultEmailTemplate: d.emailTemplate || null,
+      preferWeekdays: s.preferWeekdays || null,
+      customized: !!customized,
+      copyName: copy ? copy.name : null,
+      preview: copy ? clip(copy.text || copy.subject || '', 220) : null,
+      hint: s.hint || null,
+      note: s.byHand ? 'By hand — board skips sending this stage' : (s.manual ? 'Marked manual (board can still send)' : null),
+    };
+  });
+  return {
+    activeBoard: active.id,
+    boardName: active.name,
+    boardDescription: active.description || '',
+    packs: boards.listPacks(),
+    stages,
+    textOptions,
+    emailOptions,
+    nextStepsTip: tip,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+/** Save day / template for one stage on the active (or named) board pack. */
+function saveBoardStage(id, payload) {
+  const boards = require('./boards');
+  const packId = (payload && payload.board) || boards.activeBoardId();
+  const pack = boards.loadPackFile(packId);
+  if (!pack) return { ok: false, error: 'Unknown board "' + packId + '".' };
+  const stage = pack.stages.find((s) => s.id === id);
+  if (!stage) return { ok: false, error: 'Unknown stage "' + id + '".' };
+
+  if (payload && payload.reset) {
+    const r = boards.saveStage(packId, id, { reset: true });
+    if (!r.ok) return r;
+    return { ok: true, board: boardPayload() };
+  }
+
+  const body = {};
+  if (payload && payload.day !== undefined) body.day = payload.day;
+  if (payload && payload.afterMin !== undefined) body.afterMin = payload.afterMin;
+
+  if (stage.ch === 'text') {
+    if (payload && payload.template != null && String(payload.template).trim()) {
+      const tid = String(payload.template).trim();
+      const texts = templatesPayload().texts || [];
+      if (!texts.some((t) => String(t.id) === tid)) return { ok: false, error: 'No text template "' + tid + '".' };
+      body.template = tid;
+    } else if (payload && payload.day === undefined && payload.afterMin === undefined) {
+      return { ok: false, error: 'Pick a text template (or change the day).' };
+    }
+  } else if (payload && payload.emailTemplate != null && String(payload.emailTemplate).trim()) {
+    const key = String(payload.emailTemplate).trim();
+    const emails = templatesPayload().emails || [];
+    if (!emails.some((t) => t.key === key)) return { ok: false, error: 'No email template "' + key + '".' };
+    body.emailTemplate = key;
+  } else if (payload && payload.day === undefined && payload.afterMin === undefined) {
+    return { ok: false, error: 'Pick an email template (or change the day).' };
+  }
+
+  const r = boards.saveStage(packId, id, body);
+  if (!r.ok) return r;
+  return { ok: true, board: boardPayload() };
+}
+
+function setActiveBoard(id) {
+  const r = require('./boards').setActiveBoard(id);
+  if (!r.ok) return r;
+  return { ok: true, board: boardPayload() };
+}
+
+async function handleApi(req, res, url) {
+  const setup = require('./senderSetup');
+  if (req.method === 'GET' && url.pathname === '/api/health') return sendJson(res, 200, { ok: true, port: PORT });
+  if (req.method === 'GET' && url.pathname === '/api/daydesk') {
+    try { return sendJson(res, 200, require('./dayDesk').build()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/board') {
+    try { return sendJson(res, 200, boardPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/content') {
+    try {
+      const q = {
+        trade: url.searchParams.get('trade') || '',
+        need: url.searchParams.get('need') || '',
+        competitor: url.searchParams.get('competitor') || '',
+        segment: url.searchParams.get('segment') || '',
+        region: url.searchParams.get('region') || '',
+        stage: url.searchParams.get('stage') || 'demo',
+        q: url.searchParams.get('q') || '',
+        type: url.searchParams.get('type') || '',
+        limit: url.searchParams.get('limit') || '80',
+      };
+      return sendJson(res, 200, require('./contentLibrary').payload(q));
+    } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
+  if (req.method === 'PUT' && url.pathname === '/api/board/active') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, setActiveBoard(j.id || j.board));
+  }
+  const boardStage = url.pathname.match(/^\/api\/board\/stages\/([^/]+)$/);
+  if (boardStage && req.method === 'PUT') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, saveBoardStage(decodeURIComponent(boardStage[1]), j));
+  }
+  if (boardStage && req.method === 'POST') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, saveBoardStage(decodeURIComponent(boardStage[1]), j));
+  }
+  if (req.method === 'GET' && url.pathname === '/api/templates') {
+    try { return sendJson(res, 200, templatesPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/analytics') {
+    try { return sendJson(res, 200, analyticsPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/dnc') {
+    try { return sendJson(res, 200, dncPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/dnc') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, dncAdd(j));
+  }
+  if (req.method === 'POST' && url.pathname === '/api/dnc/clear') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, dncClear(j));
+  }
+  if (req.method === 'POST' && url.pathname === '/api/templates/text') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, setup.addTextEdit(j.name, j.text));
+  }
+  const textPut = url.pathname.match(/^\/api\/templates\/text\/([^/]+)$/);
+  if (textPut && req.method === 'PUT') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, setup.saveTextEdit(decodeURIComponent(textPut[1]), j.text));
+  }
+  if (textPut && req.method === 'DELETE') return sendJson(res, 200, setup.removeTextEdit(decodeURIComponent(textPut[1])));
+  const textReset = url.pathname.match(/^\/api\/templates\/text\/([^/]+)\/reset$/);
+  if (textReset && req.method === 'POST') return sendJson(res, 200, setup.resetTextEdit(decodeURIComponent(textReset[1])));
+  const emailPut = url.pathname.match(/^\/api\/templates\/email\/([^/]+)$/);
+  if (emailPut && req.method === 'PUT') {
+    const raw = await readBody(req);
+    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    return sendJson(res, 200, saveEmailTemplate(decodeURIComponent(emailPut[1]), j));
+  }
+  sendJson(res, 404, { ok: false, error: 'Not found' });
+}
+
+function createServer() {
+  return http.createServer(async (req, res) => {
+    try {
+      const url = new URL(req.url || '/', 'http://' + HOST + ':' + PORT);
+      if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
+      if (url.pathname === '/' || url.pathname === '/index.html') {
+        ensurePage();
+        return sendText(res, 200, 'text/html; charset=utf-8', pageHtml());
+      }
+      if (url.pathname === '/data.js') {
+        try { return sendText(res, 200, 'application/javascript; charset=utf-8', fs.readFileSync(DATA, 'utf8')); }
+        catch (_) { return sendText(res, 200, 'application/javascript; charset=utf-8', 'window.OUTREACH_DATA = {"v":1,"rows":[],"totals":{"sends":0,"texts":0,"emails":0,"people":0},"run":{"startedAt":"' + new Date().toISOString() + '","dryRun":false},"generatedAt":"' + new Date().toISOString() + '"};\n'); }
+      }
+      if (url.pathname === '/full-log') {
+        if (fs.existsSync(FULL_DASH)) {
+          try { return sendText(res, 200, 'text/html; charset=utf-8', fs.readFileSync(FULL_DASH, 'utf8')); }
+          catch (e) { return sendText(res, 500, 'text/plain; charset=utf-8', e.message); }
+        }
+        return sendText(res, 404, 'text/plain; charset=utf-8', 'Full outreach log not built yet. Run: email --sent');
+      }
+      sendText(res, 404, 'text/plain; charset=utf-8', 'Not found');
+    } catch (e) {
+      try { sendJson(res, 500, { ok: false, error: e && e.message ? e.message : 'error' }); } catch (_) { res.end(); }
+    }
+  });
+}
+
+function healthOk() {
+  return new Promise((resolve) => {
+    const req = http.get({ host: HOST, port: PORT, path: '/api/health', timeout: 800 }, (res) => {
+      res.resume();
+      resolve(res.statusCode === 200);
+    });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { try { req.destroy(); } catch (_) {} resolve(false); });
+  });
+}
+
+function serveLog(line) {
+  try {
+    fs.mkdirSync(DIR, { recursive: true });
+    fs.appendFileSync(SERVE_LOG, new Date().toISOString() + ' ' + String(line || '') + '\n');
+  } catch (_) { /* never block a launch */ }
+}
+
+/** Keep a detached --serve process running so Pipeline Assistant (Templates / Morning / …) stays up after launch exits. Default on every zw. */
+async function ensureServing() {
+  if (await healthOk()) return true;
+  serveLog('starting --serve on port ' + PORT);
+  try {
+    const out = fs.openSync(SERVE_LOG, 'a');
+    const child = spawn(process.execPath, [__filename, '--serve'], {
+      detached: true,
+      stdio: ['ignore', out, out],
+      cwd: __dirname,
+      env: process.env,
+    });
+    child.unref();
+    try { fs.closeSync(out); } catch (_) {}
+    try { writeAtomic(PID_FILE, String(child.pid) + '\n'); } catch (_) { /* optional */ }
+    serveLog('spawned pid ' + child.pid);
+  } catch (e) {
+    serveLog('spawn failed: ' + (e && e.message));
+    return false;
+  }
+  // Wait up to ~5s — Mac cold start + antivirus can be slow; never open the browser until health passes.
+  for (let i = 0; i < 50; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    if (await healthOk()) { serveLog('healthy'); return true; }
+  }
+  serveLog('health check failed after spawn');
+  return false;
+}
+
+function dashUrl() { return 'http://' + HOST + ':' + PORT + '/'; }
+
+function runServe() {
+  if (off()) { console.error('ASSISTANT_NO_DASHBOARD is set; not starting the dashboard server.'); process.exit(1); }
+  try { ensurePage(); flush('view'); } catch (_) { /* page may still serve */ }
+  const server = createServer();
+  server.on('error', (e) => {
+    if (e && e.code === 'EADDRINUSE') {
+      // already up — treat as success for a second --serve
+      healthOk().then((ok) => process.exit(ok ? 0 : 1));
+      return;
+    }
+    console.error('Dashboard server failed: ' + (e && e.message));
+    process.exit(1);
+  });
+  server.listen(PORT, HOST, () => {
+    try { writeAtomic(PID_FILE, String(process.pid) + '\n'); } catch (_) {}
+    console.log('Outreach dashboard: ' + dashUrl());
+  });
 }
 
 /**
@@ -167,12 +652,12 @@ function build(kind = 'view', flags) {
   try { ensurePage(); flush(kind, flags); return PAGE; } catch (_) { return null; }
 }
 
-/** Open a file in the default browser. Fire and forget: a missing `open` never matters. */
-function openPage(file) {
+/** Open a URL or file in the default browser. Fire and forget. */
+function openPage(target) {
   try {
-    const cmd = process.platform === 'darwin' ? ['open', [file]]
-      : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', file]]
-        : ['xdg-open', [file]];
+    const cmd = process.platform === 'darwin' ? ['open', [target]]
+      : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', target]]
+        : ['xdg-open', [target]];
     const child = spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore' });
     child.on('error', () => {});
     child.unref();
@@ -180,401 +665,48 @@ function openPage(file) {
   } catch (_) { return false; }
 }
 
-/** What run.sh calls once per launch: build the page for this run, then open it. → the page's path, 'skipped' (a launch that sends nothing, or switched off) or 'failed'. */
-function launch(flags = []) {
+/**
+ * What run.sh calls once per launch: build the page, start (or reuse) the localhost server, open the browser.
+ * Pipeline Assistant always tries to serve on 127.0.0.1 by default (ASSISTANT_NO_DASHBOARD=1 to opt out).
+ * → the dashboard URL, a file path (server could not start), 'skipped', or 'failed'.
+ */
+async function launch(flags = []) {
   if (off() || flags.some((f) => SKIP_OPEN.has(f))) return 'skipped';
   const file = build('launch', flags);
   if (!file) return 'failed';
+  let live = await ensureServing();
+  if (!live) live = await ensureServing(); // one retry — first spawn sometimes races on a busy Mac
+  if (live) {
+    openPage(dashUrl());
+    try { console.log('Pipeline Assistant: ' + dashUrl()); } catch (_) {}
+    return dashUrl();
+  }
+  // Last resort: open the static file (Sends only). Prefer telling the user how to start the live server.
+  try {
+    console.error('Pipeline Assistant server did not start on port ' + PORT + '. Run: node outreachDashboard.js --serve');
+    console.error('(details: ' + SERVE_LOG + ')');
+  } catch (_) {}
   openPage(file);
   return file;
 }
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// THE PAGE. One self-contained file: no network, no libraries, no fonts to fetch. It must not contain a backtick or a dollar-brace (it is a template literal), and everything
-// that comes from the log goes in with textContent, never innerHTML.
-// ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
-const PAGE_HTML = String.raw`<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Outreach</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%AC%3C/text%3E%3C/svg%3E">
-<style>
-:root{
-  --bg:#f5f6fa;--surface:#ffffff;--text:#19202e;--muted:#5b6578;--line:#e2e6ef;
-  --accent:#2457d6;--on-accent:#ffffff;--good:#178a4a;
-  --text-fg:#0b6b60;--text-bg:#d5f5ee;--email-fg:#5b2bb8;--email-bg:#ece5fd;
-  --warn-fg:#8a4b00;--warn-bg:#fff1d1;--fresh:#fff1b8;
-  color-scheme:light dark;
-}
-@media (prefers-color-scheme:dark){
-  :root{
-    --bg:#0e131b;--surface:#161c27;--text:#e7ebf2;--muted:#98a3b6;--line:#263044;
-    --accent:#7ba3ff;--on-accent:#0b1220;--good:#4ade80;
-    --text-fg:#5eead4;--text-bg:#0f3b36;--email-fg:#c4b1ff;--email-bg:#2b2150;
-    --warn-fg:#ffcc80;--warn-bg:#3a2a0c;--fresh:#4a4210;
-  }
-}
-*{box-sizing:border-box}
-[hidden]{display:none !important}
-html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-.wrap{max-width:1080px;margin:0 auto;padding:20px 16px 48px}
-.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
-h1{margin:0;font-size:22px;letter-spacing:-.01em}
-.sub{margin:4px 0 0;color:var(--muted);font-size:13px}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:7px;vertical-align:1px}
-.dot.live{background:var(--good)}
-.link{color:var(--accent);font-size:13px;text-decoration:none;padding-top:6px}
-.link:hover{text-decoration:underline}
-.banner{margin:14px 0 0;padding:10px 14px;border-radius:10px;background:var(--warn-bg);color:var(--warn-fg);font-size:14px}
-.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
-.card .k{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-.card .n{font-size:34px;font-weight:700;line-height:1.1;margin-top:4px;font-variant-numeric:tabular-nums}
-.card .s{font-size:13px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
-.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:18px 0 10px}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
-.seg button{border:0;background:transparent;color:var(--muted);padding:8px 14px;font:inherit;cursor:pointer}
-.seg button+button{border-left:1px solid var(--line)}
-.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);font-weight:600}
-select,input[type=search]{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
-input[type=search]{flex:1;min-width:180px}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.tablewrap{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-table{width:100%;border-collapse:collapse}
-th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--line);font-weight:600}
-td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
-tr:last-child td{border-bottom:0}
-tr.day td{background:var(--bg);color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:6px 14px}
-tr.row{cursor:pointer}
-tr.row:hover td{background:rgba(127,127,127,.07)}
-tr.fresh td{animation:flash 6s ease-out}
-@keyframes flash{0%,35%{background:var(--fresh)}100%{background:transparent}}
-.time{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
-.ago{display:block;color:var(--muted);font-size:12px;white-space:nowrap}
-.who a{color:var(--text);font-weight:600;text-decoration:none}
-.who a:hover{text-decoration:underline}
-.who .nm{font-weight:600}
-.em{color:var(--muted);font-size:13px;word-break:break-all}
-.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
-.pill.text{background:var(--text-bg);color:var(--text-fg)}
-.pill.email{background:var(--email-bg);color:var(--email-fg)}
-.tpl{font-weight:600}
-.prev{display:block;color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:46ch}
-tr.detail td{background:var(--bg);padding:12px 14px 16px}
-.meta{color:var(--muted);font-size:12px;margin:0 0 8px}
-pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
-.empty{padding:34px 16px;text-align:center;color:var(--muted)}
-.foot{margin:12px 2px 0;color:var(--muted);font-size:12px}
-@media (max-width:680px){
-  .wrap{padding:14px 12px 40px}
-  .cards{gap:8px}
-  .card{padding:10px 12px}
-  .card .n{font-size:26px}
-  .card .s{font-size:12px}
-  thead{display:none}
-  table,tbody,tr,td{display:block;width:100%}
-  tr.row{padding:10px 12px;border-bottom:1px solid var(--line)}
-  td{border:0;padding:2px 0}
-  tr.day td{padding:6px 12px}
-  td.t{display:flex;gap:8px;align-items:baseline}
-  .ago{display:inline}
-  .prev{max-width:100%;white-space:normal}
-  tr.detail{padding:0 12px 12px;border-bottom:1px solid var(--line)}
-  tr.detail td{padding:8px 0}
-}
-@media (prefers-reduced-motion:reduce){tr.fresh td{animation:none}}
-</style>
-</head>
-<body>
-<main class="wrap">
-  <header class="top">
-    <div>
-      <h1>Outreach</h1>
-      <p class="sub"><span class="dot" id="dot"></span><span id="status">Waiting for outreach-dashboard/data.js …</span></p>
-    </div>
-    <a class="link" id="fullLog" href="../texted-dashboard.html" hidden>Full outreach log &rarr;</a>
-  </header>
-  <div class="banner" id="banner" hidden>Practice flag in use (--test / --dry-run). This page lists only sends that actually went out, so it stays empty unless one does.</div>
-  <section class="cards" aria-label="Totals">
-    <div class="card"><div class="k" id="kRun">This run</div><div class="n" id="nRun">0</div><div class="s" id="sRun"></div></div>
-    <div class="card"><div class="k">Today</div><div class="n" id="nToday">0</div><div class="s" id="sToday"></div></div>
-    <div class="card"><div class="k">All time</div><div class="n" id="nAll">0</div><div class="s" id="sAll"></div></div>
-  </section>
-  <section class="controls" aria-label="Filters">
-    <div class="seg" role="group" aria-label="Channel">
-      <button type="button" data-ch="all" aria-pressed="true">All</button>
-      <button type="button" data-ch="text" aria-pressed="false">Texts</button>
-      <button type="button" data-ch="email" aria-pressed="false">Emails</button>
-    </div>
-    <select id="range" aria-label="Time range">
-      <option value="run">This run</option>
-      <option value="today">Today</option>
-      <option value="week">Last 7 days</option>
-      <option value="all">Everything</option>
-    </select>
-    <input id="q" type="search" placeholder="Search name, address, message …" aria-label="Search">
-  </section>
-  <div class="tablewrap">
-    <table>
-      <thead><tr><th>When</th><th>Who</th><th>How</th><th>What was sent</th></tr></thead>
-      <tbody id="rows"></tbody>
-    </table>
-    <div class="empty" id="empty" hidden></div>
-  </div>
-  <p class="foot" id="foot"></p>
-</main>
-<script src="data.js"></script>
-<script>
-(function () {
-  'use strict';
-  var POLL_MS = 3000, MAX_DRAWN = 500, LS = 'outreach-dashboard:';
-  var state = { channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0 };
 
-  function $(id) { return document.getElementById(id); }
-  function make(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined && text !== null) n.textContent = text; return n; }
-  function lsGet(k) { try { return window.localStorage.getItem(LS + k); } catch (e) { return null; } }
-  function lsSet(k, v) { try { window.localStorage.setItem(LS + k, v); } catch (e) {} }
-
-  var c0 = lsGet('channel'); if (c0 === 'text' || c0 === 'email') state.channel = c0;
-  var r0 = lsGet('range'); if (r0 === 'run' || r0 === 'today' || r0 === 'week' || r0 === 'all') state.range = r0;
-
-  var fTime = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' });
-  var fTimeSec = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
-  var fDay = new Intl.DateTimeFormat([], { weekday: 'short', month: 'short', day: 'numeric' });
-  var fFull = new Intl.DateTimeFormat([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' });
-  var fNum = new Intl.NumberFormat();
-
-  function startOfDay(t) { var d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
-  function dayLabel(t) {
-    var today = startOfDay(Date.now()), s = startOfDay(t);
-    if (s === today) return 'Today';
-    if (s === startOfDay(today - 12 * 3600 * 1000)) return 'Yesterday';
-    return fDay.format(new Date(t));
-  }
-  // a time of day, with the date in front when it is not today (so an old page never looks current)
-  function stamp(t, withSeconds) {
-    var d = new Date(t), tm = (withSeconds ? fTimeSec : fTime).format(d);
-    return startOfDay(t) === startOfDay(Date.now()) ? tm : fDay.format(d) + ' ' + tm;
-  }
-  function ago(t) {
-    var s = Math.max(0, Math.round((Date.now() - t) / 1000));
-    if (s < 10) return 'just now';
-    if (s < 60) return s + ' s ago';
-    var m = Math.round(s / 60);
-    if (m < 60) return m + ' min ago';
-    var h = Math.floor(m / 60);
-    if (h < 24) return h + ' h ' + (m % 60) + ' min ago';
-    var dd = Math.floor(h / 24);
-    return dd + (dd === 1 ? ' day ago' : ' days ago');
-  }
-  function data() {
-    var d = window.OUTREACH_DATA;
-    return d && d.v === 1 && d.rows && typeof d.rows.length === 'number' ? d : null;
-  }
-  function href(u) { return typeof u === 'string' && /^https?:[/][/]/i.test(u) ? u : null; }
-
-  // A new data.js arrived: keep the rows with their time parsed and a lower-case search string; remember which rows are new.
-  function ingest(d) {
-    var first = state.gen === null, prev = state.newest, now = Date.now(), i, r, e, newest = prev, rows = [];
-    for (i = 0; i < d.rows.length; i++) {
-      r = d.rows[i];
-      e = { r: r, t: Date.parse(r.at), key: r.at + '|' + r.channel + '|' + r.name };
-      e.hay = [r.name, r.email, r.template, r.subject, r.text, r.mode].join(' ').toLowerCase();
-      if (!isFinite(e.t)) continue;
-      if (e.t > newest) newest = e.t;
-      if (!first && e.t > prev) state.fresh[e.key] = now + 6000;
-      rows.push(e);
-    }
-    state.gen = d.generatedAt;
-    state.rows = rows;
-    state.newest = newest;
-  }
-
-  function inRange(t, d) {
-    if (state.range === 'all') return true;
-    if (state.range === 'run') { var s = Date.parse(d.run && d.run.startedAt); return isFinite(s) && t >= s; }
-    var today = startOfDay(Date.now());
-    if (state.range === 'today') return t >= today;
-    var wk = new Date(); wk.setDate(wk.getDate() - 6); wk.setHours(0, 0, 0, 0);
-    return t >= wk.getTime();
-  }
-
-  function tally(list) { var t = 0, m = 0, i; for (i = 0; i < list.length; i++) { if (list[i].r.channel === 'email') m++; else t++; } return { text: t, email: m, all: t + m }; }
-  function split(c) { return 'texts ' + fNum.format(c.text) + ' · emails ' + fNum.format(c.email); }
-
-  function renderCards(d) {
-    var today = startOfDay(Date.now()), rs = Date.parse(d.run && d.run.startedAt), a = [], b = [], i, e;
-    for (i = 0; i < state.rows.length; i++) {
-      e = state.rows[i];
-      if (e.t >= today) a.push(e);
-      if (isFinite(rs) && e.t >= rs) b.push(e);
-    }
-    var run = tally(b), tod = tally(a);
-    $('nRun').textContent = fNum.format(run.all); $('sRun').textContent = split(run);
-    $('nToday').textContent = fNum.format(tod.all); $('sToday').textContent = split(tod);
-    var t = d.totals || {};
-    $('nAll').textContent = fNum.format(t.sends || 0);
-    $('sAll').textContent = split({ text: t.texts || 0, email: t.emails || 0 }) + ' · people ' + fNum.format(t.people || 0);
-    $('kRun').textContent = 'This run' + (isFinite(rs) ? ' · since ' + stamp(rs, false) : '');
-    document.title = 'Outreach · ' + fNum.format(tod.all) + ' today';
-  }
-
-  function whatNodes(r) {
-    var box = document.createElement('div');
-    if (r.channel === 'email') {
-      box.appendChild(make('div', 'tpl', r.subject || r.template || 'Email'));
-      if (r.template && r.subject) box.appendChild(make('span', 'prev', r.template));
-    } else {
-      box.appendChild(make('div', 'tpl', r.template || 'Text'));
-      if (r.text) box.appendChild(make('span', 'prev', r.text));
-    }
-    return box;
-  }
-
-  function rowNodes(e) {
-    var r = e.r, tr = make('tr', 'row' + (state.fresh[e.key] > Date.now() ? ' fresh' : '')), det = make('tr', 'detail'), td, link, pill;
-    tr.setAttribute('tabindex', '0');
-    tr.setAttribute('aria-expanded', state.open[e.key] ? 'true' : 'false');
-    td = make('td', 't');
-    td.appendChild(make('span', 'time', fTime.format(new Date(e.t))));
-    var ag = make('span', 'ago', ago(e.t)); ag.setAttribute('data-t', String(e.t)); td.appendChild(ag);
-    tr.appendChild(td);
-    td = make('td', 'who');
-    var h = href(r.url);
-    if (h) { link = make('a', null, r.name); link.href = h; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.title = 'Open the account in Salesforce'; link.addEventListener('click', function (ev) { ev.stopPropagation(); }); td.appendChild(link); }
-    else td.appendChild(make('span', 'nm', r.name));
-    if (r.email) td.appendChild(make('div', 'em', r.email));
-    tr.appendChild(td);
-    td = make('td', 'how'); pill = make('span', 'pill ' + (r.channel === 'email' ? 'email' : 'text'), r.channel === 'email' ? 'Email' : 'Text'); td.appendChild(pill); tr.appendChild(td);
-    td = make('td', 'what'); td.appendChild(whatNodes(r)); tr.appendChild(td);
-
-    td = make('td'); td.colSpan = 4;
-    var bits = [fFull.format(new Date(e.t))];
-    if (r.template) bits.push(r.template);
-    if (r.mode) bits.push('mode: ' + r.mode);
-    if (r.step) bits.push('step ' + r.step);
-    td.appendChild(make('p', 'meta', bits.join(' · ')));
-    if (r.channel === 'email' && r.subject) td.appendChild(make('p', 'meta', 'Subject: ' + r.subject));
-    td.appendChild(make('pre', 'msg', r.text || '(no message was recorded)'));
-    det.appendChild(td);
-    det.hidden = !state.open[e.key];
-
-    function toggle() { var o = !state.open[e.key]; state.open[e.key] = o; det.hidden = !o; tr.setAttribute('aria-expanded', o ? 'true' : 'false'); }
-    tr.addEventListener('click', toggle);
-    tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(); } });
-    return [tr, det];
-  }
-
-  function renderTable(d) {
-    var body = $('rows'), q = state.q.toLowerCase(), list = [], i, e;
-    for (i = 0; i < state.rows.length; i++) {
-      e = state.rows[i];
-      if (state.channel !== 'all' && e.r.channel !== state.channel) continue;
-      if (!inRange(e.t, d)) continue;
-      if (q && e.hay.indexOf(q) < 0) continue;
-      list.push(e);
-    }
-    var frag = document.createDocumentFragment(), lastDay = null, n = Math.min(list.length, MAX_DRAWN), lab, dr, dtd, nodes;
-    for (i = 0; i < n; i++) {
-      lab = dayLabel(list[i].t);
-      if (lab !== lastDay) { lastDay = lab; dr = make('tr', 'day'); dtd = make('td', null, lab); dtd.colSpan = 4; dr.appendChild(dtd); frag.appendChild(dr); }
-      nodes = rowNodes(list[i]); frag.appendChild(nodes[0]); frag.appendChild(nodes[1]);
-    }
-    body.textContent = '';
-    body.appendChild(frag);
-    var em = $('empty');
-    if (!list.length) {
-      em.hidden = false;
-      em.textContent = !d.totals || !d.totals.sends ? 'Nothing has been sent yet. Everyone this script texts or emails will show up here, a few seconds after the send.' : 'No sends match these filters.';
-    } else em.hidden = true;
-    $('foot').textContent = (list.length > n ? 'Showing the newest ' + fNum.format(n) + ' of ' + fNum.format(list.length) + ' matching sends. ' : '') +
-      (d.truncated ? 'This page holds the newest ' + fNum.format(d.rows.length) + ' of ' + fNum.format(d.totals.sends) + ' sends: Today and This run are counted from those, All time counts the whole log. ' : '') +
-      'Source: texted-log.jsonl. Times are in this computer’s time zone.' + (d.dataLog && d.dataLog.file ? ' Your own data log, kept only on this computer: ' + d.dataLog.file + ' (' + [d.dataLog.rep, d.dataLog.computer, typeof d.dataLog.count === 'number' ? fNum.format(d.dataLog.count) + ' sends saved' + (isFinite(Date.parse(d.dataLog.since)) ? ' since ' + fDay.format(new Date(d.dataLog.since)) : '') : null].filter(Boolean).join(' · ') + ').' + (d.dataLog.error ? ' ⚠️ ' + d.dataLog.error : '') : '');
-  }
-
-  var curDay = startOfDay(Date.now());
-  function renderStatus() {
-    var d = state.d, s = $('status'), dot = $('dot'), els, i, day = startOfDay(Date.now());
-    if (d && day !== curDay) { curDay = day; renderAll(); return; }      // midnight went by: "Today" and the day headings move on without waiting for the next send
-    if (!d) { dot.className = 'dot'; s.textContent = 'Waiting for outreach-dashboard/data.js …'; return; }
-    dot.className = 'dot live';
-    s.textContent = 'Updated ' + stamp(Date.parse(d.generatedAt), true) + ' · ' +
-      (state.rows.length ? 'last send ' + ago(state.rows[0].t) : 'nothing sent yet') + ' · looks for new sends every ' + (POLL_MS / 1000) + ' s';
-    els = document.querySelectorAll('[data-t]');
-    for (i = 0; i < els.length; i++) els[i].textContent = ago(Number(els[i].getAttribute('data-t')));
-  }
-
-  function renderAll() {
-    var d = state.d;
-    if (!d) { $('rows').textContent = ''; $('empty').hidden = false; $('empty').textContent = 'Waiting for the first data …'; renderStatus(); return; }
-    $('banner').hidden = !(d.run && d.run.dryRun);
-    $('fullLog').hidden = !d.fullLog;
-    renderCards(d); renderTable(d); renderStatus();
-  }
-
-  // A data.js arrived. Only a NEWER one is taken (ISO times compare as text), so a slow older load can never put the page back in time.
-  function onData() {
-    var d = data();
-    if (d && (state.d === null || d.generatedAt > state.d.generatedAt)) { ingest(d); state.d = d; renderAll(); }
-    else if (!state.d) renderAll();
-    else renderStatus();
-  }
-
-  function syncControls() {
-    var b = document.querySelectorAll('.seg button'), i;
-    for (i = 0; i < b.length; i++) b[i].setAttribute('aria-pressed', b[i].getAttribute('data-ch') === state.channel ? 'true' : 'false');
-    $('range').value = state.range;
-  }
-  (function wire() {
-    var b = document.querySelectorAll('.seg button'), i, timer = null;
-    for (i = 0; i < b.length; i++) b[i].addEventListener('click', function () { state.channel = this.getAttribute('data-ch'); lsSet('channel', state.channel); syncControls(); if (state.d) renderTable(state.d); });
-    $('range').addEventListener('change', function () { state.range = this.value; lsSet('range', state.range); if (state.d) renderTable(state.d); });
-    $('q').addEventListener('input', function () { var v = this.value; clearTimeout(timer); timer = setTimeout(function () { state.q = v.trim(); if (state.d) renderTable(state.d); }, 120); });
-  })();
-
-  // Re-read data.js every few seconds. A page opened from a file cannot fetch another file, but it can load a script: a new <script> with a changing address always re-reads it.
-  // Whatever goes wrong while showing one data.js, the next poll is always scheduled.
-  var seq = 0;
-  function load(then) {
-    var s = document.createElement('script');
-    function done() {
-      try { if (s.parentNode) s.parentNode.removeChild(s); onData(); }
-      catch (e) { try { $('status').textContent = 'Could not show the latest data (' + (e && e.message ? e.message : 'unknown error') + ') · trying again'; } catch (e2) {} }
-      finally { if (then) then(); }
-    }
-    s.onload = done; s.onerror = done;
-    s.src = 'data.js?_=' + Date.now() + '-' + (seq++);
-    document.head.appendChild(s);
-  }
-  function poll() {
-    if (document.hidden) { setTimeout(poll, POLL_MS); return; }      // nobody is looking: do nothing until the tab is shown again
-    load(function () { setTimeout(poll, POLL_MS); });
-  }
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });      // back on this tab: catch up at once
-
-  syncControls();
-  try { onData(); } catch (e) {}
-  setTimeout(poll, POLL_MS);
-  setInterval(function () { try { renderStatus(); } catch (e) {} }, 1000);
-})();
-</script>
-</body>
-</html>
-`;
-
-module.exports = { touch, build, launch, openPage, buildData, PAGE, DATA, DIR };
+module.exports = { touch, build, launch, openPage, buildData, ensureServing, dashUrl, runServe, templatesPayload, analyticsPayload, dncPayload, dncAdd, dncClear, boardPayload, saveBoardStage, setActiveBoard, PAGE, DATA, DIR, PORT, HOST };
 
 if (require.main === module) {
   const [cmd, ...rest] = process.argv.slice(2);
-  if (cmd === '--launch') {
-    let r = 'failed';
-    try { r = launch(rest); } catch (_) { /* reported below */ }
-    process.exitCode = r === 'failed' ? 1 : 0;      // run.sh prints one warning line on a failure; a skipped launch is not one
+  if (cmd === '--serve') {
+    runServe();
+  } else if (cmd === '--launch') {
+    launch(rest).then((r) => { process.exitCode = r === 'failed' ? 1 : 0; }).catch(() => { process.exitCode = 1; });
   } else if (cmd === '--help' || cmd === '-h') {
-    console.log('outreachDashboard.js — the live outreach page (outreach-dashboard/index.html)\n  node outreachDashboard.js            build it and open it in your browser\n  node outreachDashboard.js --build    build it only (print its path)\n  ASSISTANT_NO_DASHBOARD=1               switch it off (run.sh opens nothing, no send writes it)');
+    console.log('outreachDashboard.js — live outreach page on http://127.0.0.1:' + PORT + '/\n' +
+      '  node outreachDashboard.js            build, start localhost server, open browser\n' +
+      '  node outreachDashboard.js --serve    keep the localhost server running (Templates + Analytics)\n' +
+      '  node outreachDashboard.js --launch   what run.sh calls once per zw start\n' +
+      '  node outreachDashboard.js --build    build outreach-dashboard/ only\n' +
+      '  ASSISTANT_NO_DASHBOARD=1               switch it off\n' +
+      '  ASSISTANT_DASHBOARD_PORT=9340         localhost port (default 9340)');
   } else if (cmd === '--build') {
     const f = build();
     console.log(f || 'The outreach dashboard could not be written (or ASSISTANT_NO_DASHBOARD is set).');
@@ -582,6 +714,12 @@ if (require.main === module) {
   } else {
     const f = build();
     if (!f) { console.log('The outreach dashboard could not be written (or ASSISTANT_NO_DASHBOARD is set).'); process.exitCode = 1; }
-    else { console.log(`\n  📬 Outreach dashboard: ${f}\n     file://${f}\n`); openPage(f); }
+    else {
+      ensureServing().then((live) => {
+        const target = live ? dashUrl() : f;
+        console.log('\n  📬 Outreach dashboard: ' + target + (live ? '' : '\n     file://' + f) + '\n');
+        openPage(live ? dashUrl() : f);
+      });
+    }
   }
 }

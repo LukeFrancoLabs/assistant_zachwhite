@@ -1,0 +1,8 @@
+{
+  "_comment": "Files Luke manages for the team. teamSync --pull copies these into the rep's assistant folder (overwriting local copies of the same names).",
+  "files": [
+    "day-desk.json",
+    "email-templates.json",
+    "email-menu.json"
+  ]
+}

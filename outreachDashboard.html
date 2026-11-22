@@ -1,0 +1,1518 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pipeline Assistant</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%AC%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f5f6fa;--surface:#ffffff;--text:#19202e;--muted:#5b6578;--line:#e2e6ef;
+  --accent:#2457d6;--on-accent:#ffffff;--good:#178a4a;--bad:#b42318;
+  --text-fg:#0b6b60;--text-bg:#d5f5ee;--email-fg:#5b2bb8;--email-bg:#ece5fd;
+  --warn-fg:#8a4b00;--warn-bg:#fff1d1;--fresh:#fff1b8;
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0e131b;--surface:#161c27;--text:#e7ebf2;--muted:#98a3b6;--line:#263044;
+    --accent:#7ba3ff;--on-accent:#0b1220;--good:#4ade80;--bad:#f97066;
+    --text-fg:#5eead4;--text-bg:#0f3b36;--email-fg:#c4b1ff;--email-bg:#2b2150;
+    --warn-fg:#ffcc80;--warn-bg:#3a2a0c;--fresh:#4a4210;
+  }
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 48px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+h1{margin:0;font-size:22px;letter-spacing:-.01em}
+.sub{margin:4px 0 0;color:var(--muted);font-size:13px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:7px;vertical-align:1px}
+.dot.live{background:var(--good)}
+.link{color:var(--accent);font-size:13px;text-decoration:none;padding-top:6px}
+.link:hover{text-decoration:underline}
+.banner{margin:14px 0 0;padding:10px 14px;border-radius:10px;background:var(--warn-bg);color:var(--warn-fg);font-size:14px}
+.nav{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 0;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.nav button{border:0;background:transparent;color:var(--muted);padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;border-radius:8px}
+.nav button[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
+.cards.four{grid-template-columns:repeat(4,1fr)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.card .k{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.card .n{font-size:34px;font-weight:700;line-height:1.1;margin-top:4px;font-variant-numeric:tabular-nums}
+.card .s{font-size:13px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:18px 0 10px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;color:var(--muted);padding:8px 14px;font:inherit;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);font-weight:600}
+select,input[type=search],input[type=text],textarea{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+input[type=search]{flex:1;min-width:180px}
+textarea{width:100%;min-height:140px;resize:vertical;line-height:1.5;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tablewrap{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--line);font-weight:600}
+td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+tr.day td{background:var(--bg);color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:6px 14px}
+tr.row{cursor:pointer}
+tr.row:hover td{background:rgba(127,127,127,.07)}
+tr.fresh td{animation:flash 6s ease-out}
+@keyframes flash{0%,35%{background:var(--fresh)}100%{background:transparent}}
+.time{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+.ago{display:block;color:var(--muted);font-size:12px;white-space:nowrap}
+.who a{color:var(--text);font-weight:600;text-decoration:none}
+.who a:hover{text-decoration:underline}
+.who .nm{font-weight:600}
+.em{color:var(--muted);font-size:13px;word-break:break-all}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.text{background:var(--text-bg);color:var(--text-fg)}
+.pill.email{background:var(--email-bg);color:var(--email-fg)}
+.pill.ok{background:#d1fadf;color:#067647}
+.pill.warn{background:var(--warn-bg);color:var(--warn-fg)}
+.tpl{font-weight:600}
+.prev{display:block;color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:46ch}
+tr.detail td{background:var(--bg);padding:12px 14px 16px}
+.meta{color:var(--muted);font-size:12px;margin:0 0 8px}
+pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.empty{padding:34px 16px;text-align:center;color:var(--muted)}
+.foot{margin:12px 2px 0;color:var(--muted);font-size:12px}
+.tpl-list{display:grid;gap:10px;margin-top:12px}
+.tpl-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.tpl-card.editing{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.tpl-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.tpl-head h3{margin:0;font-size:16px}
+.tpl-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:10px;padding:8px 12px;font:inherit;font-weight:600;cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.tpl-body{margin:10px 0 0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted)}
+.tpl-edit label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 4px}
+.tpl-note{color:var(--muted);font-size:13px;margin:8px 0 0}
+.flash{margin:10px 0 0;padding:10px 12px;border-radius:10px;font-size:14px}
+.flash.ok{background:#d1fadf;color:#067647}
+.flash.err{background:#fee4e2;color:#b42318}
+.rep-text{white-space:pre-wrap;max-width:520px}
+.desk-list{display:grid;gap:10px;margin-top:12px}
+.desk-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.desk-card.due{border-color:var(--accent)}
+.desk-card .desk-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 4px}
+.desk-card h3{margin:0;font-size:16px}
+.desk-card .desk-detail{margin:8px 0 0;color:var(--muted);font-size:13px;white-space:pre-wrap;word-break:break-word}
+.desk-card .desk-meta{margin:8px 0 0;font-size:12px;color:var(--muted)}
+.desk-card .desk-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.desk-cmd{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;color:var(--muted);word-break:break-all}
+.prio{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;margin-right:6px}
+.prio.hold{background:#fee4e2;color:#b42318}
+.prio.interested{background:#d1fadf;color:#067647}
+.prio.board{background:var(--email-bg);color:var(--email-fg)}
+.kit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:12px}
+@media (max-width:680px){
+  .wrap{padding:14px 12px 40px}
+  .cards,.cards.four{grid-template-columns:1fr 1fr;gap:8px}
+  .card{padding:10px 12px}
+  .card .n{font-size:26px}
+  .card .s{font-size:12px}
+  #view-sends thead{display:none}
+  #view-sends table,#view-sends tbody,#view-sends tr,#view-sends td{display:block;width:100%}
+  #view-sends tr.row{padding:10px 12px;border-bottom:1px solid var(--line)}
+  #view-sends td{border:0;padding:2px 0}
+  #view-sends tr.day td{padding:6px 12px}
+  #view-sends td.t{display:flex;gap:8px;align-items:baseline}
+  #view-sends .ago{display:inline}
+  #view-sends .prev{max-width:100%;white-space:normal}
+  #view-sends tr.detail{padding:0 12px 12px;border-bottom:1px solid var(--line)}
+  #view-sends tr.detail td{padding:8px 0}
+}
+@media (prefers-reduced-motion:reduce){tr.fresh td{animation:none}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <div>
+      <h1>Pipeline Assistant</h1>
+      <p class="sub"><span class="dot" id="dot"></span><span id="status">Waiting for data …</span></p>
+    </div>
+    <a class="link" id="fullLog" href="/full-log" hidden>Full outreach log &rarr;</a>
+  </header>
+  <div class="banner" id="banner" hidden>Practice flag in use (--test / --dry-run). This page lists only sends that actually went out, so it stays empty unless one does.</div>
+  <div class="banner" id="fileMode" hidden>Opened as a file — Pipeline Assistant needs the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page.</div>
+  <div class="banner" id="deskHint" hidden></div>
+
+  <nav class="nav" role="tablist" aria-label="Dashboard sections">
+    <button type="button" role="tab" id="tab-morning" aria-selected="true" data-view="morning">Morning</button>
+    <button type="button" role="tab" id="tab-replies" aria-selected="false" data-view="replies">Replies</button>
+    <button type="button" role="tab" id="tab-kit" aria-selected="false" data-view="kit">Quick kit</button>
+    <button type="button" role="tab" id="tab-myleads" aria-selected="false" data-view="myleads">My leads</button>
+    <button type="button" role="tab" id="tab-board" aria-selected="false" data-view="board">Board</button>
+    <button type="button" role="tab" id="tab-content" aria-selected="false" data-view="content">Content</button>
+    <button type="button" role="tab" id="tab-today" aria-selected="false" data-view="today">Today</button>
+    <button type="button" role="tab" id="tab-sends" aria-selected="false" data-view="sends">Sends</button>
+    <button type="button" role="tab" id="tab-templates" aria-selected="false" data-view="templates">Templates</button>
+    <button type="button" role="tab" id="tab-analytics" aria-selected="false" data-view="analytics">Scoreboard</button>
+    <button type="button" role="tab" id="tab-dnc" aria-selected="false" data-view="dnc">DNC</button>
+  </nav>
+
+  <section id="view-morning" role="tabpanel">
+    <p class="sub" style="margin:14px 0 0">What needs you today — held threads, interested replies waiting on a follow-up, and personal board touches that are due.</p>
+    <div class="cards" aria-label="Morning counts" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card"><div class="k">Needs you</div><div class="n" id="mNeed">0</div><div class="s" id="mNeedS"></div></div>
+      <div class="card"><div class="k">Holds</div><div class="n" id="mHold">0</div><div class="s">paused sends</div></div>
+      <div class="card"><div class="k">Board due</div><div class="n" id="mBoard">0</div><div class="s">your hand-added leads</div></div>
+    </div>
+    <div id="morningList" class="desk-list"></div>
+    <div class="empty" id="morningEmpty" hidden>Nothing queued — nice. Add a lead under My leads after a call, or wait for a reply.</div>
+  </section>
+
+  <section id="view-replies" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Inbound replies this copy knows about. Interested ones that still need a follow-up also show on Morning.</p>
+    <div class="controls">
+      <input id="rq" type="search" placeholder="Search replies …" aria-label="Search replies" style="flex:1;min-width:180px">
+      <span class="sub" id="replyCount"></span>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>When</th><th>Who</th><th>How</th><th>What they said</th></tr></thead>
+        <tbody id="replyRows"></tbody>
+      </table>
+      <div class="empty" id="replyEmpty" hidden></div>
+    </div>
+    <p class="foot" id="replyFoot">Replies come from a Gmail feed (<code>node replyPoller.js --setup</code>). Holds still appear on Morning without that.</p>
+  </section>
+
+  <section id="view-kit" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Post-call / post-demo helpers. Copy the command, open Salesforce from Morning or My leads, then paste into a terminal — or send from the usual <code>zw</code> menu.</p>
+    <div id="kitList" class="kit-grid"></div>
+    <p class="foot">Luke can change this kit for everyone: edit <code>team-shared/day-desk.json</code>, then each machine runs <code>node teamSync.js --pull</code>.</p>
+  </section>
+
+  <section id="view-myleads" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Your personal follow-up board — leads you added by hand after a call or demo.</p>
+    <div id="addLeadBox" class="desk-card" style="margin-top:12px">
+      <div class="desk-title">Add after a call</div>
+      <h3>Put someone on your board</h3>
+      <p class="desk-detail" id="addLeadHint"></p>
+      <div class="desk-cmd" id="addLeadCmd"></div>
+      <div class="desk-actions">
+        <button type="button" class="btn" id="copyAddLead">Copy command</button>
+      </div>
+    </div>
+    <div id="myLeadsList" class="desk-list"></div>
+    <div class="empty" id="myLeadsEmpty" hidden>No hand-added leads yet. After a good call, use the command above.</div>
+  </section>
+
+  <section id="view-board" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Modular boards — Post-demo, HVAC / Plumbing / Electrical 2-week drips (text + email), or the 60-day cold drip. Change Day or template on any outreach.</p>
+    <div id="boardFlash" class="flash" hidden></div>
+    <div class="controls" style="align-items:flex-end">
+      <div style="flex:1;min-width:200px">
+        <label for="boardPack" class="meta" style="display:block;margin:0 0 4px">Active board</label>
+        <select id="boardPack" aria-label="Active board" style="width:100%"></select>
+      </div>
+      <span class="sub" id="boardPackDesc" style="flex:2"></span>
+    </div>
+    <p class="desk-meta" id="boardTip" style="margin:8px 0 0"></p>
+    <div id="boardList" class="desk-list"></div>
+    <p class="foot" id="boardFoot">Change <b>Day</b> to move an outreach (e.g. Outreach 3 on day 5 instead of day 1). Templates come from the Templates tab. Saves to <code>boards-local.json</code>.</p>
+  </section>
+
+  <section id="view-content" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Sales Content Finder library — every trade × need path scored the same way as <a href="https://hcp-brand-content.github.io/sales-content-finder/" target="_blank" rel="noopener">hcp-brand-content</a>. Pick filters, copy the link or subject, drop into a send.</p>
+    <div class="controls" style="align-items:flex-end;flex-wrap:wrap">
+      <div>
+        <label for="cTrade" class="meta" style="display:block;margin:0 0 4px">Trade</label>
+        <select id="cTrade" aria-label="Trade"></select>
+      </div>
+      <div>
+        <label for="cNeed" class="meta" style="display:block;margin:0 0 4px">Need</label>
+        <select id="cNeed" aria-label="Need"><option value="">Any</option></select>
+      </div>
+      <div>
+        <label for="cCompetitor" class="meta" style="display:block;margin:0 0 4px">Competitor</label>
+        <select id="cCompetitor" aria-label="Competitor"><option value="">Any</option></select>
+      </div>
+      <div style="flex:1;min-width:160px">
+        <label for="cQ" class="meta" style="display:block;margin:0 0 4px">Search</label>
+        <input id="cQ" type="search" placeholder="Title, trigger, subject…" aria-label="Search content" style="width:100%">
+      </div>
+      <button type="button" class="btn" id="cGo">Find</button>
+    </div>
+    <p class="desk-meta" id="cMeta" style="margin:8px 0 0"></p>
+    <div id="cBest" class="desk-list" style="margin-top:12px"></div>
+    <h3 class="meta" style="margin:18px 0 8px">Full catalog</h3>
+    <div id="cList" class="desk-list"></div>
+    <div class="empty" id="cEmpty" hidden>No assets match. Widen the filters or clear search.</div>
+    <p class="foot">Refresh from the finder: <code>node syncContentLibrary.js</code> · snapshot in <code>content-library/</code></p>
+  </section>
+
+  <section id="view-today" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">What already went out from this copy today.</p>
+    <div class="cards" aria-label="Today totals">
+      <div class="card"><div class="k">Today</div><div class="n" id="tSends">0</div><div class="s" id="tSplit"></div></div>
+      <div class="card"><div class="k">Texts</div><div class="n" id="tTexts">0</div><div class="s">sent today</div></div>
+      <div class="card"><div class="k">Emails</div><div class="n" id="tEmails">0</div><div class="s">sent today</div></div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>When</th><th>Who</th><th>How</th><th>What</th></tr></thead>
+        <tbody id="todayRows"></tbody>
+      </table>
+      <div class="empty" id="todayEmpty" hidden>Nothing sent yet today.</div>
+    </div>
+  </section>
+
+  <section id="view-sends" role="tabpanel" hidden>
+    <div class="cards" aria-label="Totals">
+      <div class="card"><div class="k" id="kRun">This run</div><div class="n" id="nRun">0</div><div class="s" id="sRun"></div></div>
+      <div class="card"><div class="k">Today</div><div class="n" id="nToday">0</div><div class="s" id="sToday"></div></div>
+      <div class="card"><div class="k">All time</div><div class="n" id="nAll">0</div><div class="s" id="sAll"></div></div>
+    </div>
+    <section class="controls" aria-label="Filters">
+      <div class="seg" role="group" aria-label="Channel">
+        <button type="button" data-ch="all" aria-pressed="true">All</button>
+        <button type="button" data-ch="text" aria-pressed="false">Texts</button>
+        <button type="button" data-ch="email" aria-pressed="false">Emails</button>
+      </div>
+      <select id="range" aria-label="Time range">
+        <option value="run">This run</option>
+        <option value="today">Today</option>
+        <option value="week">Last 7 days</option>
+        <option value="all">Everything</option>
+      </select>
+      <input id="q" type="search" placeholder="Search name, address, message …" aria-label="Search">
+    </section>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>When</th><th>Who</th><th>How</th><th>What was sent</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty" hidden></div>
+    </div>
+    <p class="foot" id="foot"></p>
+  </section>
+
+  <section id="view-templates" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Every text and email template this copy uses. Edits save to disk and show up on the <b>next launch</b> (same as Settings &gt; T for texts).</p>
+    <div id="tplFlash" class="flash" hidden></div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Template kind">
+        <button type="button" data-tk="text" aria-pressed="true">Texts</button>
+        <button type="button" data-tk="email" aria-pressed="false">Emails</button>
+      </div>
+      <input id="tq" type="search" placeholder="Search templates …" aria-label="Search templates">
+      <button type="button" class="btn primary" id="tplAdd" hidden>+ Add text</button>
+    </div>
+    <div id="tplList" class="tpl-list"></div>
+    <p class="tpl-note" id="tplNote"></p>
+  </section>
+
+  <section id="view-analytics" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Total sends from this copy — texts and emails that actually went out.</p>
+    <div class="cards four" aria-label="Sends scoreboard" id="anCards">
+      <div class="card"><div class="k">Today</div><div class="n" id="anDay">0</div><div class="s" id="anDayS"></div></div>
+      <div class="card"><div class="k">This week</div><div class="n" id="anWeek">0</div><div class="s" id="anWeekS"></div></div>
+      <div class="card"><div class="k">This month</div><div class="n" id="anMonth">0</div><div class="s" id="anMonthS"></div></div>
+      <div class="card"><div class="k">All time</div><div class="n" id="anAll">0</div><div class="s" id="anAllS"></div></div>
+    </div>
+    <p class="foot" id="anFoot">Week = last 7 days including today. Month = calendar month to date.</p>
+  </section>
+
+  <section id="view-dnc" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Do-not-contact list for this copy. Accounts here are skipped on the next launch. You can also add someone from a send row.</p>
+    <div id="dncFlash" class="flash" hidden></div>
+    <div class="controls" style="align-items:flex-end">
+      <div style="flex:1;min-width:220px">
+        <label for="dncRef" class="meta" style="display:block;margin:0 0 4px">Salesforce account link or id</label>
+        <input id="dncRef" type="text" placeholder="https://…/Account/001…/view or 001…" aria-label="Account link or id" style="width:100%">
+      </div>
+      <div style="flex:1;min-width:160px">
+        <label for="dncName" class="meta" style="display:block;margin:0 0 4px">Name (optional)</label>
+        <input id="dncName" type="text" placeholder="Business name" aria-label="Account name" style="width:100%">
+      </div>
+      <button type="button" class="btn danger" id="dncAddBtn">Add to DNC</button>
+    </div>
+    <div class="controls">
+      <input id="dncQ" type="search" placeholder="Search DNC …" aria-label="Search DNC" style="flex:1;min-width:180px">
+      <span class="sub" id="dncCount"></span>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>When</th><th>Who</th><th>Why</th><th></th></tr></thead>
+        <tbody id="dncRows"></tbody>
+      </table>
+      <div class="empty" id="dncEmpty" hidden></div>
+    </div>
+    <p class="foot" id="dncFoot">Stored in banlist.jsonl. Taking someone off writes green_banlist.jsonl so they can be contacted again.</p>
+  </section>
+</main>
+<script src="data.js"></script>
+<script>
+(function () {
+  'use strict';
+  var POLL_MS = 3000, MAX_DRAWN = 500, LS = 'outreach-dashboard:';
+  var LIVE = location.protocol === 'http:' || location.protocol === 'https:';
+  var DESK_VIEWS = ['morning', 'replies', 'kit', 'myleads', 'board', 'content', 'today', 'sends', 'templates', 'analytics', 'dnc'];
+  var state = {
+    view: 'morning', channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0,
+    tk: 'text', tq: '', templates: null, editing: null,
+    analytics: null,
+    dnc: null, dncQ: '',
+    desk: null, rq: '',
+    board: null
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function make(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined && text !== null) n.textContent = text; return n; }
+  function lsGet(k) { try { return window.localStorage.getItem(LS + k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { window.localStorage.setItem(LS + k, v); } catch (e) {} }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  var c0 = lsGet('channel'); if (c0 === 'text' || c0 === 'email') state.channel = c0;
+  var r0 = lsGet('range'); if (r0 === 'run' || r0 === 'today' || r0 === 'week' || r0 === 'all') state.range = r0;
+  var v0 = lsGet('view'); if (DESK_VIEWS.indexOf(v0) >= 0) state.view = v0;
+
+  var fTime = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' });
+  var fTimeSec = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+  var fDay = new Intl.DateTimeFormat([], { weekday: 'short', month: 'short', day: 'numeric' });
+  var fFull = new Intl.DateTimeFormat([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' });
+  var fNum = new Intl.NumberFormat();
+
+  function startOfDay(t) { var d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
+  function dayLabel(t) {
+    var today = startOfDay(Date.now()), s = startOfDay(t);
+    if (s === today) return 'Today';
+    if (s === startOfDay(today - 12 * 3600 * 1000)) return 'Yesterday';
+    return fDay.format(new Date(t));
+  }
+  function stamp(t, withSeconds) {
+    var d = new Date(t), tm = (withSeconds ? fTimeSec : fTime).format(d);
+    return startOfDay(t) === startOfDay(Date.now()) ? tm : fDay.format(d) + ' ' + tm;
+  }
+  function ago(t) {
+    var s = Math.max(0, Math.round((Date.now() - t) / 1000));
+    if (s < 10) return 'just now';
+    if (s < 60) return s + ' s ago';
+    var m = Math.round(s / 60);
+    if (m < 60) return m + ' min ago';
+    var h = Math.floor(m / 60);
+    if (h < 24) return h + ' h ' + (m % 60) + ' min ago';
+    var dd = Math.floor(h / 24);
+    return dd + (dd === 1 ? ' day ago' : ' days ago');
+  }
+  function data() {
+    var d = window.OUTREACH_DATA;
+    return d && d.v === 1 && d.rows && typeof d.rows.length === 'number' ? d : null;
+  }
+  function href(u) { return typeof u === 'string' && /^https?:[/][/]/i.test(u) ? u : null; }
+
+  function setView(view) {
+    if (DESK_VIEWS.indexOf(view) < 0) view = 'morning';
+    state.view = view;
+    lsSet('view', view);
+    DESK_VIEWS.forEach(function (v) {
+      var pane = $('view-' + v), tab = $('tab-' + v);
+      if (pane) pane.hidden = v !== view;
+      if (tab) tab.setAttribute('aria-selected', v === view ? 'true' : 'false');
+    });
+    if (view === 'templates') loadTemplates();
+    if (view === 'analytics') loadAnalytics();
+    if (view === 'dnc') loadDnc();
+    if (view === 'board') loadBoard();
+    if (view === 'content') loadContent();
+    if (view === 'morning' || view === 'replies' || view === 'kit' || view === 'myleads' || view === 'today') loadDayDesk();
+  }
+
+  function flashBoard(msg, ok) {
+    var el = $('boardFlash');
+    el.hidden = false;
+    el.className = 'flash ' + (ok ? 'ok' : 'err');
+    el.textContent = msg;
+    clearTimeout(flashBoard._t);
+    flashBoard._t = setTimeout(function () { el.hidden = true; }, 3200);
+  }
+
+  function loadBoard() {
+    if (!LIVE) return;
+    fetch('/api/board').then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || j.ok === false) { flashBoard((j && j.error) || 'Could not load board', false); return; }
+      state.board = j;
+      renderBoard();
+    }).catch(function () { flashBoard('Could not load board', false); });
+  }
+
+  function contentQuery() {
+    return {
+      trade: ($('cTrade') && $('cTrade').value) || 'any',
+      need: ($('cNeed') && $('cNeed').value) || '',
+      competitor: ($('cCompetitor') && $('cCompetitor').value) || '',
+      q: ($('cQ') && $('cQ').value) || ''
+    };
+  }
+
+  function loadContent() {
+    if (!LIVE) return;
+    var q = contentQuery();
+    var qs = Object.keys(q).filter(function (k) { return q[k]; }).map(function (k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(q[k]);
+    }).join('&');
+    fetch('/api/content' + (qs ? '?' + qs : '')).then(function (r) { return r.json(); }).then(function (j) {
+      state.content = j;
+      fillContentFilters(j);
+      renderContent();
+    }).catch(function () {
+      $('cMeta').textContent = 'Could not load content library.';
+    });
+  }
+
+  function fillSelect(sel, options, blankLabel, blankValue, keep) {
+    if (!sel) return;
+    var cur = keep != null ? keep : sel.value;
+    sel.innerHTML = '';
+    if (blankLabel != null) {
+      var blank = document.createElement('option');
+      blank.value = blankValue == null ? '' : blankValue;
+      blank.textContent = blankLabel;
+      sel.appendChild(blank);
+    }
+    (options || []).forEach(function (t) {
+      var id = typeof t === 'object' ? t.id : t;
+      var label = typeof t === 'object' ? (t.label || t.id) : t;
+      if (!id && id !== 0) return;
+      var o = document.createElement('option');
+      o.value = id;
+      o.textContent = label;
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+  }
+
+  function fillContentFilters(j) {
+    if (!j) return;
+    fillSelect($('cTrade'), j.trades, 'All trades', 'any', ($('cTrade') && $('cTrade').value) || 'any');
+    fillSelect($('cNeed'), j.needs, 'Any', '', ($('cNeed') && $('cNeed').value) || '');
+    fillSelect($('cCompetitor'), j.competitors, 'Any', '', ($('cCompetitor') && $('cCompetitor').value) || '');
+  }
+
+  function contentCard(a, badge) {
+    var card = make('div', 'desk-card');
+    var title = make('div', 'desk-title');
+    if (badge) title.appendChild(make('span', 'pill ok', badge));
+    title.appendChild(make('span', 'pill', a.type || 'Asset'));
+    if (a.trade) title.appendChild(make('span', 'pill', a.trade));
+    card.appendChild(title);
+    card.appendChild(make('h3', null, a.title || a.id));
+    if (a.subject) card.appendChild(make('div', 'desk-detail', 'Subject: ' + a.subject));
+    if (a.why) card.appendChild(make('div', 'desk-meta', a.why));
+    if (a.score != null) card.appendChild(make('div', 'desk-meta', 'Score ' + a.score + (a.reasons && a.reasons.length ? ' · ' + a.reasons.join(', ') : '')));
+    var actions = make('div', 'desk-actions');
+    if (a.url) {
+      var open = make('a', 'btn');
+      open.href = a.url;
+      open.target = '_blank';
+      open.rel = 'noopener';
+      open.textContent = 'Open';
+      actions.appendChild(open);
+      var copyUrl = make('button', 'btn', 'Copy link');
+      copyUrl.type = 'button';
+      copyUrl.addEventListener('click', function () {
+        navigator.clipboard.writeText(a.url).then(function () { copyUrl.textContent = 'Copied'; setTimeout(function () { copyUrl.textContent = 'Copy link'; }, 1200); });
+      });
+      actions.appendChild(copyUrl);
+    }
+    if (a.subject) {
+      var copySub = make('button', 'btn', 'Copy subject');
+      copySub.type = 'button';
+      copySub.addEventListener('click', function () {
+        navigator.clipboard.writeText(a.subject).then(function () { copySub.textContent = 'Copied'; setTimeout(function () { copySub.textContent = 'Copy subject'; }, 1200); });
+      });
+      actions.appendChild(copySub);
+    }
+    if (a.sms) {
+      var copySms = make('button', 'btn', 'Copy SMS');
+      copySms.type = 'button';
+      copySms.addEventListener('click', function () {
+        navigator.clipboard.writeText(a.sms).then(function () { copySms.textContent = 'Copied'; setTimeout(function () { copySms.textContent = 'Copy SMS'; }, 1200); });
+      });
+      actions.appendChild(copySms);
+    }
+    card.appendChild(actions);
+    return card;
+  }
+
+  function renderContent() {
+    var j = state.content || {};
+    var meta = (j.assetCount || 0) + ' assets · ' + (j.pathCount || 0) + ' paths';
+    if (j.syncedAt) meta += ' · synced ' + stamp(Date.parse(j.syncedAt) || Date.now());
+    $('cMeta').textContent = meta;
+
+    var bestBox = $('cBest'); bestBox.innerHTML = '';
+    var m = j.match;
+    if (m && m.best) {
+      bestBox.appendChild(make('h3', 'meta', m.approximate ? 'Closest match for this path' : 'Best for this path'));
+      bestBox.appendChild(contentCard(m.best, 'Best'));
+      (m.also || []).slice(0, 3).forEach(function (a) { bestBox.appendChild(contentCard(a, 'Also')); });
+    } else if (j.query && (j.query.need || j.query.trade !== 'any')) {
+      bestBox.appendChild(make('div', 'desk-meta', 'No scored path match — browsing catalog below.'));
+    }
+
+    var list = $('cList'); list.innerHTML = '';
+    var assets = j.assets || [];
+    $('cEmpty').hidden = assets.length > 0;
+    assets.forEach(function (a) { list.appendChild(contentCard(a)); });
+  }
+
+  function saveBoardStage(id, body) {
+    return fetch('/api/board/stages/' + encodeURIComponent(id), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.ok) { flashBoard((j && j.error) || 'Save failed', false); return false; }
+      state.board = j.board || state.board;
+      renderBoard();
+      flashBoard('Saved — applies on the next board run', true);
+      return true;
+    }).catch(function () { flashBoard('Save failed', false); return false; });
+  }
+
+  function renderBoard() {
+    var j = state.board || {};
+    var stages = j.stages || [];
+    var textOpts = j.textOptions || [];
+    var emailOpts = j.emailOptions || [];
+    var packs = j.packs || [];
+    var packSel = $('boardPack');
+    var prev = packSel.value;
+    packSel.innerHTML = '';
+    for (var p = 0; p < packs.length; p++) {
+      var opt = document.createElement('option');
+      opt.value = packs[p].id;
+      opt.textContent = packs[p].name + ' (' + packs[p].stageCount + ' stages)';
+      if (packs[p].id === j.activeBoard) opt.selected = true;
+      packSel.appendChild(opt);
+    }
+    if (prev && prev !== j.activeBoard) { /* kept selected from server */ }
+    $('boardPackDesc').textContent = j.boardDescription || '';
+    var tip = j.nextStepsTip;
+    $('boardTip').textContent = tip
+      ? ('Tue/Fri tip: aim for Day ' + tip.dayOffset + ' (' + tip.weekday + '). ' + tip.reason)
+      : '';
+
+    var box = $('boardList'); box.innerHTML = '';
+    for (var i = 0; i < stages.length; i++) {
+      (function (s) {
+        var card = make('div', 'desk-card' + (s.customized ? ' due' : ''));
+        var title = make('div', 'desk-title');
+        title.appendChild(make('span', 'pill ' + (s.ch === 'email' ? 'email' : 'text'), s.ch === 'email' ? 'Email' : 'Text'));
+        title.appendChild(document.createTextNode('  ' + (s.label || s.id)));
+        if (s.customized) title.appendChild(make('span', 'pill ok', ' Custom'));
+        if (s.byHand) title.appendChild(make('span', 'pill warn', ' By hand'));
+        card.appendChild(title);
+        card.appendChild(make('h3', null, s.copyName || (s.ch === 'email' ? 'Email template' : 'Text template')));
+
+        var row = document.createElement('div');
+        row.className = 'controls';
+        row.style.margin = '10px 0 0';
+
+        var dayWrap = document.createElement('div');
+        dayWrap.style.minWidth = '100px';
+        var dayLab = make('label', 'meta');
+        dayLab.setAttribute('for', 'board-day-' + s.id);
+        dayLab.textContent = 'Day (after demo / start)';
+        dayWrap.appendChild(dayLab);
+        var dayIn = document.createElement('input');
+        dayIn.type = 'number';
+        dayIn.min = '0';
+        dayIn.max = '365';
+        dayIn.id = 'board-day-' + s.id;
+        dayIn.value = String(s.day != null ? s.day : 0);
+        dayIn.style.width = '100%';
+        dayIn.style.marginTop = '4px';
+        dayWrap.appendChild(dayIn);
+        row.appendChild(dayWrap);
+
+        var tplWrap = document.createElement('div');
+        tplWrap.style.flex = '1';
+        tplWrap.style.minWidth = '180px';
+        var lab = make('label', 'meta');
+        lab.setAttribute('for', 'board-sel-' + s.id);
+        lab.textContent = s.ch === 'email' ? 'Email template' : 'Text template';
+        tplWrap.appendChild(lab);
+        var sel = document.createElement('select');
+        sel.id = 'board-sel-' + s.id;
+        sel.style.width = '100%';
+        sel.style.marginTop = '4px';
+        var opts = s.ch === 'email' ? emailOpts : textOpts;
+        var cur = s.ch === 'email' ? (s.emailTemplate || '') : (s.template || '');
+        if (s.ch === 'email' && !cur) {
+          var ph = document.createElement('option');
+          ph.value = '';
+          ph.textContent = 'Default email sequence (touch ' + s.n + ')';
+          sel.appendChild(ph);
+        }
+        for (var k = 0; k < opts.length; k++) {
+          var o = document.createElement('option');
+          o.value = opts[k].id;
+          o.textContent = (s.ch === 'text' ? ('#' + opts[k].id + ' · ') : '') + opts[k].name;
+          if (String(opts[k].id) === String(cur)) o.selected = true;
+          sel.appendChild(o);
+        }
+        if (cur && !opts.some(function (x) { return String(x.id) === String(cur); })) {
+          var miss = document.createElement('option');
+          miss.value = cur;
+          miss.textContent = cur + ' (missing — pick another)';
+          miss.selected = true;
+          sel.appendChild(miss);
+        }
+        tplWrap.appendChild(sel);
+        row.appendChild(tplWrap);
+        card.appendChild(row);
+
+        if (s.hint) card.appendChild(make('div', 'desk-meta', s.hint));
+        if (s.preferWeekdays && s.preferWeekdays.length) {
+          card.appendChild(make('div', 'desk-meta', 'Prefer: ' + s.preferWeekdays.join(' / ')));
+        }
+        if (s.preview) card.appendChild(make('div', 'desk-detail', s.preview));
+        if (s.note) card.appendChild(make('div', 'desk-meta', s.note));
+
+        var actions = make('div', 'desk-actions');
+        var save = make('button', 'btn primary', 'Save');
+        save.type = 'button';
+        save.addEventListener('click', function () {
+          var body = { day: Number(dayIn.value) };
+          var val = sel.value;
+          if (s.ch === 'email') {
+            if (val) body.emailTemplate = val;
+          } else {
+            if (!val) { flashBoard('Pick a text template', false); return; }
+            body.template = val;
+          }
+          save.disabled = true;
+          saveBoardStage(s.id, body).then(function () { save.disabled = false; });
+        });
+        actions.appendChild(save);
+        if (s.customized) {
+          var reset = make('button', 'btn', 'Reset to default');
+          reset.type = 'button';
+          reset.addEventListener('click', function () {
+            reset.disabled = true;
+            saveBoardStage(s.id, { reset: true }).then(function () { reset.disabled = false; });
+          });
+          actions.appendChild(reset);
+        }
+        card.appendChild(actions);
+        box.appendChild(card);
+      })(stages[i]);
+    }
+    if (!stages.length) {
+      box.appendChild(make('div', 'empty', 'No board stages found.'));
+    }
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    return Promise.reject();
+  }
+
+  function personLink(name, url) {
+    var wrap = document.createElement('span');
+    var h = href(url);
+    if (h) {
+      var a = make('a', null, name || 'Open');
+      a.href = h; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.title = 'Open in Salesforce';
+      wrap.appendChild(a);
+    } else wrap.appendChild(make('span', 'nm', name || '(unknown)'));
+    return wrap;
+  }
+
+  function renderMorning() {
+    var j = state.desk || {};
+    var list = j.morning || [];
+    var holds = 0, board = 0, interested = 0, i;
+    for (i = 0; i < list.length; i++) {
+      if (list[i].kind === 'hold') holds++;
+      else if (list[i].kind === 'board') board++;
+      else interested++;
+    }
+    $('mNeed').textContent = fNum.format(list.length);
+    $('mNeedS').textContent = interested + ' interested · ' + holds + ' holds · ' + board + ' board';
+    $('mHold').textContent = fNum.format(holds);
+    $('mBoard').textContent = fNum.format(board);
+    var box = $('morningList'); box.innerHTML = '';
+    for (i = 0; i < list.length; i++) {
+      var m = list[i];
+      var card = make('div', 'desk-card' + (m.kind === 'hold' || m.kind === 'interested' ? ' due' : ''));
+      var title = make('div', 'desk-title');
+      title.appendChild(make('span', 'prio ' + (m.kind || ''), m.kind === 'hold' ? 'Hold' : m.kind === 'interested' ? 'Interested' : 'Board'));
+      title.appendChild(document.createTextNode(m.title || ''));
+      card.appendChild(title);
+      var h = make('h3'); h.appendChild(personLink(m.name, m.url)); card.appendChild(h);
+      if (m.detail) card.appendChild(make('div', 'desk-detail', m.detail));
+      var meta = [];
+      if (m.at) meta.push(ago(Date.parse(m.at)));
+      if (m.ageDays != null) meta.push(m.ageDays + 'd since reply');
+      if (m.action) meta.push(m.action);
+      if (meta.length) card.appendChild(make('div', 'desk-meta', meta.join(' · ')));
+      box.appendChild(card);
+    }
+    $('morningEmpty').hidden = list.length > 0;
+    var hint = $('deskHint');
+    if (j.meta && j.meta.replyHint) { hint.hidden = false; hint.textContent = j.meta.replyHint; }
+    else hint.hidden = true;
+  }
+
+  function renderReplies() {
+    var j = state.desk || {};
+    var rows = j.replies || [];
+    var q = state.rq.toLowerCase();
+    var body = $('replyRows'); body.innerHTML = '';
+    var frag = document.createDocumentFragment(), n = 0, i, r, tr, td, pill;
+    for (i = 0; i < rows.length; i++) {
+      r = rows[i];
+      if (q && [r.name, r.reply, r.accountId].join(' ').toLowerCase().indexOf(q) < 0) continue;
+      n++;
+      tr = make('tr', 'row');
+      td = make('td', 't');
+      var t = Date.parse(r.at);
+      td.appendChild(make('span', 'time', isFinite(t) ? stamp(t, false) : '—'));
+      if (isFinite(t)) { var ag = make('span', 'ago', ago(t)); td.appendChild(ag); }
+      tr.appendChild(td);
+      td = make('td', 'who'); td.appendChild(personLink(r.name, r.url)); tr.appendChild(td);
+      td = make('td', 'how');
+      pill = make('span', 'pill ' + (r.ch === 'email' ? 'email' : 'text'), r.ch === 'email' ? 'Email' : 'Text');
+      td.appendChild(pill);
+      if (r.interested) td.appendChild(make('span', 'pill ok', ' Interested'));
+      if (r.optout) td.appendChild(make('span', 'pill warn', ' Opt-out'));
+      tr.appendChild(td);
+      td = make('td'); td.appendChild(make('div', 'rep-text', r.reply || '')); tr.appendChild(td);
+      frag.appendChild(tr);
+    }
+    body.appendChild(frag);
+    $('replyCount').textContent = n + ' shown';
+    var em = $('replyEmpty');
+    if (!n) {
+      em.hidden = false;
+      em.textContent = rows.length ? 'No replies match this search.' : 'No replies yet. Set up the Gmail feed: node replyPoller.js --setup';
+    } else em.hidden = true;
+  }
+
+  function renderKit() {
+    var kit = (state.desk && state.desk.kit) || [];
+    var box = $('kitList'); box.innerHTML = '';
+    for (var i = 0; i < kit.length; i++) {
+      (function (k) {
+        var card = make('div', 'desk-card');
+        card.appendChild(make('div', 'desk-title', k.kind === 'email' ? 'Email' : 'Text'));
+        card.appendChild(make('h3', null, k.label || k.id));
+        if (k.hint) card.appendChild(make('div', 'desk-meta', k.hint));
+        if (k.subject) card.appendChild(make('div', 'tpl', k.subject));
+        if (k.preview) card.appendChild(make('div', 'desk-detail', k.preview));
+        if (k.command) {
+          card.appendChild(make('div', 'desk-cmd', k.command));
+          var actions = make('div', 'desk-actions');
+          var btn = make('button', 'btn', 'Copy command');
+          btn.type = 'button';
+          btn.addEventListener('click', function () {
+            copyText(k.command).then(function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy command'; }, 1200); }).catch(function () {});
+          });
+          actions.appendChild(btn);
+          card.appendChild(actions);
+        }
+        box.appendChild(card);
+      })(kit[i]);
+    }
+  }
+
+  function renderMyLeads() {
+    var j = state.desk || {};
+    var add = j.addLead || {};
+    $('addLeadHint').textContent = add.hint || '';
+    $('addLeadCmd').textContent = add.command || '';
+    var list = j.myLeads || [];
+    var box = $('myLeadsList'); box.innerHTML = '';
+    for (var i = 0; i < list.length; i++) {
+      var m = list[i];
+      var card = make('div', 'desk-card' + (m.dueNow ? ' due' : ''));
+      card.appendChild(make('div', 'desk-title', m.dueNow ? 'Due now' : (m.state || 'On board')));
+      var h = make('h3'); h.appendChild(personLink(m.name, m.url)); card.appendChild(h);
+      var bits = [];
+      if (m.next) bits.push('Next: ' + m.next);
+      if (m.tags && m.tags.length) bits.push('#' + m.tags.join(' #'));
+      if (m.hold) bits.push(m.hold);
+      if (bits.length) card.appendChild(make('div', 'desk-meta', bits.join(' · ')));
+      box.appendChild(card);
+    }
+    $('myLeadsEmpty').hidden = list.length > 0;
+  }
+
+  function renderTodayDesk() {
+    var t = (state.desk && state.desk.today) || { sends: 0, texts: 0, emails: 0, rows: [] };
+    $('tSends').textContent = fNum.format(t.sends || 0);
+    $('tTexts').textContent = fNum.format(t.texts || 0);
+    $('tEmails').textContent = fNum.format(t.emails || 0);
+    $('tSplit').textContent = 'texts ' + fNum.format(t.texts || 0) + ' · emails ' + fNum.format(t.emails || 0);
+    var body = $('todayRows'); body.innerHTML = '';
+    var rows = t.rows || [], frag = document.createDocumentFragment(), i, r, tr, td;
+    for (i = 0; i < rows.length; i++) {
+      r = rows[i];
+      tr = make('tr', 'row');
+      td = make('td', 't');
+      var ts = Date.parse(r.at);
+      td.appendChild(make('span', 'time', isFinite(ts) ? stamp(ts, false) : '—'));
+      tr.appendChild(td);
+      td = make('td', 'who'); td.appendChild(personLink(r.name, r.url)); tr.appendChild(td);
+      td = make('td', 'how'); td.appendChild(make('span', 'pill ' + (r.channel === 'email' ? 'email' : 'text'), r.channel === 'email' ? 'Email' : 'Text')); tr.appendChild(td);
+      td = make('td');
+      td.appendChild(make('div', 'tpl', r.subject || r.template || (r.channel === 'email' ? 'Email' : 'Text')));
+      if (r.preview) td.appendChild(make('span', 'prev', r.preview));
+      tr.appendChild(td);
+      frag.appendChild(tr);
+    }
+    body.appendChild(frag);
+    $('todayEmpty').hidden = rows.length > 0;
+  }
+
+  function renderDayDesk() {
+    if (!state.desk) return;
+    renderMorning();
+    renderReplies();
+    renderKit();
+    renderMyLeads();
+    renderTodayDesk();
+  }
+
+  function loadDayDesk() {
+    if (!LIVE) return;
+    fetch('/api/daydesk').then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || j.ok === false) return;
+      state.desk = j;
+      renderDayDesk();
+    }).catch(function () {});
+  }
+
+  function ingest(d) {
+    var first = state.gen === null, prev = state.newest, now = Date.now(), i, r, e, newest = prev, rows = [];
+    for (i = 0; i < d.rows.length; i++) {
+      r = d.rows[i];
+      e = { r: r, t: Date.parse(r.at), key: r.at + '|' + r.channel + '|' + r.name };
+      e.hay = [r.name, r.email, r.template, r.subject, r.text, r.mode].join(' ').toLowerCase();
+      if (!isFinite(e.t)) continue;
+      if (e.t > newest) newest = e.t;
+      if (!first && e.t > prev) state.fresh[e.key] = now + 6000;
+      rows.push(e);
+    }
+    state.gen = d.generatedAt;
+    state.rows = rows;
+    state.newest = newest;
+  }
+
+  function inRange(t, d) {
+    if (state.range === 'all') return true;
+    if (state.range === 'run') { var s = Date.parse(d.run && d.run.startedAt); return isFinite(s) && t >= s; }
+    var today = startOfDay(Date.now());
+    if (state.range === 'today') return t >= today;
+    var wk = new Date(); wk.setDate(wk.getDate() - 6); wk.setHours(0, 0, 0, 0);
+    return t >= wk.getTime();
+  }
+
+  function tally(list) { var t = 0, m = 0, i; for (i = 0; i < list.length; i++) { if (list[i].r.channel === 'email') m++; else t++; } return { text: t, email: m, all: t + m }; }
+  function split(c) { return 'texts ' + fNum.format(c.text) + ' · emails ' + fNum.format(c.email); }
+
+  function renderCards(d) {
+    var today = startOfDay(Date.now()), rs = Date.parse(d.run && d.run.startedAt), a = [], b = [], i, e;
+    for (i = 0; i < state.rows.length; i++) {
+      e = state.rows[i];
+      if (e.t >= today) a.push(e);
+      if (isFinite(rs) && e.t >= rs) b.push(e);
+    }
+    var run = tally(b), tod = tally(a);
+    $('nRun').textContent = fNum.format(run.all); $('sRun').textContent = split(run);
+    $('nToday').textContent = fNum.format(tod.all); $('sToday').textContent = split(tod);
+    var t = d.totals || {};
+    $('nAll').textContent = fNum.format(t.sends || 0);
+    $('sAll').textContent = split({ text: t.texts || 0, email: t.emails || 0 }) + ' · people ' + fNum.format(t.people || 0);
+    $('kRun').textContent = 'This run' + (isFinite(rs) ? ' · since ' + stamp(rs, false) : '');
+    document.title = 'Pipeline Assistant · ' + fNum.format(tod.all) + ' today';
+  }
+
+  function whatNodes(r) {
+    var box = document.createElement('div');
+    if (r.channel === 'email') {
+      box.appendChild(make('div', 'tpl', r.subject || r.template || 'Email'));
+      if (r.template && r.subject) box.appendChild(make('span', 'prev', r.template));
+    } else {
+      box.appendChild(make('div', 'tpl', r.template || 'Text'));
+      if (r.text) box.appendChild(make('span', 'prev', r.text));
+    }
+    return box;
+  }
+
+  function rowNodes(e) {
+    var r = e.r, tr = make('tr', 'row' + (state.fresh[e.key] > Date.now() ? ' fresh' : '')), det = make('tr', 'detail'), td, link, pill;
+    tr.setAttribute('tabindex', '0');
+    tr.setAttribute('aria-expanded', state.open[e.key] ? 'true' : 'false');
+    td = make('td', 't');
+    td.appendChild(make('span', 'time', fTime.format(new Date(e.t))));
+    var ag = make('span', 'ago', ago(e.t)); ag.setAttribute('data-t', String(e.t)); td.appendChild(ag);
+    tr.appendChild(td);
+    td = make('td', 'who');
+    var h = href(r.url);
+    if (h) { link = make('a', null, r.name); link.href = h; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.title = 'Open the account in Salesforce'; link.addEventListener('click', function (ev) { ev.stopPropagation(); }); td.appendChild(link); }
+    else td.appendChild(make('span', 'nm', r.name));
+    if (r.email) td.appendChild(make('div', 'em', r.email));
+    tr.appendChild(td);
+    td = make('td', 'how'); pill = make('span', 'pill ' + (r.channel === 'email' ? 'email' : 'text'), r.channel === 'email' ? 'Email' : 'Text'); td.appendChild(pill); tr.appendChild(td);
+    td = make('td', 'what'); td.appendChild(whatNodes(r)); tr.appendChild(td);
+
+    td = make('td'); td.colSpan = 4;
+    var bits = [fFull.format(new Date(e.t))];
+    if (r.template) bits.push(r.template);
+    if (r.mode) bits.push('mode: ' + r.mode);
+    if (r.step) bits.push('step ' + r.step);
+    td.appendChild(make('p', 'meta', bits.join(' · ')));
+    if (r.channel === 'email' && r.subject) td.appendChild(make('p', 'meta', 'Subject: ' + r.subject));
+    td.appendChild(make('pre', 'msg', r.text || '(no message was recorded)'));
+    if (LIVE && (r.accountId || r.url)) {
+      var dncRow = make('div', 'tpl-actions');
+      dncRow.style.marginTop = '10px';
+      var dncBtn = make('button', 'btn danger', 'Add to DNC');
+      dncBtn.type = 'button';
+      dncBtn.title = 'Do not contact — skip this account on the next launch';
+      dncBtn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var id = r.accountId || r.url;
+        if (!id) { alert('No Salesforce account id on this send.'); return; }
+        if (!confirm('Add ' + (r.name || 'this account') + ' to the do-not-contact list?')) return;
+        dncBtn.disabled = true;
+        apiDncAdd(id, r.name, 'added from send row').then(function (ok) {
+          dncBtn.disabled = false;
+          if (ok) { dncBtn.textContent = 'On DNC'; dncBtn.disabled = true; }
+        });
+      });
+      dncRow.appendChild(dncBtn);
+      td.appendChild(dncRow);
+    }
+    det.appendChild(td);
+    det.hidden = !state.open[e.key];
+
+    function toggle() { var o = !state.open[e.key]; state.open[e.key] = o; det.hidden = !o; tr.setAttribute('aria-expanded', o ? 'true' : 'false'); }
+    tr.addEventListener('click', toggle);
+    tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(); } });
+    return [tr, det];
+  }
+
+  function renderTable(d) {
+    var body = $('rows'), q = state.q.toLowerCase(), list = [], i, e;
+    for (i = 0; i < state.rows.length; i++) {
+      e = state.rows[i];
+      if (state.channel !== 'all' && e.r.channel !== state.channel) continue;
+      if (!inRange(e.t, d)) continue;
+      if (q && e.hay.indexOf(q) < 0) continue;
+      list.push(e);
+    }
+    var frag = document.createDocumentFragment(), lastDay = null, n = Math.min(list.length, MAX_DRAWN), lab, dr, dtd, nodes;
+    for (i = 0; i < n; i++) {
+      lab = dayLabel(list[i].t);
+      if (lab !== lastDay) { lastDay = lab; dr = make('tr', 'day'); dtd = make('td', null, lab); dtd.colSpan = 4; dr.appendChild(dtd); frag.appendChild(dr); }
+      nodes = rowNodes(list[i]); frag.appendChild(nodes[0]); frag.appendChild(nodes[1]);
+    }
+    body.textContent = '';
+    body.appendChild(frag);
+    var em = $('empty');
+    if (!list.length) {
+      em.hidden = false;
+      em.textContent = !d.totals || !d.totals.sends ? 'Nothing has been sent yet. Everyone this script texts or emails will show up here, a few seconds after the send.' : 'No sends match these filters.';
+    } else em.hidden = true;
+    $('foot').textContent = (list.length > n ? 'Showing the newest ' + fNum.format(n) + ' of ' + fNum.format(list.length) + ' matching sends. ' : '') +
+      (d.truncated ? 'This page holds the newest ' + fNum.format(d.rows.length) + ' of ' + fNum.format(d.totals.sends) + ' sends: Today and This run are counted from those, All time counts the whole log. ' : '') +
+      'Source: texted-log.jsonl. Times are in this computer’s time zone.' + (d.dataLog && d.dataLog.file ? ' Your own data log, kept only on this computer: ' + d.dataLog.file + '.' : '');
+  }
+
+  var curDay = startOfDay(Date.now());
+  function renderStatus() {
+    var d = state.d, s = $('status'), dot = $('dot'), els, i, day = startOfDay(Date.now());
+    if (d && day !== curDay) { curDay = day; renderAll(); return; }
+    if (!d) { dot.className = 'dot'; s.textContent = 'Waiting for data …'; return; }
+    dot.className = 'dot live';
+    s.textContent = 'Updated ' + stamp(Date.parse(d.generatedAt), true) + ' · ' +
+      (state.rows.length ? 'last send ' + ago(state.rows[0].t) : 'nothing sent yet') +
+      (LIVE ? ' · localhost' : ' · file mode') +
+      ' · looks for new sends every ' + (POLL_MS / 1000) + ' s';
+    els = document.querySelectorAll('[data-t]');
+    for (i = 0; i < els.length; i++) els[i].textContent = ago(Number(els[i].getAttribute('data-t')));
+  }
+
+  function renderAll() {
+    var d = state.d;
+    if (!d) { $('rows').textContent = ''; $('empty').hidden = false; $('empty').textContent = 'Waiting for the first data …'; renderStatus(); return; }
+    $('banner').hidden = !(d.run && d.run.dryRun);
+    $('fullLog').hidden = !d.fullLog;
+    renderCards(d); renderTable(d); renderStatus();
+  }
+
+  function onData() {
+    var d = data();
+    if (d && (state.d === null || d.generatedAt > state.d.generatedAt)) { ingest(d); state.d = d; renderAll(); }
+    else if (!state.d) renderAll();
+    else renderStatus();
+  }
+
+  function syncControls() {
+    var b = document.querySelectorAll('#view-sends .seg button'), i;
+    for (i = 0; i < b.length; i++) b[i].setAttribute('aria-pressed', b[i].getAttribute('data-ch') === state.channel ? 'true' : 'false');
+    $('range').value = state.range;
+  }
+
+  function flashTpl(msg, ok) {
+    var el = $('tplFlash');
+    el.hidden = !msg;
+    el.className = 'flash ' + (ok ? 'ok' : 'err');
+    el.textContent = msg || '';
+  }
+
+  function loadTemplates() {
+    if (!LIVE) {
+      $('tplNote').textContent = 'Open this page via localhost (run zw) to load and edit templates.';
+      $('tplList').textContent = '';
+      $('tplAdd').hidden = true;
+      return;
+    }
+    fetch('/api/templates').then(function (r) { return r.json(); }).then(function (j) {
+      state.templates = j;
+      renderTemplates();
+    }).catch(function (e) {
+      flashTpl('Could not load templates: ' + (e && e.message ? e.message : 'error'), false);
+    });
+  }
+
+  function renderTemplates() {
+    var j = state.templates, list = $('tplList'), q = state.tq.toLowerCase(), i, items, item, card;
+    list.textContent = '';
+    if (!j) return;
+    $('tplAdd').hidden = state.tk !== 'text' || !LIVE;
+    items = state.tk === 'email' ? (j.emails || []) : (j.texts || []);
+    $('tplNote').textContent = state.tk === 'text'
+      ? 'Texts use <first name>, <full name>, <call number>, <text number>, <booking link>. Saved in text-templates.json — used on the next zw launch.'
+      : 'Emails use {{greeting}} / {{business|…}}. Saved in email-templates.json — used on the next zw launch.';
+    for (i = 0; i < items.length; i++) {
+      item = items[i];
+      if (q && [item.id || item.key, item.name, item.subject, item.text || item.body].join(' ').toLowerCase().indexOf(q) < 0) continue;
+      card = make('div', 'tpl-card' + (state.editing === (item.id || item.key) ? ' editing' : ''));
+      card.appendChild(renderTplCard(item));
+      list.appendChild(card);
+    }
+    if (!list.childNodes.length) list.appendChild(make('div', 'empty', 'No templates match.'));
+  }
+
+  function renderTplCard(item) {
+    var box = document.createElement('div');
+    var key = item.id || item.key;
+    var editing = state.editing === key;
+    var head = make('div', 'tpl-head');
+    var left = document.createElement('div');
+    var title = make('h3', null, (item.id ? '#' + item.id + ' · ' : '') + item.name);
+    left.appendChild(title);
+    if (item.kind === 'changed') left.appendChild(make('span', 'pill warn', 'edited'));
+    if (item.kind === 'yours') left.appendChild(make('span', 'pill ok', 'yours'));
+    if (item.subject) left.appendChild(make('div', 'meta', 'Subject: ' + item.subject));
+    head.appendChild(left);
+    var actions = make('div', 'tpl-actions');
+    if (!editing) {
+      var editBtn = make('button', 'btn', 'Edit');
+      editBtn.type = 'button';
+      editBtn.addEventListener('click', function () { state.editing = key; renderTemplates(); });
+      actions.appendChild(editBtn);
+      if (item.kind === 'changed') {
+        var resetBtn = make('button', 'btn', 'Reset');
+        resetBtn.type = 'button';
+        resetBtn.addEventListener('click', function () { apiResetText(item.id); });
+        actions.appendChild(resetBtn);
+      }
+      if (item.kind === 'yours') {
+        var delBtn = make('button', 'btn danger', 'Remove');
+        delBtn.type = 'button';
+        delBtn.addEventListener('click', function () {
+          if (confirm('Remove this text?')) apiRemoveText(item.id);
+        });
+        actions.appendChild(delBtn);
+      }
+    }
+    head.appendChild(actions);
+    box.appendChild(head);
+
+    if (!editing) {
+      box.appendChild(make('pre', 'tpl-body', item.channel === 'email' ? item.body : item.text));
+      return box;
+    }
+
+    var form = make('div', 'tpl-edit');
+    var nameIn = null, subIn = null, bodyIn, psIn = null;
+    if (item.channel === 'email' || item.kind === 'yours' || item._new) {
+      form.appendChild(make('label', null, item.channel === 'email' ? 'Name' : 'Name (as the list shows it)'));
+      nameIn = document.createElement('input');
+      nameIn.type = 'text';
+      nameIn.value = item.name || '';
+      form.appendChild(nameIn);
+    }
+    if (item.channel === 'email') {
+      form.appendChild(make('label', null, 'Subject'));
+      subIn = document.createElement('input');
+      subIn.type = 'text';
+      subIn.value = item.subject || '';
+      form.appendChild(subIn);
+    }
+    form.appendChild(make('label', null, item.channel === 'email' ? 'Body (one paragraph per line)' : 'Wording'));
+    bodyIn = document.createElement('textarea');
+    bodyIn.value = item.channel === 'email' ? (item.body || '') : (item.text || '');
+    form.appendChild(bodyIn);
+    if (item.channel === 'email') {
+      form.appendChild(make('label', null, 'P.S. (optional)'));
+      psIn = document.createElement('input');
+      psIn.type = 'text';
+      psIn.value = item.ps || '';
+      form.appendChild(psIn);
+    }
+    var row = make('div', 'tpl-actions');
+    row.style.marginTop = '10px';
+    var saveBtn = make('button', 'btn primary', 'Save');
+    saveBtn.type = 'button';
+    saveBtn.addEventListener('click', function () {
+      if (item._new) apiAddText(nameIn.value, bodyIn.value);
+      else if (item.channel === 'email') apiSaveEmail(item.key, { name: nameIn.value, subject: subIn.value, body: bodyIn.value, ps: psIn.value });
+      else apiSaveText(item.id, bodyIn.value);
+    });
+    var cancelBtn = make('button', 'btn', 'Cancel');
+    cancelBtn.type = 'button';
+    cancelBtn.addEventListener('click', function () {
+      state.editing = null;
+      if (state.templates && state.templates.texts) state.templates.texts = state.templates.texts.filter(function (x) { return !x._new; });
+      renderTemplates();
+    });
+    row.appendChild(saveBtn);
+    row.appendChild(cancelBtn);
+    form.appendChild(row);
+    box.appendChild(form);
+    return box;
+  }
+
+  function apiSaveText(id, text) {
+    fetch('/api/templates/text/' + encodeURIComponent(id), {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) { flashTpl(j.error || 'Save failed', false); return; }
+      flashTpl(j.unchanged ? 'Nothing changed — already that wording.' : 'Saved. It will be used on the next launch.', true);
+      state.editing = null;
+      loadTemplates();
+    }).catch(function (e) { flashTpl(e.message || 'Save failed', false); });
+  }
+  function apiResetText(id) {
+    fetch('/api/templates/text/' + encodeURIComponent(id) + '/reset', { method: 'POST' })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        if (!j.ok) { flashTpl(j.error || 'Reset failed', false); return; }
+        flashTpl('Original wording restored. Used on the next launch.', true);
+        loadTemplates();
+      }).catch(function (e) { flashTpl(e.message || 'Reset failed', false); });
+  }
+  function apiRemoveText(id) {
+    fetch('/api/templates/text/' + encodeURIComponent(id), { method: 'DELETE' })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        if (!j.ok) { flashTpl(j.error || 'Remove failed', false); return; }
+        flashTpl('Removed.', true);
+        loadTemplates();
+      }).catch(function (e) { flashTpl(e.message || 'Remove failed', false); });
+  }
+  function apiAddText(name, text) {
+    fetch('/api/templates/text', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, text: text })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) { flashTpl(j.error || 'Add failed', false); return; }
+      flashTpl('Added as text ' + (j.id || '') + '. Used on the next launch.', true);
+      state.editing = null;
+      loadTemplates();
+    }).catch(function (e) { flashTpl(e.message || 'Add failed', false); });
+  }
+  function apiSaveEmail(key, payload) {
+    fetch('/api/templates/email/' + encodeURIComponent(key), {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) { flashTpl(j.error || 'Save failed', false); return; }
+      flashTpl('Email template saved. Used on the next launch.', true);
+      state.editing = null;
+      loadTemplates();
+    }).catch(function (e) { flashTpl(e.message || 'Save failed', false); });
+  }
+
+  function splitLabel(b) {
+    b = b || {};
+    return 'texts ' + fNum.format(b.texts || 0) + ' · emails ' + fNum.format(b.emails || 0);
+  }
+  function loadAnalytics() {
+    if (!LIVE) {
+      $('anFoot').textContent = 'Open via localhost (run zw) to load the scoreboard.';
+      return;
+    }
+    fetch('/api/analytics').then(function (r) { return r.json(); }).then(function (j) {
+      state.analytics = j;
+      renderAnalytics();
+    }).catch(function (e) {
+      $('anFoot').textContent = 'Could not load scoreboard: ' + (e && e.message ? e.message : 'error');
+    });
+  }
+
+  function renderAnalytics() {
+    var j = state.analytics;
+    if (!j) return;
+    $('anDay').textContent = fNum.format((j.daily && j.daily.sends) || 0);
+    $('anDayS').textContent = splitLabel(j.daily);
+    $('anWeek').textContent = fNum.format((j.weekly && j.weekly.sends) || 0);
+    $('anWeekS').textContent = splitLabel(j.weekly);
+    $('anMonth').textContent = fNum.format((j.monthly && j.monthly.sends) || 0);
+    $('anMonthS').textContent = splitLabel(j.monthly);
+    $('anAll').textContent = fNum.format((j.allTime && j.allTime.sends) || 0);
+    $('anAllS').textContent = splitLabel(j.allTime);
+    $('anFoot').textContent = 'Week = last 7 days including today. Month = calendar month to date. Source: texted-log.jsonl.';
+  }
+
+  function flashDnc(msg, ok) {
+    var el = $('dncFlash');
+    el.hidden = !msg;
+    el.className = 'flash ' + (ok ? 'ok' : 'err');
+    el.textContent = msg || '';
+  }
+
+  function apiDncAdd(accountId, accountName, reason) {
+    return fetch('/api/dnc', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: accountId, accountName: accountName || null, reason: reason || null })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) { flashDnc(j.error || 'Could not add to DNC', false); return false; }
+      flashDnc(j.already ? 'Already on the DNC list.' : 'Added to DNC. Skipped on the next launch.', true);
+      if (state.view === 'dnc') loadDnc();
+      return true;
+    }).catch(function (e) { flashDnc(e.message || 'Could not add to DNC', false); return false; });
+  }
+
+  function apiDncClear(accountId, accountName) {
+    return fetch('/api/dnc/clear', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: accountId, accountName: accountName || null })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) { flashDnc(j.error || 'Could not clear DNC', false); return false; }
+      flashDnc(j.already ? (j.note || 'Not on DNC.') : 'Taken off DNC. Can be contacted again on the next launch.', true);
+      loadDnc();
+      return true;
+    }).catch(function (e) { flashDnc(e.message || 'Could not clear DNC', false); return false; });
+  }
+
+  function loadDnc() {
+    if (!LIVE) {
+      $('dncEmpty').hidden = false;
+      $('dncEmpty').textContent = 'Open via localhost (run zw) to manage DNC.';
+      $('dncRows').textContent = '';
+      $('dncCount').textContent = '';
+      return;
+    }
+    fetch('/api/dnc').then(function (r) { return r.json(); }).then(function (j) {
+      state.dnc = j;
+      renderDnc();
+    }).catch(function (e) {
+      flashDnc('Could not load DNC: ' + (e && e.message ? e.message : 'error'), false);
+    });
+  }
+
+  function renderDnc() {
+    var j = state.dnc, body = $('dncRows'), q = state.dncQ.toLowerCase(), i, r, tr, td, link, btn, list = [], frag;
+    body.textContent = '';
+    if (!j) return;
+    list = (j.rows || []).filter(function (row) {
+      if (!q) return true;
+      return [row.name, row.accountId, row.reason, row.source].join(' ').toLowerCase().indexOf(q) >= 0;
+    });
+    $('dncCount').textContent = list.length === (j.rows || []).length
+      ? (fNum.format(j.count || 0) + ' on DNC')
+      : (fNum.format(list.length) + ' of ' + fNum.format(j.count || 0));
+    frag = document.createDocumentFragment();
+    for (i = 0; i < list.length; i++) {
+      r = list[i];
+      tr = make('tr', 'row');
+      tr.style.cursor = 'default';
+      td = make('td', 't');
+      if (r.at) {
+        td.appendChild(make('span', 'time', fTime.format(new Date(r.at))));
+        td.appendChild(make('span', 'ago', ago(Date.parse(r.at))));
+      } else td.appendChild(make('span', 'ago', '—'));
+      tr.appendChild(td);
+      td = make('td', 'who');
+      if (r.url) {
+        link = make('a', null, r.name || r.accountId);
+        link.href = r.url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+        td.appendChild(link);
+      } else td.appendChild(make('span', 'nm', r.name || r.accountId));
+      if (r.accountId) td.appendChild(make('div', 'em', r.accountId));
+      tr.appendChild(td);
+      td = make('td');
+      td.appendChild(make('div', null, r.reason || '—'));
+      if (r.source) td.appendChild(make('div', 'meta', 'via ' + r.source));
+      tr.appendChild(td);
+      td = make('td');
+      btn = make('button', 'btn', 'Take off DNC');
+      btn.type = 'button';
+      (function (row, el) {
+        el.addEventListener('click', function () {
+          if (!confirm('Take ' + (row.name || row.accountId) + ' off the do-not-contact list?')) return;
+          el.disabled = true;
+          apiDncClear(row.accountId, row.name).then(function () { el.disabled = false; });
+        });
+      })(r, btn);
+      td.appendChild(btn);
+      tr.appendChild(td);
+      frag.appendChild(tr);
+    }
+    body.appendChild(frag);
+    var em = $('dncEmpty');
+    if (!list.length) {
+      em.hidden = false;
+      em.textContent = (j.rows && j.rows.length) ? 'No DNC entries match this search.' : 'Nobody is on the DNC list yet.';
+    } else em.hidden = true;
+  }
+
+  // Wire UI
+  (function wire() {
+    var tabs = document.querySelectorAll('.nav button'), i, timer = null;
+    for (i = 0; i < tabs.length; i++) tabs[i].addEventListener('click', function () { setView(this.getAttribute('data-view')); });
+    var b = document.querySelectorAll('#view-sends .seg button');
+    for (i = 0; i < b.length; i++) b[i].addEventListener('click', function () { state.channel = this.getAttribute('data-ch'); lsSet('channel', state.channel); syncControls(); if (state.d) renderTable(state.d); });
+    $('range').addEventListener('change', function () { state.range = this.value; lsSet('range', state.range); if (state.d) renderTable(state.d); });
+    $('q').addEventListener('input', function () { var v = this.value; clearTimeout(timer); timer = setTimeout(function () { state.q = v.trim(); if (state.d) renderTable(state.d); }, 120); });
+
+    var tb = document.querySelectorAll('#view-templates .seg button');
+    for (i = 0; i < tb.length; i++) tb[i].addEventListener('click', function () {
+      state.tk = this.getAttribute('data-tk');
+      for (var j = 0; j < tb.length; j++) tb[j].setAttribute('aria-pressed', tb[j].getAttribute('data-tk') === state.tk ? 'true' : 'false');
+      state.editing = null;
+      renderTemplates();
+    });
+    $('tq').addEventListener('input', function () { state.tq = this.value.trim(); renderTemplates(); });
+    $('tplAdd').addEventListener('click', function () {
+      state.editing = '__new__';
+      state.templates = state.templates || { texts: [], emails: [] };
+      var texts = (state.templates.texts || []).filter(function (x) { return !x._new; });
+      texts.unshift({ id: '__new__', name: '', text: '', kind: 'yours', _new: true, channel: 'text' });
+      state.templates.texts = texts;
+      renderTemplates();
+    });
+
+    $('dncAddBtn').addEventListener('click', function () {
+      var ref = $('dncRef').value.trim(), name = $('dncName').value.trim();
+      if (!ref) { flashDnc('Paste a Salesforce account link or id first.', false); return; }
+      $('dncAddBtn').disabled = true;
+      apiDncAdd(ref, name || null, 'added from DNC tab').then(function (ok) {
+        $('dncAddBtn').disabled = false;
+        if (ok) { $('dncRef').value = ''; $('dncName').value = ''; loadDnc(); }
+      });
+    });
+    var dncTimer = null;
+    $('dncQ').addEventListener('input', function () {
+      var v = this.value;
+      clearTimeout(dncTimer);
+      dncTimer = setTimeout(function () { state.dncQ = v.trim(); renderDnc(); }, 120);
+    });
+
+    var rqTimer = null;
+    $('rq').addEventListener('input', function () {
+      var v = this.value;
+      clearTimeout(rqTimer);
+      rqTimer = setTimeout(function () { state.rq = v.trim(); renderReplies(); }, 120);
+    });
+    $('copyAddLead').addEventListener('click', function () {
+      var cmd = $('addLeadCmd').textContent || '';
+      if (!cmd) return;
+      copyText(cmd).then(function () {
+        $('copyAddLead').textContent = 'Copied';
+        setTimeout(function () { $('copyAddLead').textContent = 'Copy command'; }, 1200);
+      }).catch(function () {});
+    });
+
+    $('boardPack').addEventListener('change', function () {
+      var id = this.value;
+      if (!id || !LIVE) return;
+      fetch('/api/board/active', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        if (!j || !j.ok) { flashBoard((j && j.error) || 'Could not switch board', false); return; }
+        state.board = j.board;
+        renderBoard();
+        flashBoard('Switched to ' + ((j.board && j.board.boardName) || id), true);
+      }).catch(function () { flashBoard('Could not switch board', false); });
+    });
+
+    function bindContentFind() {
+      if ($('cGo')) $('cGo').addEventListener('click', function () { loadContent(); });
+      ['cTrade', 'cNeed', 'cCompetitor'].forEach(function (id) {
+        var el = $(id);
+        if (el) el.addEventListener('change', function () { loadContent(); });
+      });
+      if ($('cQ')) {
+        var t;
+        $('cQ').addEventListener('input', function () {
+          clearTimeout(t);
+          t = setTimeout(function () { loadContent(); }, 280);
+        });
+        $('cQ').addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); loadContent(); }
+        });
+      }
+    }
+    bindContentFind();
+
+  })();
+
+  $('fileMode').hidden = LIVE;
+
+  var seq = 0;
+  function load(then) {
+    if (LIVE) {
+      fetch('/data.js?_=' + Date.now() + '-' + (seq++)).then(function (r) { return r.text(); }).then(function (txt) {
+        try { (0, eval)(txt); } catch (e) {}
+        try { onData(); } catch (e) {}
+        if (then) then();
+      }).catch(function () { if (then) then(); });
+      return;
+    }
+    var s = document.createElement('script');
+    function done() {
+      try { if (s.parentNode) s.parentNode.removeChild(s); onData(); }
+      catch (e) { try { $('status').textContent = 'Could not show the latest data · trying again'; } catch (e2) {} }
+      finally { if (then) then(); }
+    }
+    s.onload = done; s.onerror = done;
+    s.src = 'data.js?_=' + Date.now() + '-' + (seq++);
+    document.head.appendChild(s);
+  }
+  function poll() {
+    if (document.hidden) { setTimeout(poll, POLL_MS); return; }
+    load(function () { setTimeout(poll, POLL_MS); });
+  }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
+
+  syncControls();
+  setView(state.view);
+  try { onData(); } catch (e) {}
+  setTimeout(poll, POLL_MS);
+  setInterval(function () { try { renderStatus(); } catch (e) {} }, 1000);
+})();
+</script>
+</body>
+</html>

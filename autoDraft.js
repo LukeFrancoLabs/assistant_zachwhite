@@ -12,7 +12,7 @@
  *   email           the email campaign: each account's email is written this way, only the email is sent ... draftAndSend(…, 'email'), called from the --email block
  *   email --text    the text campaign off a list view: the same, only the text is sent ............... runAutoText
  *
- * The plain campaigns use it by themselves (wordingFor says when): --no-auto goes back to picking a template; --message / --template / --email-template / --subject / --body-file mean the
+ * The plain campaigns use it when Settings has Claude drafts on (wordingFor says when): off by default (templates). --no-auto forces templates; --message / --template / --email-template / --subject / --body-file mean the
  * rep chose the wording; the sequences (--sequence, --core), --library, --blast and --never-emailed have their own; a text campaign off a report keeps its templates.
  * Nothing is sent before the rep has seen every draft: they are printed, then there is one question (y/N; --yes skips it). A draft that fails the checks (needs-review, error) is never sent.
  *
@@ -27,9 +27,11 @@
 // Who gets auto wording
 // ---------------------------------------------------------------------------------------------
 /**
- * Should this plain email / text campaign write each message from the account's notes and opportunities? ON by default.
- * Off, with the reason (for the log line), when: --no-auto; the rep chose the wording (--message, --template, --email-template, --subject, --body-file); the mode has its own wording
- * (--sequence / --core, --library, --blast, --never-emailed); or it is a text campaign off a report (those keep their templates). → { on, why }
+ * Should this plain email / text campaign write each message from the account's notes and opportunities?
+ * OFF by default (templates only). Turn on in Settings: `zw --settings` → Claude drafts → on.
+ * Also off, with the reason (for the log line), when: --no-auto; the rep chose the wording (--message, --template,
+ * --email-template, --subject, --body-file); the mode has its own wording (--sequence / --core, --library, --blast,
+ * --never-emailed); or it is a text campaign off a report (those keep their templates). → { on, why }
  */
 function wordingFor(args, channel, { isReport = false } = {}) {
   const off = (why) => ({ on: false, why });
@@ -40,10 +42,13 @@ function wordingFor(args, channel, { isReport = false } = {}) {
     if (args.blast) return off('--blast sends one email to everybody');
     if (args.neverEmailed) return off('--never-emailed sends one named email');
     if (args.emailTemplate || args.subject || args.bodyFile) return off('--email-template / --subject / --body-file pick the wording');
-    return { on: true, why: '' };
+  } else {
+    if (isReport) return off('a text campaign off a report keeps its templates');
+    if (args.message || args.template) return off('--message / --template pick the wording');
   }
-  if (isReport) return off('a text campaign off a report keeps its templates');
-  if (args.message || args.template) return off('--message / --template pick the wording');
+  let claudeOn = false;
+  try { claudeOn = !!require('./senderSetup').claudeDraftsOn(); } catch (_) { claudeOn = false; }
+  if (!claudeOn) return off('Claude drafts are off — turn them on in Settings (S → Claude drafts → on)');
   return { on: true, why: '' };
 }
 
@@ -117,7 +122,7 @@ async function startSession({ args, deps, channels = ['text', 'email'], noAutoHi
       console.log(provider === 'cli'
         ? '   Fix: run  claude auth login --sso  in a terminal, finish the browser sign-in, then rerun this command.\n   Nothing was read or sent.\n'
         : '   AUTO_LLM=api needs a valid ANTHROPIC_API_KEY (or unset AUTO_LLM to use your Claude login). Nothing was read or sent.\n');
-      if (noAutoHint) console.log('   Or add --no-auto to send a template instead (that needs no Claude).\n');
+      if (noAutoHint) console.log('   Or turn Claude drafts off in Settings (S → Claude drafts → off) and rerun to pick a template instead.\n');
       return null;
     }
     commandLog('✅', 'Claude', `${provider} is answering`);
@@ -351,7 +356,7 @@ async function runAutoText({ context, initialPage, args, io }) {
   const { commandLog } = io.deps;
   const ctx = await startSession({ args, deps: io.deps, channels: ['text'], noAutoHint: true });
   if (!ctx) return;
-  commandLog('✨', 'Auto wording', "each text is written from that account's Salesforce notes and opportunities (your Granola note first). Add --no-auto to pick a template instead.");
+  commandLog('✨', 'Auto wording', "each text is written from that account's Salesforce notes and opportunities (your Granola note first). Turn Claude drafts off in Settings to pick a template instead.");
 
   let range = args.range; let parsed = null;
   while (!parsed) {
