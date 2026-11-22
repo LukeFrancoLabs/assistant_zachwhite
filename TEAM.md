@@ -92,10 +92,20 @@ Per-rep `sender.json` (name, booking link, phone, text overrides) is **never** o
 
 ```text
 zw                  → welcome menu + Pipeline Assistant in the browser
+zwdemo              → director demo — filled Morning / Today / My leads (mock data, port 9341)
 Morning tab         → work the queue
 Quick kit           → after a call/demo, copy a send command
 My leads            → add the account after a good conversation
 ```
+
+### Director walkthrough (`zwdemo`)
+
+```bash
+zwdemo
+# or:  node outreachDashboard.js --demo
+```
+
+Opens **http://127.0.0.1:9341/** with a blue DEMO banner and mock HVAC shops, holds, interested replies, nurture → re-engage, and a full Today / Sends log. Nothing is written to real logs; live `zw` stays on port 9340.
 
 Add a lead from the terminal:
 

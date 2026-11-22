@@ -34,6 +34,10 @@ h1{margin:0;font-size:22px;letter-spacing:-.01em}
 .link{color:var(--accent);font-size:13px;text-decoration:none;padding-top:6px}
 .link:hover{text-decoration:underline}
 .banner{margin:14px 0 0;padding:10px 14px;border-radius:10px;background:var(--warn-bg);color:var(--warn-fg);font-size:14px}
+.banner.demo{background:linear-gradient(90deg,#1a3a5c,#2457d6);color:#fff;border:0;font-weight:600}
+.banner.demo code{background:rgba(255,255,255,.15);padding:1px 6px;border-radius:6px}
+.prio.reengage{background:var(--warn-bg);color:var(--warn-fg)}
+.prio.interested{background:#d1fadf;color:#067647}
 .nav{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 0;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
 .nav button{border:0;background:transparent;color:var(--muted);padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;border-radius:8px}
 .nav button[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
@@ -165,6 +169,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     </div>
     <a class="link" id="fullLog" href="/full-log" hidden>Full outreach log &rarr;</a>
   </header>
+  <div class="banner demo" id="demoBanner" hidden>DEMO MODE — mock leads &amp; sends for directors. Nothing is real Salesforce data. Launch with <code>zwdemo</code>.</div>
   <div class="banner" id="banner" hidden>Practice flag in use (--test / --dry-run). This page lists only sends that actually went out, so it stays empty unless one does.</div>
   <div class="banner" id="fileMode" hidden>Opened as a file — Pipeline Assistant needs the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page.</div>
   <div class="banner" id="deskHint" hidden></div>
@@ -945,7 +950,11 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
       var m = list[i];
       var card = make('div', 'desk-card' + (m.kind === 'hold' || m.kind === 'interested' ? ' due' : ''));
       var title = make('div', 'desk-title');
-      title.appendChild(make('span', 'prio ' + (m.kind || ''), m.kind === 'hold' ? 'Hold' : m.kind === 'interested' ? 'Interested' : 'Board'));
+      title.appendChild(make('span', 'prio ' + (m.kind || ''),
+        m.kind === 'hold' ? 'Hold'
+          : m.kind === 'interested' ? 'Interested'
+            : m.kind === 'reengage' ? 'Re-engage'
+              : 'Board'));
       title.appendChild(document.createTextNode(m.title || ''));
       card.appendChild(title);
       var h = make('h3'); h.appendChild(personLink(m.name, m.url)); card.appendChild(h);
@@ -1173,11 +1182,32 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     renderTodayDesk();
   }
 
+  function showDemoBanner(on) {
+    var b = $('demoBanner');
+    if (!b) return;
+    b.hidden = !on;
+    if (on) {
+      document.title = 'Pipeline Assistant · DEMO';
+      try {
+        var h = document.querySelector('h1');
+        if (h && h.textContent.indexOf('DEMO') < 0) h.textContent = 'Pipeline Assistant · DEMO';
+      } catch (e) {}
+    }
+  }
+
+  function detectDemo() {
+    if (!LIVE) return;
+    fetch('/api/health').then(function (r) { return r.json(); }).then(function (j) {
+      if (j && j.demo) showDemoBanner(true);
+    }).catch(function () {});
+  }
+
   function loadDayDesk() {
     if (!LIVE) return;
     fetch('/api/daydesk').then(function (r) { return r.json(); }).then(function (j) {
       if (!j || j.ok === false) return;
       state.desk = j;
+      if (j.demo || (j.meta && j.meta.demo)) showDemoBanner(true);
       renderDayDesk();
     }).catch(function () {});
   }
@@ -1802,6 +1832,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
 
   syncControls();
+  detectDemo();
   setView(state.view);
   try { onData(); } catch (e) {}
   setTimeout(poll, POLL_MS);

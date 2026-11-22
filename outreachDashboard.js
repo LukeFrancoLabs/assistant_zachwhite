@@ -21,17 +21,22 @@ const http = require('http');
 const path = require('path');
 const { spawn } = require('child_process');
 
+const demoMode = require('./demoMode');
+const DEMO = demoMode.isDemo();
+
 const DIR = path.join(__dirname, 'outreach-dashboard');
 const PAGE = path.join(DIR, 'index.html');
 const PAGE_SRC = path.join(__dirname, 'outreachDashboard.html'); // tracked source; copied into DIR on build
 const DATA = path.join(DIR, 'data.js');
 const RUN_FILE = path.join(DIR, 'run.json');         // { startedAt, pid } of the newest process that has sent something
-const PID_FILE = path.join(DIR, 'server.pid');
-const SERVE_LOG = path.join(DIR, 'server.log');   // why --serve failed (launch swallows console; this file keeps a trail)
+const PID_FILE = path.join(DIR, DEMO ? 'server-demo.pid' : 'server.pid');
+const SERVE_LOG = path.join(DIR, DEMO ? 'server-demo.log' : 'server.log');   // why --serve failed (launch swallows console; this file keeps a trail)
 const LOG_FILE = path.join(__dirname, 'texted-log.jsonl');
 const EMAIL_TEMPLATES = path.join(__dirname, 'email-templates.json');
 const FULL_DASH = path.join(__dirname, 'texted-dashboard.html');   // the bigger Outreach Log page (email --sent): linked from this one once it exists
-const PORT = Math.max(1, Number(process.env.ASSISTANT_DASHBOARD_PORT) || 9340);
+const PORT = DEMO
+  ? (Math.max(1, Number(process.env.ASSISTANT_DEMO_PORT) || demoMode.DEMO_PORT))
+  : Math.max(1, Number(process.env.ASSISTANT_DASHBOARD_PORT) || 9340);
 const HOST = '127.0.0.1';
 
 const MAX_ROWS = 1000;          // the page always holds at least the newest 1000 sends (All time counts the whole log) ...
@@ -351,11 +356,18 @@ function sendText(res, status, type, text) {
   res.end(text);
 }
 
+/** In-memory board override for zwdemo (does not write boards-local.json). */
+let demoActiveBoardId = null;
+
 /** Modular boards (post-demo, cold drip, …) — stages, day offsets, templates. */
 function boardPayload() {
   const boards = require('./boards');
   const cadence = require('./cadence');
-  const active = boards.loadActive();
+  let active = boards.loadActive();
+  if (DEMO && demoActiveBoardId && boards.loadPackFile(demoActiveBoardId)) {
+    const pack = boards.loadPackFile(demoActiveBoardId);
+    active = { ...pack, overrides: {} };
+  }
   const basePack = boards.loadPackFile(active.id) || active;
   const defById = Object.fromEntries((basePack.stages || []).map((s) => [s.id, s]));
   const over = active.overrides || {};
@@ -462,11 +474,17 @@ function setActiveBoard(id) {
 
 async function handleApi(req, res, url) {
   const setup = require('./senderSetup');
-  if (req.method === 'GET' && url.pathname === '/api/health') return sendJson(res, 200, { ok: true, port: PORT });
+  if (req.method === 'GET' && url.pathname === '/api/health') {
+    return sendJson(res, 200, DEMO ? demoMode.health(PORT) : { ok: true, port: PORT, demo: false });
+  }
   if (req.method === 'GET' && url.pathname === '/api/daydesk') {
+    if (DEMO) return sendJson(res, 200, demoMode.daydesk());
     try { return sendJson(res, 200, require('./dayDesk').build()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }
   if (req.method === 'PUT' && url.pathname === '/api/leads/board') {
+    if (DEMO) {
+      return sendJson(res, 200, { ok: true, demo: true, error: null, message: 'Demo mode — lead board not saved.', myLeads: demoMode.daydesk().myLeads });
+    }
     const raw = await readBody(req);
     let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
     const id = j.accountId || j.id || j.ref;
@@ -480,7 +498,11 @@ async function handleApi(req, res, url) {
     } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }
   if (req.method === 'GET' && url.pathname === '/api/board') {
-    try { return sendJson(res, 200, boardPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+    try {
+      const board = boardPayload();
+      if (DEMO) board.demo = true;
+      return sendJson(res, 200, board);
+    } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }
   if (req.method === 'GET' && url.pathname === '/api/content') {
     try {
@@ -501,15 +523,24 @@ async function handleApi(req, res, url) {
   if (req.method === 'PUT' && url.pathname === '/api/board/active') {
     const raw = await readBody(req);
     let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
+    if (DEMO) {
+      const id = j.id || j.board;
+      const boards = require('./boards');
+      if (!id || !boards.loadPackFile(id)) {
+        return sendJson(res, 200, { ok: false, error: 'Unknown board "' + id + '".', demo: true });
+      }
+      demoActiveBoardId = id;
+      const board = boardPayload();
+      board.demo = true;
+      return sendJson(res, 200, { ok: true, demo: true, activeBoard: id, board });
+    }
     return sendJson(res, 200, setActiveBoard(j.id || j.board));
   }
   const boardStage = url.pathname.match(/^\/api\/board\/stages\/([^/]+)$/);
-  if (boardStage && req.method === 'PUT') {
-    const raw = await readBody(req);
-    let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
-    return sendJson(res, 200, saveBoardStage(decodeURIComponent(boardStage[1]), j));
-  }
-  if (boardStage && req.method === 'POST') {
+  if (boardStage && (req.method === 'PUT' || req.method === 'POST')) {
+    if (DEMO) {
+      return sendJson(res, 200, { ok: true, demo: true, message: 'Demo mode — stage edits not saved.', board: boardPayload() });
+    }
     const raw = await readBody(req);
     let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
     return sendJson(res, 200, saveBoardStage(decodeURIComponent(boardStage[1]), j));
@@ -518,22 +549,27 @@ async function handleApi(req, res, url) {
     try { return sendJson(res, 200, templatesPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }
   if (req.method === 'GET' && url.pathname === '/api/analytics') {
+    if (DEMO) return sendJson(res, 200, demoMode.analytics());
     try { return sendJson(res, 200, analyticsPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }
   if (req.method === 'GET' && url.pathname === '/api/dnc') {
+    if (DEMO) return sendJson(res, 200, demoMode.dnc());
     try { return sendJson(res, 200, dncPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }
   if (req.method === 'POST' && url.pathname === '/api/dnc') {
+    if (DEMO) return sendJson(res, 200, { ok: true, demo: true, message: 'Demo mode — DNC not saved.', dnc: demoMode.dnc() });
     const raw = await readBody(req);
     let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
     return sendJson(res, 200, dncAdd(j));
   }
   if (req.method === 'POST' && url.pathname === '/api/dnc/clear') {
+    if (DEMO) return sendJson(res, 200, { ok: true, demo: true, message: 'Demo mode — DNC not cleared.', dnc: demoMode.dnc() });
     const raw = await readBody(req);
     let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
     return sendJson(res, 200, dncClear(j));
   }
   if (req.method === 'POST' && url.pathname === '/api/templates/text') {
+    if (DEMO) return sendJson(res, 200, { ok: false, demo: true, error: 'Demo mode — templates are read-only.' });
     const raw = await readBody(req);
     let j; try { j = JSON.parse(raw || '{}'); } catch (_) { return sendJson(res, 400, { ok: false, error: 'Invalid JSON' }); }
     return sendJson(res, 200, setup.addTextEdit(j.name, j.text));
@@ -566,6 +602,10 @@ function createServer() {
         return sendText(res, 200, 'text/html; charset=utf-8', pageHtml());
       }
       if (url.pathname === '/data.js') {
+        if (DEMO) {
+          return sendText(res, 200, 'application/javascript; charset=utf-8',
+            'window.OUTREACH_DATA = ' + JSON.stringify(demoMode.outreachData()) + ';\n');
+        }
         try { return sendText(res, 200, 'application/javascript; charset=utf-8', fs.readFileSync(DATA, 'utf8')); }
         catch (_) { return sendText(res, 200, 'application/javascript; charset=utf-8', 'window.OUTREACH_DATA = {"v":1,"rows":[],"totals":{"sends":0,"texts":0,"emails":0,"people":0},"run":{"startedAt":"' + new Date().toISOString() + '","dryRun":false},"generatedAt":"' + new Date().toISOString() + '"};\n'); }
       }
@@ -604,14 +644,20 @@ function serveLog(line) {
 /** Keep a detached --serve process running so Pipeline Assistant (Templates / Morning / …) stays up after launch exits. Default on every zw. */
 async function ensureServing() {
   if (await healthOk()) return true;
-  serveLog('starting --serve on port ' + PORT);
+  serveLog('starting --serve on port ' + PORT + (DEMO ? ' (demo)' : ''));
   try {
     const out = fs.openSync(SERVE_LOG, 'a');
-    const child = spawn(process.execPath, [__filename, '--serve'], {
+    const args = DEMO ? ['--serve', '--demo'] : ['--serve'];
+    const env = Object.assign({}, process.env);
+    if (DEMO) {
+      env.ZW_DEMO = '1';
+      env.ASSISTANT_DEMO_PORT = String(PORT);
+    }
+    const child = spawn(process.execPath, [__filename, ...args], {
       detached: true,
       stdio: ['ignore', out, out],
       cwd: __dirname,
-      env: process.env,
+      env,
     });
     child.unref();
     try { fs.closeSync(out); } catch (_) {}
@@ -647,8 +693,64 @@ function runServe() {
   });
   server.listen(PORT, HOST, () => {
     try { writeAtomic(PID_FILE, String(process.pid) + '\n'); } catch (_) {}
-    console.log('Outreach dashboard: ' + dashUrl());
+    if (DEMO) {
+      console.log('Pipeline Assistant DEMO: ' + dashUrl());
+      console.log('  Mock Morning / Today / Sends — nothing writes to real logs.');
+    } else {
+      console.log('Outreach dashboard: ' + dashUrl());
+    }
   });
+}
+
+/** Open the director demo (`zwdemo`) — mock leads on a separate port (default 9341). */
+async function launchDemo() {
+  process.env.ZW_DEMO = '1';
+  // Re-require is awkward mid-process; spawn a dedicated demo server instead.
+  const port = demoMode.DEMO_PORT;
+  const url = 'http://' + HOST + ':' + port + '/';
+  const healthDemo = () => new Promise((resolve) => {
+    const req = http.get({ host: HOST, port, path: '/api/health', timeout: 800 }, (res) => {
+      let body = '';
+      res.on('data', (c) => { body += c; });
+      res.on('end', () => {
+        try {
+          const j = JSON.parse(body);
+          resolve(res.statusCode === 200 && j && j.demo === true);
+        } catch (_) { resolve(false); }
+      });
+    });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { try { req.destroy(); } catch (_) {} resolve(false); });
+  });
+  if (!(await healthDemo())) {
+    try {
+      fs.mkdirSync(DIR, { recursive: true });
+      const out = fs.openSync(path.join(DIR, 'server-demo.log'), 'a');
+      const child = spawn(process.execPath, [__filename, '--serve', '--demo'], {
+        detached: true,
+        stdio: ['ignore', out, out],
+        cwd: __dirname,
+        env: Object.assign({}, process.env, { ZW_DEMO: '1', ASSISTANT_DEMO_PORT: String(port) }),
+      });
+      child.unref();
+      try { fs.closeSync(out); } catch (_) {}
+    } catch (e) {
+      console.error('Could not start demo server: ' + (e && e.message));
+      return 'failed';
+    }
+    for (let i = 0; i < 120; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      if (await healthDemo()) break;
+    }
+  }
+  if (!(await healthDemo())) {
+    console.error('Demo server did not start on ' + url);
+    return 'failed';
+  }
+  openPage(url);
+  console.log('\n  🎬 Pipeline Assistant DEMO: ' + url);
+  console.log('     Mock Morning, Today, Sends, My leads — for directors.\n');
+  return url;
 }
 
 /**
@@ -709,22 +811,26 @@ async function launch(flags = []) {
 }
 
 
-module.exports = { touch, build, launch, openPage, buildData, ensureServing, dashUrl, runServe, templatesPayload, analyticsPayload, dncPayload, dncAdd, dncClear, boardPayload, saveBoardStage, setActiveBoard, PAGE, DATA, DIR, PORT, HOST };
+module.exports = { touch, build, launch, launchDemo, openPage, buildData, ensureServing, dashUrl, runServe, templatesPayload, analyticsPayload, dncPayload, dncAdd, dncClear, boardPayload, saveBoardStage, setActiveBoard, PAGE, DATA, DIR, PORT, HOST, DEMO };
 
 if (require.main === module) {
   const [cmd, ...rest] = process.argv.slice(2);
-  if (cmd === '--serve') {
+  if (cmd === '--demo') {
+    launchDemo().then((r) => { process.exitCode = r === 'failed' ? 1 : 0; }).catch(() => { process.exitCode = 1; });
+  } else if (cmd === '--serve') {
     runServe();
   } else if (cmd === '--launch') {
     launch(rest).then((r) => { process.exitCode = r === 'failed' ? 1 : 0; }).catch(() => { process.exitCode = 1; });
   } else if (cmd === '--help' || cmd === '-h') {
-    console.log('outreachDashboard.js — live outreach page on http://127.0.0.1:' + PORT + '/\n' +
+    console.log('outreachDashboard.js — live outreach page on http://127.0.0.1:' + (DEMO ? demoMode.DEMO_PORT : 9340) + '/\n' +
       '  node outreachDashboard.js            build, start localhost server, open browser\n' +
       '  node outreachDashboard.js --serve    keep the localhost server running (Templates + Analytics)\n' +
+      '  node outreachDashboard.js --demo     director demo with mock Morning / Today / leads (port 9341)\n' +
       '  node outreachDashboard.js --launch   what run.sh calls once per zw start\n' +
       '  node outreachDashboard.js --build    build outreach-dashboard/ only\n' +
       '  ASSISTANT_NO_DASHBOARD=1               switch it off\n' +
-      '  ASSISTANT_DASHBOARD_PORT=9340         localhost port (default 9340)');
+      '  ASSISTANT_DASHBOARD_PORT=9340         live localhost port\n' +
+      '  ASSISTANT_DEMO_PORT=9341              demo localhost port');
   } else if (cmd === '--build') {
     const f = build();
     console.log(f || 'The outreach dashboard could not be written (or ASSISTANT_NO_DASHBOARD is set).');
