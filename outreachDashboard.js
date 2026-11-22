@@ -27,6 +27,7 @@ const PAGE_SRC = path.join(__dirname, 'outreachDashboard.html'); // tracked sour
 const DATA = path.join(DIR, 'data.js');
 const RUN_FILE = path.join(DIR, 'run.json');         // { startedAt, pid } of the newest process that has sent something
 const PID_FILE = path.join(DIR, 'server.pid');
+const SERVE_LOG = path.join(DIR, 'server.log');   // why --serve failed (launch swallows console; this file keeps a trail)
 const LOG_FILE = path.join(__dirname, 'texted-log.jsonl');
 const EMAIL_TEMPLATES = path.join(__dirname, 'email-templates.json');
 const FULL_DASH = path.join(__dirname, 'texted-dashboard.html');   // the bigger Outreach Log page (email --sent): linked from this one once it exists
@@ -419,23 +420,39 @@ function healthOk() {
   });
 }
 
-/** Keep a detached --serve process running so Templates / Analytics stay editable after launch exits. */
+function serveLog(line) {
+  try {
+    fs.mkdirSync(DIR, { recursive: true });
+    fs.appendFileSync(SERVE_LOG, new Date().toISOString() + ' ' + String(line || '') + '\n');
+  } catch (_) { /* never block a launch */ }
+}
+
+/** Keep a detached --serve process running so Day Desk (Templates / Morning / …) stays up after launch exits. Default on every zw. */
 async function ensureServing() {
   if (await healthOk()) return true;
+  serveLog('starting --serve on port ' + PORT);
   try {
+    const out = fs.openSync(SERVE_LOG, 'a');
     const child = spawn(process.execPath, [__filename, '--serve'], {
       detached: true,
-      stdio: 'ignore',
+      stdio: ['ignore', out, out],
       cwd: __dirname,
       env: process.env,
     });
     child.unref();
+    try { fs.closeSync(out); } catch (_) {}
     try { writeAtomic(PID_FILE, String(child.pid) + '\n'); } catch (_) { /* optional */ }
-  } catch (_) { return false; }
-  for (let i = 0; i < 40; i++) {
-    await new Promise((r) => setTimeout(r, 100));
-    if (await healthOk()) return true;
+    serveLog('spawned pid ' + child.pid);
+  } catch (e) {
+    serveLog('spawn failed: ' + (e && e.message));
+    return false;
   }
+  // Wait up to ~5s — Mac cold start + antivirus can be slow; never open the browser until health passes.
+  for (let i = 0; i < 50; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    if (await healthOk()) { serveLog('healthy'); return true; }
+  }
+  serveLog('health check failed after spawn');
   return false;
 }
 
@@ -491,17 +508,25 @@ function openPage(target) {
 
 /**
  * What run.sh calls once per launch: build the page, start (or reuse) the localhost server, open the browser.
+ * Day Desk always tries to serve on 127.0.0.1 by default (ASSISTANT_NO_DASHBOARD=1 to opt out).
  * → the dashboard URL, a file path (server could not start), 'skipped', or 'failed'.
  */
 async function launch(flags = []) {
   if (off() || flags.some((f) => SKIP_OPEN.has(f))) return 'skipped';
   const file = build('launch', flags);
   if (!file) return 'failed';
-  const live = await ensureServing();
+  let live = await ensureServing();
+  if (!live) live = await ensureServing(); // one retry — first spawn sometimes races on a busy Mac
   if (live) {
     openPage(dashUrl());
+    try { console.log('Day Desk: ' + dashUrl()); } catch (_) {}
     return dashUrl();
   }
+  // Last resort: open the static file (Sends only). Prefer telling the user how to start the live server.
+  try {
+    console.error('Day Desk server did not start on port ' + PORT + '. Run: node outreachDashboard.js --serve');
+    console.error('(details: ' + SERVE_LOG + ')');
+  } catch (_) {}
   openPage(file);
   return file;
 }

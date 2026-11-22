@@ -307,12 +307,19 @@ if [ $TOMORROW = 1 ] && [ -f "$SCRIPT_DIR/tomorrow.lock" ]; then
   fi
 fi
 
-# The OUTREACH DASHBOARD (outreachDashboard.js): http://127.0.0.1:9340/ — Sends (live log), Templates (view/edit texts + emails; saved for the next launch), Analytics (replies + scorecard).
-# Opens here once per launch BEFORE Chrome starts. A detached --serve keeps Templates/Analytics editable after this script moves on. Skipped for --help / --inspect / --sent.
-# If it cannot open, the run carries on (one warning). ASSISTANT_NO_DASHBOARD=1 turns it off; ASSISTANT_DASHBOARD_PORT overrides 9340.
+# Day Desk (outreachDashboard.js): http://127.0.0.1:9340/ — Morning / Replies / Kit / Templates / Scoreboard / DNC.
+# Starts a background --serve by default BEFORE Chrome, so the page is always live on localhost.
+# Skipped for --help / --inspect / --sent. ASSISTANT_NO_DASHBOARD=1 turns it off; ASSISTANT_DASHBOARD_PORT overrides 9340.
 case "${ASSISTANT_NO_DASHBOARD:-}" in
   ''|0|false|FALSE|False|no|NO|No|off|OFF|Off)
-    node "$SCRIPT_DIR/outreachDashboard.js" --launch "$@" >/dev/null 2>&1 || echo "⚠️  The outreach dashboard could not be opened (the run carries on without it; ASSISTANT_NO_DASHBOARD=1 stops it trying)."
+    DASH_MSG=$(node "$SCRIPT_DIR/outreachDashboard.js" --launch "$@" 2>&1) || true
+    if curl -s -m 2 "http://127.0.0.1:${ASSISTANT_DASHBOARD_PORT:-9340}/api/health" >/dev/null 2>&1; then
+      echo "📬 Day Desk: http://127.0.0.1:${ASSISTANT_DASHBOARD_PORT:-9340}/"
+    else
+      echo "⚠️  Day Desk did not start on port ${ASSISTANT_DASHBOARD_PORT:-9340}."
+      echo "   Fix:  cd \"$SCRIPT_DIR\" && node outreachDashboard.js --serve"
+      [ -n "$DASH_MSG" ] && echo "   ($DASH_MSG)" | head -c 400; echo
+    fi
     ;;
 esac
 
