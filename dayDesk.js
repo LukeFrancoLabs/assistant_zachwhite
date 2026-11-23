@@ -66,14 +66,14 @@ function kitPayload() {
       return {
         id: k.id, kind: 'email', key: k.key, label: k.label || t.name || k.key, hint: k.hint || '',
         subject: t.subject || '', preview: clip(body, 280),
-        command: `zw --email --email-template ${k.key} --range 1-1`,
+        command: null,
       };
     }
     const t = texts[String(k.template)] || {};
     return {
       id: k.id, kind: 'text', template: String(k.template), label: k.label || t.name || ('Text ' + k.template), hint: k.hint || '',
       preview: clip(t.text || '', 280),
-      command: `zw --text --template ${k.template} --range 1-1`,
+      command: null,
     };
   });
 }
@@ -90,7 +90,7 @@ function morningFromHolds() {
       at: h.at,
       detail: clip(h.reason || h.kind),
       status: h.status || 'new',
-      action: 'Open in Salesforce · run: zw  then email --holds',
+      action: 'Open the account in Salesforce',
     }));
   } catch (_) { return []; }
 }
@@ -134,7 +134,7 @@ function morningFromReplies(now = new Date()) {
       detail: clip(r.reply),
       ageDays,
       channel: r.channel === 'email' ? 'email' : 'text',
-      action: 'Open in Salesforce · send a check-in from Quick kit',
+      action: 'Open the account, then pick the check-in on Quick kit',
     });
     if (out.length >= 40) break;
   }
@@ -159,8 +159,8 @@ function morningFromPersonalBoard(now = new Date()) {
       detail: e.next ? (e.next.ch === 'email' ? 'Email stage ready' : 'Text stage ready') : (e.hold || e.state),
       stage: e.next ? e.next.id : null,
       action: e.next && e.next.ch === 'email'
-        ? 'zw --email --from-hand --range 1-1'
-        : 'zw --text  (or email --board for the automatic stage)',
+        ? 'Email stage is ready — open the account'
+        : 'Text stage is ready — open the account',
     }));
   } catch (_) { return []; }
 }
@@ -238,9 +238,8 @@ function todayPayload() {
 
 function howToAddLead() {
   return {
-    hint: 'After you talk to a pro, add them to your personal board so the next touch shows up here.',
-    command: 'node textLog.js --add-lead <Salesforce account link> --tag referral --did email,text,call',
-    alt: 'Or open the full outreach log (email --sent) → Tools → Follow-up board → ➕ Add a lead.',
+    hint: 'After you talk to a pro, add them here. The board updates as soon as you click Add.',
+    command: null,
   };
 }
 

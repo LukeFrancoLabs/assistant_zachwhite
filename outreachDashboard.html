@@ -141,6 +141,9 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 .desk-card .desk-meta{margin:8px 0 0;font-size:12px;color:var(--muted)}
 .desk-card .desk-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
 .desk-cmd{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;color:var(--muted);word-break:break-all}
+.day-step{display:flex;align-items:center;gap:6px;margin-top:4px}
+.day-step input{width:72px;text-align:center}
+.day-step .btn{min-width:36px;padding:6px 0}
 .prio{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;margin-right:6px}
 .prio.hold{background:var(--err-bg);color:var(--err-fg)}
 .prio.interested{background:var(--ok-bg);color:var(--ok-fg)}
@@ -225,28 +228,51 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   </section>
 
   <section id="view-kit" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Post-call / post-demo helpers. Copy the command, open Salesforce from Morning or My leads, then paste into a terminal — or send from the usual <code>zw</code> menu.</p>
+    <p class="sub" style="margin:14px 0 0">Post-call / post-demo messages. Add the pro on My leads, and the board times the next touch.</p>
     <div id="kitList" class="kit-grid"></div>
     <p class="foot">Luke can change this kit for everyone: edit <code>team-shared/day-desk.json</code>, then each machine runs <code>node teamSync.js --pull</code>.</p>
   </section>
 
   <section id="view-myleads" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Your personal follow-up board — leads you added by hand after a call or demo.</p>
+    <p class="sub" style="margin:14px 0 0">Your personal follow-up board — add someone after a call or demo. They show up here as soon as you add them.</p>
     <div id="addLeadBox" class="desk-card" style="margin-top:12px">
       <div class="desk-title">Add after a call</div>
       <h3>Put someone on your board</h3>
-      <p class="desk-detail" id="addLeadHint"></p>
-      <div class="desk-cmd" id="addLeadCmd"></div>
+      <p class="desk-detail" id="addLeadHint">After you talk to a pro, add them here. The board updates as soon as you click Add.</p>
+      <div id="leadFlash" class="flash" hidden></div>
+      <div class="controls" style="align-items:flex-end">
+        <div style="flex:2;min-width:220px">
+          <label for="leadRef" class="meta" style="display:block;margin:0 0 4px">Salesforce account link or id</label>
+          <input id="leadRef" type="text" placeholder="https://…/Account/001…/view" aria-label="Salesforce account link or id" style="width:100%">
+        </div>
+        <div style="flex:1;min-width:160px">
+          <label for="leadName" class="meta" style="display:block;margin:0 0 4px">Business name</label>
+          <input id="leadName" type="text" placeholder="Shown on the board" aria-label="Business name" style="width:100%">
+        </div>
+      </div>
+      <div class="desk-meta" style="margin-top:10px">Tag</div>
+      <div class="seg" id="leadTags" role="group" aria-label="Lead tags" style="margin-top:4px">
+        <button type="button" data-tag="referral" aria-pressed="true">Referral</button>
+        <button type="button" data-tag="demo" aria-pressed="false">Demo</button>
+        <button type="button" data-tag="shark" aria-pressed="false">Shark</button>
+        <button type="button" data-tag="lds" aria-pressed="false">LDS</button>
+      </div>
+      <div class="desk-meta" style="margin-top:10px">What you already did</div>
+      <div class="seg" id="leadDid" role="group" aria-label="What you already did" style="margin-top:4px">
+        <button type="button" data-did="email" aria-pressed="true">Email</button>
+        <button type="button" data-did="text" aria-pressed="true">Text</button>
+        <button type="button" data-did="call" aria-pressed="false">Call</button>
+      </div>
       <div class="desk-actions">
-        <button type="button" class="btn" id="copyAddLead">Copy command</button>
+        <button type="button" class="btn primary" id="leadAdd">Add to board</button>
       </div>
     </div>
     <div id="myLeadsList" class="desk-list"></div>
-    <div class="empty" id="myLeadsEmpty" hidden>No hand-added leads yet. After a good call, use the command above.</div>
+    <div class="empty" id="myLeadsEmpty" hidden>No hand-added leads yet. After a good call, add them with the form above.</div>
   </section>
 
   <section id="view-board" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Modular boards — Post-demo, HVAC / Plumbing / Electrical 2-week drips (text + email), or the 60-day cold drip. Change Day or template on any outreach.</p>
+    <p class="sub" style="margin:14px 0 0">Modular boards — Post-demo, HVAC / Plumbing / Electrical 2-week drips (text + email), or the 60-day cold drip. Move a day or pick a template and the card updates immediately.</p>
     <div id="boardFlash" class="flash" hidden></div>
     <div class="controls" style="align-items:flex-end">
       <div style="flex:1;min-width:200px">
@@ -257,7 +283,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     </div>
     <p class="desk-meta" id="boardTip" style="margin:8px 0 0"></p>
     <div id="boardList" class="desk-list"></div>
-    <p class="foot" id="boardFoot">Change <b>Day</b> to move an outreach (e.g. Outreach 3 on day 5 instead of day 1). Templates come from the Templates tab. Saves to <code>boards-local.json</code>.</p>
+    <p class="foot" id="boardFoot">Day is how many days after the demo or the start of the drip. The next board run uses whatever is on the card now.</p>
   </section>
 
   <section id="view-content" role="tabpanel" hidden>
@@ -647,7 +673,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
       if (!j || !j.ok) { flashBoard((j && j.error) || 'Save failed', false); return false; }
       state.board = j.board || state.board;
       renderBoard();
-      flashBoard('Saved — applies on the next board run', true);
+      flashBoard('Updated.', true);
       return true;
     }).catch(function () { flashBoard('Save failed', false); return false; });
   }
@@ -692,20 +718,29 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
         row.style.margin = '10px 0 0';
 
         var dayWrap = document.createElement('div');
-        dayWrap.style.minWidth = '100px';
+        dayWrap.style.minWidth = '140px';
         var dayLab = make('label', 'meta');
         dayLab.setAttribute('for', 'board-day-' + s.id);
         dayLab.textContent = 'Day (after demo / start)';
         dayWrap.appendChild(dayLab);
+        var step = document.createElement('div');
+        step.className = 'day-step';
+        var minus = make('button', 'btn', '−');
+        minus.type = 'button';
+        minus.setAttribute('aria-label', 'One day earlier');
         var dayIn = document.createElement('input');
         dayIn.type = 'number';
         dayIn.min = '0';
         dayIn.max = '365';
         dayIn.id = 'board-day-' + s.id;
         dayIn.value = String(s.day != null ? s.day : 0);
-        dayIn.style.width = '100%';
-        dayIn.style.marginTop = '4px';
-        dayWrap.appendChild(dayIn);
+        var plus = make('button', 'btn', '+');
+        plus.type = 'button';
+        plus.setAttribute('aria-label', 'One day later');
+        step.appendChild(minus);
+        step.appendChild(dayIn);
+        step.appendChild(plus);
+        dayWrap.appendChild(step);
         row.appendChild(dayWrap);
 
         var tplWrap = document.createElement('div');
@@ -752,23 +787,39 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
         if (s.preview) card.appendChild(make('div', 'desk-detail', s.preview));
         if (s.note) card.appendChild(make('div', 'desk-meta', s.note));
 
-        var actions = make('div', 'desk-actions');
-        var save = make('button', 'btn primary', 'Save');
-        save.type = 'button';
-        save.addEventListener('click', function () {
-          var body = { day: Number(dayIn.value) };
+        function commitStage() {
+          var day = Number(dayIn.value);
+          if (!Number.isFinite(day) || day < 0 || day > 365) { flashBoard('Day needs to be a whole number from 0 to 365.', false); return; }
+          var body = { day: Math.round(day) };
           var val = sel.value;
           if (s.ch === 'email') {
             if (val) body.emailTemplate = val;
           } else {
-            if (!val) { flashBoard('Pick a text template', false); return; }
+            if (!val) { flashBoard('Pick a text template.', false); return; }
             body.template = val;
           }
-          save.disabled = true;
-          saveBoardStage(s.id, body).then(function () { save.disabled = false; });
-        });
-        actions.appendChild(save);
+          var sameDay = Number(s.day) === body.day;
+          var sameTpl = s.ch === 'email' ? String(s.emailTemplate || '') === String(val) : String(s.template || '') === String(val);
+          if (sameDay && sameTpl) return;
+          minus.disabled = true; plus.disabled = true; sel.disabled = true; dayIn.disabled = true;
+          saveBoardStage(s.id, body).then(function (ok) {
+            if (ok) return;
+            minus.disabled = false; plus.disabled = false; sel.disabled = false; dayIn.disabled = false;
+          });
+        }
+        function nudge(delta) {
+          var n = Number(dayIn.value);
+          if (!Number.isFinite(n)) n = 0;
+          dayIn.value = String(Math.max(0, Math.min(365, Math.round(n) + delta)));
+          commitStage();
+        }
+        minus.addEventListener('click', function () { nudge(-1); });
+        plus.addEventListener('click', function () { nudge(1); });
+        dayIn.addEventListener('change', commitStage);
+        sel.addEventListener('change', commitStage);
+
         if (s.customized) {
+          var actions = make('div', 'desk-actions');
           var reset = make('button', 'btn', 'Reset to default');
           reset.type = 'button';
           reset.addEventListener('click', function () {
@@ -776,19 +827,14 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
             saveBoardStage(s.id, { reset: true }).then(function () { reset.disabled = false; });
           });
           actions.appendChild(reset);
+          card.appendChild(actions);
         }
-        card.appendChild(actions);
         box.appendChild(card);
       })(stages[i]);
     }
     if (!stages.length) {
       box.appendChild(make('div', 'empty', 'No board stages found.'));
     }
-  }
-
-  function copyText(text) {
-    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
-    return Promise.reject();
   }
 
   function personLink(name, url) {
@@ -884,40 +930,60 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
         if (k.hint) card.appendChild(make('div', 'desk-meta', k.hint));
         if (k.subject) card.appendChild(make('div', 'tpl', k.subject));
         if (k.preview) card.appendChild(make('div', 'desk-detail', k.preview));
-        if (k.command) {
-          card.appendChild(make('div', 'desk-cmd', k.command));
-          var actions = make('div', 'desk-actions');
-          var btn = make('button', 'btn', 'Copy command');
-          btn.type = 'button';
-          btn.addEventListener('click', function () {
-            copyText(k.command).then(function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy command'; }, 1200); }).catch(function () {});
-          });
-          actions.appendChild(btn);
-          card.appendChild(actions);
-        }
         box.appendChild(card);
       })(kit[i]);
     }
   }
 
+  function removeHandLead(accountId, btn) {
+    if (!accountId) return;
+    if (!confirm('Take this lead off your board?')) return;
+    if (btn) btn.disabled = true;
+    fetch('/api/leads/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: accountId })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (btn) btn.disabled = false;
+      var el = $('leadFlash');
+      if (!j || !j.ok) {
+        if (el) { el.hidden = false; el.className = 'flash err'; el.textContent = (j && j.error) || 'Could not remove that lead.'; }
+        return;
+      }
+      if (el) { el.hidden = false; el.className = 'flash ok'; el.textContent = 'Removed from the board.'; }
+      if (j.desk) { state.desk = j.desk; renderDayDesk(); }
+      else loadDayDesk();
+    }).catch(function () {
+      if (btn) btn.disabled = false;
+    });
+  }
+
   function renderMyLeads() {
     var j = state.desk || {};
     var add = j.addLead || {};
-    $('addLeadHint').textContent = add.hint || '';
-    $('addLeadCmd').textContent = add.command || '';
+    if (add.hint) $('addLeadHint').textContent = add.hint;
     var list = j.myLeads || [];
     var box = $('myLeadsList'); box.innerHTML = '';
     for (var i = 0; i < list.length; i++) {
-      var m = list[i];
-      var card = make('div', 'desk-card' + (m.dueNow ? ' due' : ''));
-      card.appendChild(make('div', 'desk-title', m.dueNow ? 'Due now' : (m.state || 'On board')));
-      var h = make('h3'); h.appendChild(personLink(m.name, m.url)); card.appendChild(h);
-      var bits = [];
-      if (m.next) bits.push('Next: ' + m.next);
-      if (m.tags && m.tags.length) bits.push('#' + m.tags.join(' #'));
-      if (m.hold) bits.push(m.hold);
-      if (bits.length) card.appendChild(make('div', 'desk-meta', bits.join(' · ')));
-      box.appendChild(card);
+      (function (m) {
+        var card = make('div', 'desk-card' + (m.dueNow ? ' due' : ''));
+        card.appendChild(make('div', 'desk-title', m.dueNow ? 'Due now' : (m.state || 'On board')));
+        var h = make('h3'); h.appendChild(personLink(m.name, m.url)); card.appendChild(h);
+        var bits = [];
+        if (m.next) bits.push('Next: ' + m.next);
+        if (m.tags && m.tags.length) bits.push('#' + m.tags.join(' #'));
+        if (m.hold) bits.push(m.hold);
+        if (bits.length) card.appendChild(make('div', 'desk-meta', bits.join(' · ')));
+        if (m.accountId) {
+          var actions = make('div', 'desk-actions');
+          var remove = make('button', 'btn', 'Remove');
+          remove.type = 'button';
+          remove.addEventListener('click', function () { removeHandLead(m.accountId, remove); });
+          actions.appendChild(remove);
+          card.appendChild(actions);
+        }
+        box.appendChild(card);
+      })(list[i]);
     }
     $('myLeadsEmpty').hidden = list.length > 0;
   }
@@ -1504,13 +1570,56 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
       clearTimeout(rqTimer);
       rqTimer = setTimeout(function () { state.rq = v.trim(); renderReplies(); }, 120);
     });
-    $('copyAddLead').addEventListener('click', function () {
-      var cmd = $('addLeadCmd').textContent || '';
-      if (!cmd) return;
-      copyText(cmd).then(function () {
-        $('copyAddLead').textContent = 'Copied';
-        setTimeout(function () { $('copyAddLead').textContent = 'Copy command'; }, 1200);
-      }).catch(function () {});
+    function flashLead(msg, ok) {
+      var el = $('leadFlash');
+      if (!el) return;
+      el.hidden = !msg;
+      el.className = 'flash ' + (ok ? 'ok' : 'err');
+      el.textContent = msg || '';
+    }
+    function pressedValues(root, attr) {
+      var out = [], buttons, i;
+      if (!root) return out;
+      buttons = root.querySelectorAll('button[aria-pressed="true"]');
+      for (i = 0; i < buttons.length; i++) out.push(buttons[i].getAttribute(attr));
+      return out.filter(Boolean);
+    }
+    function togglePressed(ev) {
+      var b = ev.target.closest('button');
+      if (!b || !ev.currentTarget.contains(b)) return;
+      b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+    }
+    if ($('leadTags')) $('leadTags').addEventListener('click', togglePressed);
+    if ($('leadDid')) $('leadDid').addEventListener('click', togglePressed);
+    if ($('leadAdd')) $('leadAdd').addEventListener('click', function () {
+      var ref = ($('leadRef').value || '').trim();
+      var tags = pressedValues($('leadTags'), 'data-tag');
+      var did = pressedValues($('leadDid'), 'data-did');
+      if (!ref) { flashLead('Paste a Salesforce account link or id.', false); return; }
+      if (!tags.length) { flashLead('Pick at least one tag.', false); return; }
+      if (did.indexOf('email') < 0 && did.indexOf('text') < 0) {
+        flashLead('Mark the email or the text you already sent. A call alone does not start the follow-up.', false);
+        return;
+      }
+      $('leadAdd').disabled = true;
+      fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ref: ref, name: ($('leadName').value || '').trim(), tags: tags, did: did })
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        $('leadAdd').disabled = false;
+        if (!j || !j.ok) { flashLead((j && j.error) || 'Could not add that lead.', false); return; }
+        $('leadRef').value = '';
+        $('leadName').value = '';
+        var who = j.account && j.account.name ? ' ' + j.account.name : '';
+        var warn = j.warnings && j.warnings.length ? ' ' + j.warnings[0] : '';
+        flashLead('Added' + who + '.' + warn, true);
+        if (j.desk) { state.desk = j.desk; renderDayDesk(); }
+        else loadDayDesk();
+      }).catch(function () {
+        $('leadAdd').disabled = false;
+        flashLead('Could not add that lead.', false);
+      });
     });
 
     $('boardPack').addEventListener('change', function () {
