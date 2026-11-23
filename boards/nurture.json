@@ -1,0 +1,85 @@
+{
+  "id": "nurture",
+  "name": "Nurture",
+  "description": "90-day follow-up for a demo before this November. One email every other week (day 0 through day 84). Starts at the first touch. Nothing here sends on its own.",
+  "tag": "nurture",
+  "stages": [
+    {
+      "id": "nu1",
+      "outreach": 1,
+      "day": 0,
+      "ch": "email",
+      "n": 1,
+      "label": "Week 0 · Open the thread",
+      "emailTemplate": "curiosity",
+      "afterMin": 0,
+      "hint": "Day 0 — campaigns, Pipeline, and booking alerts."
+    },
+    {
+      "id": "nu2",
+      "outreach": 2,
+      "day": 14,
+      "ch": "email",
+      "n": 2,
+      "label": "Week 2 · Why now",
+      "emailTemplate": "why-now",
+      "afterMin": 0,
+      "hint": "Day 14 — the short version and the offer."
+    },
+    {
+      "id": "nu3",
+      "outreach": 3,
+      "day": 28,
+      "ch": "email",
+      "n": 3,
+      "label": "Week 4 · Who answers",
+      "emailTemplate": "csr-ai",
+      "afterMin": 0,
+      "hint": "Day 28 — CSR AI when the team is on a job."
+    },
+    {
+      "id": "nu4",
+      "outreach": 4,
+      "day": 42,
+      "ch": "email",
+      "n": 4,
+      "label": "Week 6 · Past customers",
+      "emailTemplate": "past-customers",
+      "afterMin": 0,
+      "hint": "Day 42 — reviews and past-customer campaigns."
+    },
+    {
+      "id": "nu5",
+      "outreach": 5,
+      "day": 56,
+      "ch": "email",
+      "n": 5,
+      "label": "Week 8 · Autopilot",
+      "emailTemplate": "autopilot",
+      "afterMin": 0,
+      "hint": "Day 56 — thank-you, review, referral, and the 12-month touch."
+    },
+    {
+      "id": "nu6",
+      "outreach": 6,
+      "day": 70,
+      "ch": "email",
+      "n": 6,
+      "label": "Week 10 · Research note",
+      "emailTemplate": "research-reengage",
+      "afterMin": 0,
+      "hint": "Day 70 — repeat jobs cost less than a new customer."
+    },
+    {
+      "id": "nu7",
+      "outreach": 7,
+      "day": 84,
+      "ch": "email",
+      "n": 7,
+      "label": "Week 12 · Check-in",
+      "emailTemplate": "nurture-checkin",
+      "afterMin": 0,
+      "hint": "Day 84 — last email inside the 90 days. A quiet close if the timing is still off."
+    }
+  ]
+}
