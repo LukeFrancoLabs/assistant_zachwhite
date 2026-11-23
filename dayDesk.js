@@ -134,7 +134,7 @@ function morningFromReplies(now = new Date()) {
       detail: clip(r.reply),
       ageDays,
       channel: r.channel === 'email' ? 'email' : 'text',
-      action: 'Open the account, then pick the check-in on Quick kit',
+      action: 'Open the account and send the follow-up',
     });
     if (out.length >= 40) break;
   }

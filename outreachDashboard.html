@@ -171,7 +171,6 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 .prio.hold{background:var(--err-bg);color:var(--err-fg)}
 .prio.interested{background:var(--ok-bg);color:var(--ok-fg)}
 .prio.board{background:var(--email-bg);color:var(--email-fg)}
-.kit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:12px}
 @media (max-width:980px){
   .cards.home-stats{grid-template-columns:repeat(3,1fr)}
 }
@@ -224,7 +223,6 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     <button type="button" role="tab" id="tab-sends" aria-selected="false" data-view="sends">Sends</button>
     <button type="button" role="tab" id="tab-templates" aria-selected="false" data-view="templates">Templates</button>
     <button type="button" role="tab" id="tab-dnc" aria-selected="false" data-view="dnc">DNC</button>
-    <button type="button" role="tab" id="tab-kit" aria-selected="false" data-view="kit">Quick kit</button>
   </nav>
 
   <section id="view-home" role="tabpanel">
@@ -271,12 +269,6 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
       </table>
       <div class="empty" id="todayEmpty" hidden>Nothing sent yet today.</div>
     </div>
-  </section>
-
-  <section id="view-kit" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Post-call / post-demo messages. Add the pro on Dashboard, and the board times the next touch.</p>
-    <div id="kitList" class="kit-grid"></div>
-    <p class="foot">Luke can change this kit for everyone: edit <code>team-shared/day-desk.json</code>, then each machine runs <code>node teamSync.js --pull</code>.</p>
   </section>
 
   <section id="view-dashboard" role="tabpanel" hidden>
@@ -454,7 +446,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   'use strict';
   var POLL_MS = 3000, MAX_DRAWN = 500, LS = 'outreach-dashboard:';
   var LIVE = location.protocol === 'http:' || location.protocol === 'https:';
-  var LIB_VIEWS = ['board', 'content', 'sends', 'templates', 'dnc', 'kit'];
+  var LIB_VIEWS = ['board', 'content', 'sends', 'templates', 'dnc'];
   var state = {
     view: 'home', channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0,
     tk: 'text', tq: '', templates: null, editing: null,
@@ -509,6 +501,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     if (view === 'morning' || view === 'replies' || view === 'today' || view === 'analytics' || view === 'home') return 'home';
     if (view === 'myleads' || view === 'dashboard') return 'dashboard';
     if (view === 'boards') return 'boards';
+    if (view === 'kit') return 'board';
     if (LIB_VIEWS.indexOf(view) >= 0) return view;
     return 'home';
   }
@@ -574,7 +567,7 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
       if (tab) tab.setAttribute('aria-selected', v === view ? 'true' : 'false');
     });
     if (view === 'home') { loadDayDesk(); loadAnalytics(); }
-    if (view === 'dashboard' || view === 'kit') loadDayDesk();
+    if (view === 'dashboard') loadDayDesk();
     if (view === 'templates') loadTemplates();
     if (view === 'dnc') loadDnc();
     if (view === 'board') loadBoard();
@@ -1101,22 +1094,6 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     } else em.hidden = true;
   }
 
-  function renderKit() {
-    var kit = (state.desk && state.desk.kit) || [];
-    var box = $('kitList'); box.innerHTML = '';
-    for (var i = 0; i < kit.length; i++) {
-      (function (k) {
-        var card = make('div', 'desk-card');
-        card.appendChild(make('div', 'desk-title', k.kind === 'email' ? 'Email' : 'Text'));
-        card.appendChild(make('h3', null, k.label || k.id));
-        if (k.hint) card.appendChild(make('div', 'desk-meta', k.hint));
-        if (k.subject) card.appendChild(make('div', 'tpl', k.subject));
-        if (k.preview) card.appendChild(make('div', 'desk-detail', k.preview));
-        box.appendChild(card);
-      })(kit[i]);
-    }
-  }
-
   function removeHandLead(accountId, btn) {
     if (!accountId) return;
     if (!confirm('Take this lead off your board?')) return;
@@ -1213,7 +1190,6 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     if (!state.desk) return;
     renderMorning();
     renderReplies();
-    renderKit();
     renderMyLeads();
     renderTodayDesk();
   }
