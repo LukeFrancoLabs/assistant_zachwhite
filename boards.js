@@ -68,7 +68,7 @@ function loadPackFile(id) {
 }
 
 function listPacks() {
-  const ORDER = ['post-demo', 'drip-hvac', 'drip-plumbing', 'drip-electrical', 'drip'];
+  const ORDER = ['post-demo', 'nurture', 'drip-hvac', 'drip-plumbing', 'drip-electrical', 'drip'];
   const byId = new Map();
   byId.set('drip', dripPack());
   try {

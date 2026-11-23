@@ -502,6 +502,9 @@ async function handleApi(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/board') {
     try { return sendJson(res, 200, boardPayload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
   }
+  if (req.method === 'GET' && url.pathname === '/api/demo-board') {
+    try { return sendJson(res, 200, require('./demoBoard').payload()); } catch (e) { return sendJson(res, 500, { ok: false, error: e.message }); }
+  }
   if (req.method === 'GET' && url.pathname === '/api/content') {
     try {
       const q = {

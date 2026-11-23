@@ -25,6 +25,8 @@
 /evening-status.json
 /follow-up-cadence.json
 /boards-local.json
+/demo-board.json
+/demo-attended.json
 /run.json
 /workflow-diagram.json
 /*.csv

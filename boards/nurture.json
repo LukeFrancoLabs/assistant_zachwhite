@@ -1,0 +1,63 @@
+{
+  "id": "nurture",
+  "name": "Nurture",
+  "description": "Longer follow-up for a demo that happened before this November. Starts at the first touch. Nothing here sends on its own.",
+  "tag": "nurture",
+  "stages": [
+    {
+      "id": "nu1",
+      "outreach": 1,
+      "day": 0,
+      "ch": "email",
+      "n": 1,
+      "label": "Nurture 1 · Open the thread",
+      "emailTemplate": "curiosity",
+      "afterMin": 0,
+      "hint": "First touch back — campaigns, Pipeline, and booking alerts."
+    },
+    {
+      "id": "nu2",
+      "outreach": 2,
+      "day": 14,
+      "ch": "email",
+      "n": 2,
+      "label": "Nurture 2 · Why now",
+      "emailTemplate": "why-now",
+      "afterMin": 0,
+      "hint": "Two weeks later — the short version and the offer."
+    },
+    {
+      "id": "nu3",
+      "outreach": 3,
+      "day": 30,
+      "ch": "email",
+      "n": 3,
+      "label": "Nurture 3 · Past customers",
+      "emailTemplate": "past-customers",
+      "afterMin": 0,
+      "hint": "A month out — reviews and past-customer campaigns."
+    },
+    {
+      "id": "nu4",
+      "outreach": 4,
+      "day": 60,
+      "ch": "email",
+      "n": 4,
+      "label": "Nurture 4 · Autopilot",
+      "emailTemplate": "autopilot",
+      "afterMin": 0,
+      "hint": "Two months out — thank-you, review, referral, and the 12-month touch."
+    },
+    {
+      "id": "nu5",
+      "outreach": 5,
+      "day": 90,
+      "ch": "email",
+      "n": 5,
+      "label": "Nurture 5 · Research note",
+      "emailTemplate": "research-reengage",
+      "afterMin": 0,
+      "hint": "Last planned touch — repeat jobs cost less than a new customer."
+    }
+  ]
+}
