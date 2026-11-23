@@ -70,6 +70,9 @@ h1{margin:0;font-size:22px;letter-spacing:-.01em}
 .link:hover{text-decoration:underline}
 .banner{margin:14px 0 0;padding:10px 14px;border-radius:10px;background:var(--warn-bg);color:var(--warn-fg);font-size:14px}
 .nav{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 0;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.subnav{margin-top:8px}
+.home-h{margin:22px 0 0;font-size:16px;letter-spacing:-.01em}
+.cards.home-stats{grid-template-columns:repeat(6,1fr)}
 .nav button{border:0;background:transparent;color:var(--muted);padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;border-radius:8px}
 .nav button[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
 .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
@@ -149,9 +152,12 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 .prio.interested{background:var(--ok-bg);color:var(--ok-fg)}
 .prio.board{background:var(--email-bg);color:var(--email-fg)}
 .kit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:12px}
+@media (max-width:980px){
+  .cards.home-stats{grid-template-columns:repeat(3,1fr)}
+}
 @media (max-width:680px){
   .wrap{padding:14px 12px 40px}
-  .cards,.cards.four{grid-template-columns:1fr 1fr;gap:8px}
+  .cards,.cards.four,.cards.home-stats{grid-template-columns:1fr 1fr;gap:8px}
   .card{padding:10px 12px}
   .card .n{font-size:26px}
   .card .s{font-size:12px}
@@ -186,33 +192,43 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   <div class="banner" id="fileMode" hidden>Opened as a file — Pipeline Assistant needs the live local server. Run <code>zw</code> (or <code>node outreachDashboard.js</code>) and use the localhost page.</div>
   <div class="banner" id="deskHint" hidden></div>
 
-  <nav class="nav" role="tablist" aria-label="Dashboard sections">
-    <button type="button" role="tab" id="tab-morning" aria-selected="true" data-view="morning">Morning</button>
-    <button type="button" role="tab" id="tab-replies" aria-selected="false" data-view="replies">Replies</button>
-    <button type="button" role="tab" id="tab-kit" aria-selected="false" data-view="kit">Quick kit</button>
-    <button type="button" role="tab" id="tab-myleads" aria-selected="false" data-view="myleads">My leads</button>
+  <nav class="nav nav-main" role="tablist" aria-label="Dashboard sections">
+    <button type="button" role="tab" id="tab-home" aria-selected="true" data-view="home">Home</button>
+    <button type="button" role="tab" id="tab-dashboard" aria-selected="false" data-view="dashboard">Dashboard</button>
+    <button type="button" role="tab" id="tab-library" aria-selected="false" data-view="library">Library</button>
+  </nav>
+  <nav class="nav subnav" id="libraryNav" role="tablist" aria-label="Library" hidden>
     <button type="button" role="tab" id="tab-board" aria-selected="false" data-view="board">Board</button>
     <button type="button" role="tab" id="tab-content" aria-selected="false" data-view="content">Content</button>
-    <button type="button" role="tab" id="tab-today" aria-selected="false" data-view="today">Today</button>
     <button type="button" role="tab" id="tab-sends" aria-selected="false" data-view="sends">Sends</button>
     <button type="button" role="tab" id="tab-templates" aria-selected="false" data-view="templates">Templates</button>
-    <button type="button" role="tab" id="tab-analytics" aria-selected="false" data-view="analytics">Scoreboard</button>
     <button type="button" role="tab" id="tab-dnc" aria-selected="false" data-view="dnc">DNC</button>
+    <button type="button" role="tab" id="tab-kit" aria-selected="false" data-view="kit">Quick kit</button>
   </nav>
 
-  <section id="view-morning" role="tabpanel">
-    <p class="sub" style="margin:14px 0 0">What needs you today — held threads, interested replies waiting on a follow-up, and personal board touches that are due.</p>
-    <div class="cards" aria-label="Morning counts" style="grid-template-columns:repeat(3,1fr)">
+  <section id="view-home" role="tabpanel">
+    <p class="sub" style="margin:14px 0 0">Scoreboard, what needs you this morning, and replies — all on one page.</p>
+    <div class="cards four" aria-label="Sends scoreboard" id="anCards">
+      <div class="card"><div class="k">Today</div><div class="n" id="anDay">0</div><div class="s" id="anDayS"></div></div>
+      <div class="card"><div class="k">This week</div><div class="n" id="anWeek">0</div><div class="s" id="anWeekS"></div></div>
+      <div class="card"><div class="k">This month</div><div class="n" id="anMonth">0</div><div class="s" id="anMonthS"></div></div>
+      <div class="card"><div class="k">All time</div><div class="n" id="anAll">0</div><div class="s" id="anAllS"></div></div>
+    </div>
+    <p class="foot" id="anFoot">Week = last 7 days including today. Month = calendar month to date.</p>
+    <div class="cards home-stats" aria-label="Morning and today">
       <div class="card"><div class="k">Needs you</div><div class="n" id="mNeed">0</div><div class="s" id="mNeedS"></div></div>
       <div class="card"><div class="k">Holds</div><div class="n" id="mHold">0</div><div class="s">paused sends</div></div>
       <div class="card"><div class="k">Board due</div><div class="n" id="mBoard">0</div><div class="s">your hand-added leads</div></div>
+      <div class="card"><div class="k">Sent today</div><div class="n" id="tSends">0</div><div class="s" id="tSplit"></div></div>
+      <div class="card"><div class="k">Texts</div><div class="n" id="tTexts">0</div><div class="s">sent today</div></div>
+      <div class="card"><div class="k">Emails</div><div class="n" id="tEmails">0</div><div class="s">sent today</div></div>
     </div>
+    <h2 class="home-h">What needs you</h2>
     <div id="morningList" class="desk-list"></div>
-    <div class="empty" id="morningEmpty" hidden>Nothing queued — nice. Add a lead under My leads after a call, or wait for a reply.</div>
-  </section>
+    <div class="empty" id="morningEmpty" hidden>Nothing queued — nice. Add a lead on Dashboard after a call, or wait for a reply.</div>
 
-  <section id="view-replies" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Inbound replies this copy knows about. Interested ones that still need a follow-up also show on Morning.</p>
+    <h2 class="home-h">Replies</h2>
+    <p class="sub" style="margin:6px 0 0">Inbound replies this copy knows about. Interested ones that still need a follow-up also show above.</p>
     <div class="controls">
       <input id="rq" type="search" placeholder="Search replies …" aria-label="Search replies" style="flex:1;min-width:180px">
       <span class="sub" id="replyCount"></span>
@@ -224,17 +240,30 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
       </table>
       <div class="empty" id="replyEmpty" hidden></div>
     </div>
-    <p class="foot" id="replyFoot">Replies come from a Gmail feed (<code>node replyPoller.js --setup</code>). Holds still appear on Morning without that.</p>
+    <p class="foot" id="replyFoot">Replies come from a Gmail feed (<code>node replyPoller.js --setup</code>). Holds still show above if a send was paused.</p>
+
+    <h2 class="home-h">Sent today</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>When</th><th>Who</th><th>How</th><th>What</th></tr></thead>
+        <tbody id="todayRows"></tbody>
+      </table>
+      <div class="empty" id="todayEmpty" hidden>Nothing sent yet today.</div>
+    </div>
   </section>
 
   <section id="view-kit" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Post-call / post-demo messages. Add the pro on My leads, and the board times the next touch.</p>
+    <p class="sub" style="margin:14px 0 0">Post-call / post-demo messages. Add the pro on Dashboard, and the board times the next touch.</p>
     <div id="kitList" class="kit-grid"></div>
     <p class="foot">Luke can change this kit for everyone: edit <code>team-shared/day-desk.json</code>, then each machine runs <code>node teamSync.js --pull</code>.</p>
   </section>
 
-  <section id="view-myleads" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Your personal follow-up board — add someone after a call or demo. They show up here as soon as you add them.</p>
+  <section id="view-dashboard" role="tabpanel" hidden>
+    <p class="sub" style="margin:14px 0 0">Your leads. Search the list, or add someone after a call or demo.</p>
+    <div class="controls">
+      <input id="leadQ" type="search" placeholder="Search leads by name, tag, or next step …" aria-label="Search leads" style="flex:1;min-width:200px">
+      <span class="sub" id="leadCount"></span>
+    </div>
     <div id="addLeadBox" class="desk-card" style="margin-top:12px">
       <div class="desk-title">Add after a call</div>
       <h3>Put someone on your board</h3>
@@ -315,22 +344,6 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     <p class="foot">Refresh from the finder: <code>node syncContentLibrary.js</code> · snapshot in <code>content-library/</code></p>
   </section>
 
-  <section id="view-today" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">What already went out from this copy today.</p>
-    <div class="cards" aria-label="Today totals">
-      <div class="card"><div class="k">Today</div><div class="n" id="tSends">0</div><div class="s" id="tSplit"></div></div>
-      <div class="card"><div class="k">Texts</div><div class="n" id="tTexts">0</div><div class="s">sent today</div></div>
-      <div class="card"><div class="k">Emails</div><div class="n" id="tEmails">0</div><div class="s">sent today</div></div>
-    </div>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th>When</th><th>Who</th><th>How</th><th>What</th></tr></thead>
-        <tbody id="todayRows"></tbody>
-      </table>
-      <div class="empty" id="todayEmpty" hidden>Nothing sent yet today.</div>
-    </div>
-  </section>
-
   <section id="view-sends" role="tabpanel" hidden>
     <div class="cards" aria-label="Totals">
       <div class="card"><div class="k" id="kRun">This run</div><div class="n" id="nRun">0</div><div class="s" id="sRun"></div></div>
@@ -376,17 +389,6 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     <p class="tpl-note" id="tplNote"></p>
   </section>
 
-  <section id="view-analytics" role="tabpanel" hidden>
-    <p class="sub" style="margin:14px 0 0">Total sends from this copy — texts and emails that actually went out.</p>
-    <div class="cards four" aria-label="Sends scoreboard" id="anCards">
-      <div class="card"><div class="k">Today</div><div class="n" id="anDay">0</div><div class="s" id="anDayS"></div></div>
-      <div class="card"><div class="k">This week</div><div class="n" id="anWeek">0</div><div class="s" id="anWeekS"></div></div>
-      <div class="card"><div class="k">This month</div><div class="n" id="anMonth">0</div><div class="s" id="anMonthS"></div></div>
-      <div class="card"><div class="k">All time</div><div class="n" id="anAll">0</div><div class="s" id="anAllS"></div></div>
-    </div>
-    <p class="foot" id="anFoot">Week = last 7 days including today. Month = calendar month to date.</p>
-  </section>
-
   <section id="view-dnc" role="tabpanel" hidden>
     <p class="sub" style="margin:14px 0 0">Do-not-contact list for this copy. Accounts here are skipped on the next launch. You can also add someone from a send row.</p>
     <div id="dncFlash" class="flash" hidden></div>
@@ -421,14 +423,14 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   'use strict';
   var POLL_MS = 3000, MAX_DRAWN = 500, LS = 'outreach-dashboard:';
   var LIVE = location.protocol === 'http:' || location.protocol === 'https:';
-  var DESK_VIEWS = ['morning', 'replies', 'kit', 'myleads', 'board', 'content', 'today', 'sends', 'templates', 'analytics', 'dnc'];
+  var LIB_VIEWS = ['board', 'content', 'sends', 'templates', 'dnc', 'kit'];
   var state = {
-    view: 'morning', channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0,
+    view: 'home', channel: 'all', range: 'today', q: '', open: {}, fresh: {}, rows: [], d: null, gen: null, newest: 0,
     tk: 'text', tq: '', templates: null, editing: null,
     analytics: null,
     dnc: null, dncQ: '',
-    desk: null, rq: '',
-    board: null
+    desk: null, rq: '', leadQ: '',
+    board: null, lib: 'board'
   };
 
   function $(id) { return document.getElementById(id); }
@@ -472,7 +474,16 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 
   var c0 = lsGet('channel'); if (c0 === 'text' || c0 === 'email') state.channel = c0;
   var r0 = lsGet('range'); if (r0 === 'run' || r0 === 'today' || r0 === 'week' || r0 === 'all') state.range = r0;
-  var v0 = lsGet('view'); if (DESK_VIEWS.indexOf(v0) >= 0) state.view = v0;
+  function normalizeView(view) {
+    if (view === 'morning' || view === 'replies' || view === 'today' || view === 'analytics' || view === 'home') return 'home';
+    if (view === 'myleads' || view === 'dashboard') return 'dashboard';
+    if (LIB_VIEWS.indexOf(view) >= 0) return view;
+    return 'home';
+  }
+  var v0 = normalizeView(lsGet('view'));
+  state.view = v0;
+  if (LIB_VIEWS.indexOf(v0) >= 0) state.lib = v0;
+  var lib0 = lsGet('lib'); if (LIB_VIEWS.indexOf(lib0) >= 0) state.lib = lib0;
 
   var fTime = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' });
   var fTimeSec = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
@@ -509,20 +520,32 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
   function href(u) { return typeof u === 'string' && /^https?:[/][/]/i.test(u) ? u : null; }
 
   function setView(view) {
-    if (DESK_VIEWS.indexOf(view) < 0) view = 'morning';
+    if (view === 'library') view = state.lib || 'board';
+    view = normalizeView(view);
     state.view = view;
     lsSet('view', view);
-    DESK_VIEWS.forEach(function (v) {
+    var lib = LIB_VIEWS.indexOf(view) >= 0;
+    if (lib) { state.lib = view; lsSet('lib', view); }
+    var top = view === 'dashboard' ? 'dashboard' : (lib ? 'library' : 'home');
+    ['home', 'dashboard', 'library'].forEach(function (v) {
+      var tab = $('tab-' + v);
+      if (tab) tab.setAttribute('aria-selected', v === top ? 'true' : 'false');
+    });
+    var home = $('view-home'), dash = $('view-dashboard'), sub = $('libraryNav');
+    if (home) home.hidden = view !== 'home';
+    if (dash) dash.hidden = view !== 'dashboard';
+    if (sub) sub.hidden = !lib;
+    LIB_VIEWS.forEach(function (v) {
       var pane = $('view-' + v), tab = $('tab-' + v);
       if (pane) pane.hidden = v !== view;
       if (tab) tab.setAttribute('aria-selected', v === view ? 'true' : 'false');
     });
+    if (view === 'home') { loadDayDesk(); loadAnalytics(); }
+    if (view === 'dashboard' || view === 'kit') loadDayDesk();
     if (view === 'templates') loadTemplates();
-    if (view === 'analytics') loadAnalytics();
     if (view === 'dnc') loadDnc();
     if (view === 'board') loadBoard();
     if (view === 'content') loadContent();
-    if (view === 'morning' || view === 'replies' || view === 'kit' || view === 'myleads' || view === 'today') loadDayDesk();
   }
 
   function flashBoard(msg, ok) {
@@ -963,8 +986,16 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
     var add = j.addLead || {};
     if (add.hint) $('addLeadHint').textContent = add.hint;
     var list = j.myLeads || [];
+    var q = (state.leadQ || '').toLowerCase();
+    var shown = [];
+    for (var n = 0; n < list.length; n++) {
+      var row = list[n];
+      var hay = [row.name, row.accountId, row.next, row.state, row.hold, (row.tags || []).join(' ')].join(' ').toLowerCase();
+      if (!q || hay.indexOf(q) >= 0) shown.push(row);
+    }
+    if ($('leadCount')) $('leadCount').textContent = shown.length + (list.length ? ' of ' + list.length : '');
     var box = $('myLeadsList'); box.innerHTML = '';
-    for (var i = 0; i < list.length; i++) {
+    for (var i = 0; i < shown.length; i++) {
       (function (m) {
         var card = make('div', 'desk-card' + (m.dueNow ? ' due' : ''));
         card.appendChild(make('div', 'desk-title', m.dueNow ? 'Due now' : (m.state || 'On board')));
@@ -983,9 +1014,13 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
           card.appendChild(actions);
         }
         box.appendChild(card);
-      })(list[i]);
+      })(shown[i]);
     }
-    $('myLeadsEmpty').hidden = list.length > 0;
+    var em = $('myLeadsEmpty');
+    em.hidden = shown.length > 0;
+    em.textContent = list.length && !shown.length
+      ? 'No leads match that search.'
+      : 'No hand-added leads yet. After a good call, add them with the form above.';
   }
 
   function renderTodayDesk() {
@@ -1524,8 +1559,13 @@ pre.msg{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-mon
 
   // Wire UI
   (function wire() {
-    var tabs = document.querySelectorAll('.nav button'), i, timer = null;
+    var tabs = document.querySelectorAll('.nav-main button, #libraryNav button'), i, timer = null, leadTimer = null;
     for (i = 0; i < tabs.length; i++) tabs[i].addEventListener('click', function () { setView(this.getAttribute('data-view')); });
+    if ($('leadQ')) $('leadQ').addEventListener('input', function () {
+      var v = this.value;
+      clearTimeout(leadTimer);
+      leadTimer = setTimeout(function () { state.leadQ = v.trim(); renderMyLeads(); }, 120);
+    });
     var b = document.querySelectorAll('#view-sends .seg button');
     for (i = 0; i < b.length; i++) b[i].addEventListener('click', function () { state.channel = this.getAttribute('data-ch'); lsSet('channel', state.channel); syncControls(); if (state.d) renderTable(state.d); });
     $('range').addEventListener('change', function () { state.range = this.value; lsSet('range', state.range); if (state.d) renderTable(state.d); });
