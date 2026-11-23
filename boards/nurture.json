@@ -1,7 +1,7 @@
 {
   "id": "nurture",
   "name": "Nurture",
-  "description": "Longer follow-up for a demo that happened before this November. Starts at the first touch. Nothing here sends on its own.",
+  "description": "90-day follow-up for a demo before this November. One email every other week (day 0 through day 84). Starts at the first touch. Nothing here sends on its own.",
   "tag": "nurture",
   "stages": [
     {
@@ -10,10 +10,10 @@
       "day": 0,
       "ch": "email",
       "n": 1,
-      "label": "Nurture 1 · Open the thread",
+      "label": "Week 0 · Open the thread",
       "emailTemplate": "curiosity",
       "afterMin": 0,
-      "hint": "First touch back — campaigns, Pipeline, and booking alerts."
+      "hint": "Day 0 — campaigns, Pipeline, and booking alerts."
     },
     {
       "id": "nu2",
@@ -21,43 +21,65 @@
       "day": 14,
       "ch": "email",
       "n": 2,
-      "label": "Nurture 2 · Why now",
+      "label": "Week 2 · Why now",
       "emailTemplate": "why-now",
       "afterMin": 0,
-      "hint": "Two weeks later — the short version and the offer."
+      "hint": "Day 14 — the short version and the offer."
     },
     {
       "id": "nu3",
       "outreach": 3,
-      "day": 30,
+      "day": 28,
       "ch": "email",
       "n": 3,
-      "label": "Nurture 3 · Past customers",
-      "emailTemplate": "past-customers",
+      "label": "Week 4 · Who answers",
+      "emailTemplate": "csr-ai",
       "afterMin": 0,
-      "hint": "A month out — reviews and past-customer campaigns."
+      "hint": "Day 28 — CSR AI when the team is on a job."
     },
     {
       "id": "nu4",
       "outreach": 4,
-      "day": 60,
+      "day": 42,
       "ch": "email",
       "n": 4,
-      "label": "Nurture 4 · Autopilot",
-      "emailTemplate": "autopilot",
+      "label": "Week 6 · Past customers",
+      "emailTemplate": "past-customers",
       "afterMin": 0,
-      "hint": "Two months out — thank-you, review, referral, and the 12-month touch."
+      "hint": "Day 42 — reviews and past-customer campaigns."
     },
     {
       "id": "nu5",
       "outreach": 5,
-      "day": 90,
+      "day": 56,
       "ch": "email",
       "n": 5,
-      "label": "Nurture 5 · Research note",
+      "label": "Week 8 · Autopilot",
+      "emailTemplate": "autopilot",
+      "afterMin": 0,
+      "hint": "Day 56 — thank-you, review, referral, and the 12-month touch."
+    },
+    {
+      "id": "nu6",
+      "outreach": 6,
+      "day": 70,
+      "ch": "email",
+      "n": 6,
+      "label": "Week 10 · Research note",
       "emailTemplate": "research-reengage",
       "afterMin": 0,
-      "hint": "Last planned touch — repeat jobs cost less than a new customer."
+      "hint": "Day 70 — repeat jobs cost less than a new customer."
+    },
+    {
+      "id": "nu7",
+      "outreach": 7,
+      "day": 84,
+      "ch": "email",
+      "n": 7,
+      "label": "Week 12 · Check-in",
+      "emailTemplate": "nurture-checkin",
+      "afterMin": 0,
+      "hint": "Day 84 — last email inside the 90 days. A quiet close if the timing is still off."
     }
   ]
 }

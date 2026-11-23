@@ -320,6 +320,20 @@
       ""
     ]
   },
+  "nurture-checkin": {
+    "name": "Nurture: 90-day check-in",
+    "subject": "Still worth a look for {{business|your shop}}?",
+    "body": [
+      "{{greeting}}",
+      "",
+      "It's been a few months since we walked through Housecall Pro. I don't want to keep filling your inbox if the timing is off.",
+      "",
+      "If scheduling, getting paid, or follow-up after a job is still messy, the same setup is here: Pipeline so leads don't sit, and Campaigns so past customers hear from you without a spreadsheet.",
+      "",
+      "If you want another look, reply here or grab a time below. If not, no worries — I'll leave it.",
+      ""
+    ]
+  },
   "electrical-drip-3": {
     "name": "Electrical drip · reputation",
     "subject": "Reviews that keep electrical leads coming in",
