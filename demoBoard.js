@@ -22,9 +22,9 @@ const ZONE = 'America/New_York';
 const SF_ORIGIN = 'https://housecallpro.lightning.force.com';
 const ROSTER_FILE = path.join(__dirname, 'demo-attended.json');
 const SNAPSHOT_FILE = path.join(__dirname, 'demo-board.json');
-const NODE_W = 220;
-const NODE_GAP = 64;
-const NODE_H = 108;
+const NODE_W = 132;
+const NODE_H = 132;
+const NODE_GAP = 88;
 
 function localDay(date) {
   return tcpa.localDay(date instanceof Date ? date : new Date(date), ZONE);
@@ -247,24 +247,28 @@ function layoutBoard(pack, placements) {
   const edges = [];
   for (let i = 0; i < nodes.length - 1; i++) edges.push({ from: nodes[i].id, to: nodes[i + 1].id, label: '' });
   const width = 16 + nodes.length * (NODE_W + NODE_GAP) + 8;
-  const height = 24 + NODE_H + 28;
-  return { id: pack.id, name: pack.name, description: pack.description || '', width, height, nodes, edges };
+  const height = 24 + NODE_H + 36;
+  return { id: pack.id, name: pack.name, description: pack.description || '', width, height, nodeSize: NODE_W, nodes, edges };
 }
 
 function layoutRouter(counts, cutoff, people) {
   const list = people || [];
+  const step = NODE_W + NODE_GAP;
+  const nurtureY = 24;
+  const postY = nurtureY + NODE_H + 36;
+  const midY = Math.round((nurtureY + postY) / 2);
   const nodes = [
-    { id: 'attended', kind: 'start', label: 'Demo attended', day: null, ch: null, hint: 'Date the demo happened.', x: 16, y: 86, people: list.map(publicPerson), count: counts.total },
-    { id: 'split', kind: 'decision', label: 'Before November 1?', day: null, ch: null, hint: 'Cutoff ' + cutoff + ' (Eastern).', x: 16 + (NODE_W + NODE_GAP), y: 86, people: [], count: null },
-    { id: 'to-nurture', kind: 'board', label: 'Nurture', day: null, ch: 'email', hint: 'First nurture touch. Demos before this November.', x: 16 + 2 * (NODE_W + NODE_GAP), y: 16, people: list.filter((p) => p.status === 'nurture').map(publicPerson), count: counts.nurture },
-    { id: 'to-post', kind: 'board', label: 'Post-demo, caught up', day: null, ch: 'email', hint: 'Outreach through today counts as already sent.', x: 16 + 2 * (NODE_W + NODE_GAP), y: 156, people: list.filter((p) => p.boardId === 'post-demo').map(publicPerson), count: counts.postDemo },
+    { id: 'attended', kind: 'start', label: 'Demo attended', day: null, ch: null, hint: 'Date the demo happened.', x: 24, y: midY, people: list.map(publicPerson), count: counts.total },
+    { id: 'split', kind: 'decision', label: 'Before November 1?', day: null, ch: null, hint: 'Cutoff ' + cutoff + ' (Eastern).', x: 24 + step, y: midY, people: [], count: null },
+    { id: 'to-nurture', kind: 'board', label: 'Nurture', day: null, ch: 'email', hint: 'First nurture touch. Demos before this November.', x: 24 + 2 * step, y: nurtureY, people: list.filter((p) => p.status === 'nurture').map(publicPerson), count: counts.nurture },
+    { id: 'to-post', kind: 'board', label: 'Post-demo, caught up', day: null, ch: 'email', hint: 'Outreach through today counts as already sent.', x: 24 + 2 * step, y: postY, people: list.filter((p) => p.boardId === 'post-demo').map(publicPerson), count: counts.postDemo },
   ];
   const edges = [
     { from: 'attended', to: 'split', label: '' },
     { from: 'split', to: 'to-nurture', label: 'Before Nov' },
     { from: 'split', to: 'to-post', label: 'November on' },
   ];
-  return { width: 16 + 3 * (NODE_W + NODE_GAP) + 8, height: 156 + NODE_H + 24, nodes, edges };
+  return { width: 24 + 2 * step + NODE_W + 36, height: postY + NODE_H + 32, nodeSize: NODE_W, nodes, edges };
 }
 
 function publicPerson(p) {
